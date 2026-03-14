@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code — contains secrets (API tokens)
+.claude/mcp_settings.json
+
+# Claude Code local project data (not source code)
+.claude/
+
+# Skills lock (local tooling)
+skills-lock.json
