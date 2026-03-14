@@ -86,11 +86,27 @@ export function parseWebhookPayload(payload: WhatsAppWebhookPayload): WhatsAppMe
 }
 
 async function processMessages(messages: WhatsAppMessage[]): Promise<void> {
-  // Placeholder for state machine processing (VBS-20)
-  // Each message will be routed through the bot state machine
-  console.log(`[WA Webhook] Processing ${messages.length} message(s)`);
+  const { handleIncomingMessage } = await import("@/lib/bot/engine");
+
   for (const msg of messages) {
-    console.log(`[WA Webhook] From: ${msg.from}, type: ${msg.type}`);
+    let text = "";
+    if (msg.type === "text") {
+      text = msg.text.body;
+    } else if (msg.type === "interactive") {
+      if (msg.interactive.type === "button_reply" && msg.interactive.button_reply) {
+        text = msg.interactive.button_reply.id;
+      } else if (msg.interactive.type === "list_reply" && msg.interactive.list_reply) {
+        text = msg.interactive.list_reply.id;
+      }
+    }
+
+    if (!text) continue;
+
+    try {
+      await handleIncomingMessage(msg.from, text);
+    } catch (err) {
+      console.error(`[WA Webhook] Error processing message from ${msg.from}:`, err);
+    }
   }
 }
 
