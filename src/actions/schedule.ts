@@ -47,7 +47,7 @@ export async function saveSystemConfig(formData: FormData) {
   const supabase = await createClient();
   const client = supabase as AnyClient;
 
-  const keys = ["cbu", "cbu_alias", "mp_enabled", "auto_cancel_hours", "buffer_minutes", "business_name"];
+  const keys = ["cbu", "cbu_alias", "mp_enabled", "auto_cancel_hours", "buffer_minutes", "business_name", "admin_phone"];
 
   for (const key of keys) {
     const value = (formData.get(key) as string) ?? "";
