@@ -28,6 +28,17 @@ export default async function ConfiguracionPage() {
           />
         </div>
 
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Teléfono admin (WhatsApp)</label>
+          <input
+            name="admin_phone"
+            defaultValue={cfg["admin_phone"] ?? ""}
+            placeholder="ej: 59891374904"
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
+          />
+          <p className="mt-1 text-xs text-gray-500">Número completo con código de país, sin +. Recibe notificaciones del bot.</p>
+        </div>
+
         <h2 className="text-base font-semibold text-gray-800 border-b pb-2 pt-2">Pagos — Transferencia bancaria</h2>
 
         <div>
