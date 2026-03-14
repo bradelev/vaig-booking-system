@@ -21,7 +21,7 @@ export async function buildKnowledgeBase(): Promise<KnowledgeBase> {
   const [servicesResult, professionalsResult] = await Promise.all([
     supabase
       .from("services")
-      .select("id, name, description, duration_minutes, price, deposit_amount")
+      .select("id, name, description, duration_minutes, price, deposit_amount, default_professional_id")
       .eq("is_active", true)
       .order("name"),
     supabase
@@ -46,6 +46,7 @@ export async function buildKnowledgeBase(): Promise<KnowledgeBase> {
     duration_minutes: number;
     price: number;
     deposit_amount: number;
+    default_professional_id: string | null;
   };
 
   type ProfessionalRow = {
@@ -63,6 +64,7 @@ export async function buildKnowledgeBase(): Promise<KnowledgeBase> {
     durationMinutes: s.duration_minutes,
     price: Number(s.price),
     depositAmount: Number(s.deposit_amount),
+    defaultProfessionalId: s.default_professional_id,
   }));
 
   const professionals: ProfessionalInfo[] = (

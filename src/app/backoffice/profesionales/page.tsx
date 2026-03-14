@@ -84,6 +84,12 @@ export default async function ProfesionalesPage() {
                         >
                           Editar
                         </Link>
+                        <Link
+                          href={`/backoffice/profesionales/${p.id}/horario`}
+                          className="text-sm text-blue-600 hover:underline"
+                        >
+                          Horario
+                        </Link>
                         <form action={toggleAction}>
                           <button
                             type="submit"
