@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { fetchMPPayment } from "@/lib/payments";
 import { createClient } from "@/lib/supabase/server";
+import { notifyAdminPaymentConfirmed } from "@/lib/bot/notifications";
 
 function verifySignature(
   payload: string,
@@ -46,7 +47,8 @@ async function handlePaymentNotification(paymentId: string, _payload?: string): 
 
   if (payment.status === "approved") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any)
+    const db = supabase as any;
+    const { error } = await db
       .from("bookings")
       .update({
         status: "deposit_paid",
@@ -59,6 +61,25 @@ async function handlePaymentNotification(paymentId: string, _payload?: string): 
       console.error("[MP Webhook] Failed to update booking:", error);
     } else {
       console.log(`[MP Webhook] Booking ${bookingId} marked as deposit_paid`);
+
+      // VBS-50: Notify admin of confirmed payment
+      const { data: bookingData } = await db
+        .from("bookings")
+        .select("scheduled_at, clients(first_name, last_name, phone), services(name, deposit_amount)")
+        .eq("id", bookingId)
+        .single();
+
+      if (bookingData) {
+        void notifyAdminPaymentConfirmed({
+          bookingId,
+          clientName: `${bookingData.clients?.first_name ?? ""} ${bookingData.clients?.last_name ?? ""}`.trim(),
+          clientPhone: bookingData.clients?.phone ?? "",
+          serviceName: bookingData.services?.name ?? "",
+          scheduledAt: bookingData.scheduled_at,
+          amount: Number(bookingData.services?.deposit_amount ?? 0),
+          method: "mercadopago",
+        });
+      }
     }
   } else {
     console.log(`[MP Webhook] Payment ${paymentId} status: ${payment.status} (no action)`);

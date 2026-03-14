@@ -9,6 +9,9 @@ import { getNextAvailableSlots, checkSlotAvailability } from "@/lib/scheduler/db
 import { getConfigValue } from "@/lib/config";
 import { createMPPreference } from "@/lib/payments/mp";
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "./rate-limit";
+import { answerWithLLM } from "./llm";
+import { notifyAdminNewBooking } from "./notifications";
 import type { BotConversationState, BookingFlowContext, ServiceInfo, SlotOption } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,6 +55,16 @@ async function replyButtons(
 // ── State machine ─────────────────────────────────────────────────────────────
 
 export async function handleIncomingMessage(phone: string, messageText: string): Promise<void> {
+  // VBS-29: Rate limiting check
+  const rateLimit = await checkRateLimit(phone);
+  if (!rateLimit.allowed) {
+    await reply(
+      phone,
+      "Has enviado demasiados mensajes en poco tiempo. Por favor esperá unos minutos antes de intentar de nuevo. ⏳"
+    );
+    return;
+  }
+
   // Always allow cancel/menu override
   if (isCancelTrigger(messageText)) {
     await clearSession(phone);
@@ -155,10 +168,26 @@ async function handleMenuSelection(
 
 async function handleInfoFlow(phone: string, text: string): Promise<void> {
   const t = normalize(text);
-  if (t.includes("agendar") || t.includes("turno") || t.includes("si") || t.includes("sí")) {
+  if (t.includes("agendar") || t.includes("turno") || t === "si" || t === "sí") {
     return startBookingFlow(phone);
   }
-  // Back to menu
+  if (isMenuTrigger(text)) {
+    return handleMenu(phone);
+  }
+
+  // VBS-31: Use LLM to answer free-form questions
+  const llmEnabled = process.env.ANTHROPIC_API_KEY;
+  if (llmEnabled) {
+    try {
+      const answer = await answerWithLLM(text);
+      await reply(phone, answer + "\n\n_Escribí *agendar* para reservar un turno o *hola* para el menú._");
+      return;
+    } catch (err) {
+      console.error("[Bot] LLM error:", err);
+      // Fall through to menu
+    }
+  }
+
   await handleMenu(phone);
 }
 
@@ -556,6 +585,17 @@ async function handleBookingConfirm(
   }
 
   const bookingId = booking.id as string;
+
+  // VBS-50: Notify admin of new booking (fire-and-forget)
+  void notifyAdminNewBooking({
+    bookingId,
+    clientName: `${context.clientFirstName ?? ""} ${context.clientLastName ?? ""}`.trim(),
+    clientPhone: phone,
+    serviceName: service?.name ?? context.selectedServiceName ?? "Servicio",
+    professionalName: context.selectedProfessionalName ?? null,
+    scheduledAt: slot.start,
+    depositAmount: service?.depositAmount ?? 0,
+  });
 
   // Build payment message
   const autoHours = parseInt(await getConfigValue("auto_cancel_hours", "24"));
