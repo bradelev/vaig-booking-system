@@ -88,14 +88,32 @@ const navItems = [
   },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+export default function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
 
   return (
-    <aside className="w-60 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
-      <div className="px-6 py-5 border-b border-gray-200">
-        <span className="text-lg font-bold text-gray-900">VAIG</span>
-        <span className="ml-2 text-sm text-gray-500">Backoffice</span>
+    <aside className="w-full h-full bg-white border-r border-gray-200 flex flex-col">
+      <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
+        <div>
+          <span className="text-lg font-bold text-gray-900">VAIG</span>
+          <span className="ml-2 text-sm text-gray-500">Backoffice</span>
+        </div>
+        {onClose && (
+          <button
+            type="button"
+            className="md:hidden rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 transition-colors"
+            onClick={onClose}
+            aria-label="Cerrar menú"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map((item) => {
