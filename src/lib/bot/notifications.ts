@@ -10,6 +10,13 @@
 import { sendTextMessage } from "@/lib/whatsapp";
 import { getConfigValue } from "@/lib/config";
 
+function applyTemplate(template: string, vars: Record<string, string>): string {
+  return Object.entries(vars).reduce(
+    (msg, [k, v]) => msg.replace(new RegExp(`\\{${k}\\}`, "g"), v),
+    template
+  );
+}
+
 async function getAdminPhone(): Promise<string | null> {
   const phone = await getConfigValue("admin_phone", "");
   return phone.trim() || null;
@@ -68,12 +75,16 @@ export interface PackPurchasedNotificationParams {
 export async function notifyClientPackPurchased(
   params: PackPurchasedNotificationParams
 ): Promise<void> {
-  let msg = `🎉 *¡Pack adquirido!*\n\n`;
-  msg += `Hola ${params.clientName}! Confirmamos la compra de tu pack:\n\n`;
-  msg += `📦 *${params.packName}*\n`;
-  msg += `📋 Servicio: ${params.serviceName}\n`;
-  msg += `✅ ${params.sessionsTotal} sesiones disponibles\n\n`;
-  msg += `Podés agendar tus turnos cuando quieras escribiéndonos. ¡Gracias! 😊`;
+  const template = await getConfigValue(
+    "template_pack_purchased",
+    "🎉 *¡Pack adquirido!*\n\nHola {firstName}! Confirmamos la compra de tu pack:\n\n📦 *{packName}*\n📋 Servicio: {serviceName}\n✅ {sessionsTotal} sesiones disponibles\n\nPodés agendar tus turnos cuando quieras escribiéndonos. ¡Gracias! 😊"
+  );
+  const msg = applyTemplate(template, {
+    firstName: params.clientName,
+    packName: params.packName,
+    serviceName: params.serviceName,
+    sessionsTotal: String(params.sessionsTotal),
+  });
 
   try {
     await sendTextMessage({ to: params.clientPhone, body: msg });
@@ -113,11 +124,16 @@ export async function notifyClientCancellation(
 
   const reasonText = REASON_LABELS[params.reason] ?? "surgió un imprevisto";
 
-  let msg = `❌ *Reserva cancelada*\n\n`;
-  msg += `Hola ${params.clientName}, lamentablemente tu turno fue cancelado porque ${reasonText}.\n\n`;
-  msg += `📋 Servicio: ${params.serviceName}\n`;
-  msg += `📅 Turno: ${dateLabel}\n\n`;
-  msg += `Si querés, podés volver a reservar escribiéndonos cuando gustes. 😊`;
+  const template = await getConfigValue(
+    "template_cancel_client",
+    "❌ *Reserva cancelada*\n\nHola {firstName}, lamentablemente tu turno fue cancelado porque {reasonText}.\n\n📋 Servicio: {serviceName}\n📅 Turno: {dateLabel}\n\nSi querés, podés volver a reservar escribiéndonos cuando gustes. 😊"
+  );
+  const msg = applyTemplate(template, {
+    firstName: params.clientName,
+    reasonText,
+    serviceName: params.serviceName,
+    dateLabel,
+  });
 
   try {
     await sendTextMessage({ to: params.clientPhone, body: msg });
