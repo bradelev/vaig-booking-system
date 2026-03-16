@@ -16,6 +16,7 @@ export type BotConversationState =
   | "pack_service"
   | "pack_selection"
   | "waitlist_offer"
+  | "reschedule_confirm"
   | "cancelling";
 
 export interface ServiceInfo {
@@ -52,6 +53,8 @@ export interface BookingFlowContext {
   clientId?: string; // set if client already exists
   pendingBookingId?: string;
   requestedDateStr?: string; // user-requested date like "mañana" or "viernes"
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any; // allows ephemeral underscore fields (_slots, _requestedSlot, etc.)
 }
 
 export interface KnowledgeBase {
