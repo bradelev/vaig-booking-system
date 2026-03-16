@@ -1,56 +1,32 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { BOOKING_STATUS_COLORS, BOOKING_STATUS_LABELS } from "@/lib/utils";
+import { listCalendarEvents } from "@/lib/gcal";
+import type { CalendarEvent } from "@/lib/gcal";
+import CalendarShell from "@/components/backoffice/agenda/calendar-shell";
+import {
+  AgendaEvent,
+  CalendarView,
+  getMondayOfWeek,
+} from "@/components/backoffice/agenda/agenda-types";
 
 interface AgendaBooking {
   id: string;
   scheduled_at: string;
+  end_at?: string;
+  gcal_event_id?: string;
   status: string;
   clients: { first_name: string; last_name: string } | null;
   services: { name: string; duration_minutes: number } | null;
   professionals: { id: string; name: string } | null;
 }
 
-interface Professional {
-  id: string;
-  name: string;
-}
-
-const HOURS = Array.from({ length: 13 }, (_, i) => i + 8); // 08:00 to 20:00
-const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-
-function getMondayOfWeek(dateStr: string): Date {
-  const date = new Date(dateStr + "T00:00:00");
-  const day = date.getDay(); // 0=Sun, 1=Mon...
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(date);
-  monday.setDate(date.getDate() + diff);
-  return monday;
-}
-
-function formatWeekLabel(monday: Date): string {
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
-  const tz = "America/Argentina/Buenos_Aires";
-  return `${monday.toLocaleDateString("es-AR", { ...opts, timeZone: tz })} – ${sunday.toLocaleDateString("es-AR", { ...opts, timeZone: tz })}`;
-}
-
-function toDateStr(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ semana?: string; profesional?: string }>;
+  searchParams: Promise<{ semana?: string; profesional?: string; vista?: string }>;
 }) {
-  const { semana, profesional: filterProfId } = await searchParams;
+  const { semana, profesional: filterProfId, vista } = await searchParams;
 
-  const TZ = "America/Argentina/Buenos_Aires";
-
-  // Determine the week's Monday
-  const weekParam = semana ?? new Date().toLocaleDateString("sv-SE", { timeZone: TZ });
+  const weekParam = semana ?? new Date().toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" });
   const monday = getMondayOfWeek(weekParam);
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
@@ -60,11 +36,17 @@ export default async function AgendaPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
 
-  const [{ data: bookingsRaw }, { data: profsRaw }] = await Promise.all([
+  const [
+    { data: bookingsRaw },
+    { data: profsRaw },
+    { data: clientsRaw },
+    { data: servicesRaw },
+    gcalEvents,
+  ] = await Promise.all([
     client
       .from("bookings")
       .select(
-        `id, scheduled_at, status,
+        `id, scheduled_at, end_at, gcal_event_id, status,
          clients(first_name, last_name),
          services(name, duration_minutes),
          professionals(id, name)`
@@ -74,170 +56,69 @@ export default async function AgendaPage({
       .not("status", "in", '("cancelled","no_show")')
       .order("scheduled_at"),
     client.from("professionals").select("id, name").eq("is_active", true).order("name"),
+    client.from("clients").select("id, first_name, last_name").order("first_name"),
+    client.from("services").select("id, name, duration_minutes").eq("is_active", true).order("name"),
+    listCalendarEvents(monday.toISOString(), sunday.toISOString()),
   ]);
 
   const allBookings = (bookingsRaw ?? []) as AgendaBooking[];
-  const professionals = (profsRaw ?? []) as Professional[];
+  const professionals = (profsRaw ?? []) as { id: string; name: string }[];
+  const clients = (clientsRaw ?? []) as { id: string; first_name: string; last_name: string }[];
+  const services = (servicesRaw ?? []) as { id: string; name: string; duration_minutes: number }[];
+  const calEvents = gcalEvents as CalendarEvent[];
 
-  const bookings = filterProfId
-    ? allBookings.filter((b) => b.professionals?.id === filterProfId)
-    : allBookings;
+  // Build set of gcal_event_ids already linked to a local booking
+  const linkedGcalIds = new Set(
+    allBookings.map((b) => b.gcal_event_id).filter(Boolean)
+  );
 
-  // Navigation dates
-  const prevMonday = new Date(monday);
-  prevMonday.setDate(monday.getDate() - 7);
-  const nextMonday = new Date(monday);
-  nextMonday.setDate(monday.getDate() + 7);
+  // Convert bookings to AgendaEvent
+  const bookingEvents: AgendaEvent[] = allBookings.map((b) => ({
+    id: b.id,
+    scheduled_at: b.scheduled_at,
+    end_at: b.end_at ?? b.scheduled_at,
+    status: b.status,
+    source: "booking",
+    clientName: b.clients
+      ? `${b.clients.first_name} ${b.clients.last_name}`.trim()
+      : "—",
+    serviceName: b.services?.name ?? "—",
+    professionalName: b.professionals?.name,
+  }));
 
-  // Build week days array
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return d;
-  });
+  // Convert GCal events (skip ones already linked to a booking)
+  const gcalAgendaEvents: AgendaEvent[] = calEvents
+    .filter((e) => !linkedGcalIds.has(e.id))
+    .map((e) => ({
+      id: e.id,
+      scheduled_at: e.start,
+      end_at: e.end,
+      status: "confirmed",
+      source: "gcal",
+      clientName: e.summary,
+      serviceName: "",
+      gcalColorId: e.colorId,
+    }));
 
-  // Map bookings to day+hour
-  function getBookingsForCell(day: Date, hour: number): AgendaBooking[] {
-    const dateStr = toDateStr(day);
-    return bookings.filter((b) => {
-      const dt = new Date(b.scheduled_at);
-      const localDate = dt.toLocaleDateString("sv-SE", { timeZone: TZ });
-      const localHour = parseInt(
-        dt.toLocaleTimeString("es-AR", { timeZone: TZ, hour: "2-digit", hour12: false }),
-        10
-      );
-      return localDate === dateStr && localHour === hour;
-    });
-  }
+  // Merge and sort
+  const allEvents: AgendaEvent[] = [...bookingEvents, ...gcalAgendaEvents].sort(
+    (a, b) => a.scheduled_at.localeCompare(b.scheduled_at)
+  );
 
-  const prevSemana = toDateStr(prevMonday);
-  const nextSemana = toDateStr(nextMonday);
-
-  const profQuery = filterProfId ? `&profesional=${filterProfId}` : "";
+  const initialView: CalendarView =
+    vista === "day" || vista === "month" ? (vista as CalendarView) : "week";
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Agenda</h1>
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-          {/* Professional filter */}
-          <div className="flex items-center gap-1 flex-wrap">
-            <Link
-              href={`/backoffice/agenda?semana=${weekParam}`}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                !filterProfId ? "bg-gray-900 text-white" : "border border-gray-300 text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              Todos
-            </Link>
-            {professionals.map((p) => (
-              <Link
-                key={p.id}
-                href={`/backoffice/agenda?semana=${weekParam}&profesional=${p.id}`}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                  filterProfId === p.id
-                    ? "bg-gray-900 text-white"
-                    : "border border-gray-300 text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                {p.name}
-              </Link>
-            ))}
-          </div>
-          {/* Week navigation */}
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/backoffice/agenda?semana=${prevSemana}${profQuery}`}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
-            >
-              ←
-            </Link>
-            <span className="text-sm font-medium text-gray-700 min-w-[180px] text-center">
-              {formatWeekLabel(monday)}
-            </span>
-            <Link
-              href={`/backoffice/agenda?semana=${nextSemana}${profQuery}`}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
-            >
-              →
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-lg border bg-white shadow-sm overflow-x-auto">
-        <table className="min-w-full border-collapse">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="w-16 px-3 py-2 text-left text-xs font-medium text-gray-500 border-b border-r border-gray-200">
-                Hora
-              </th>
-              {weekDays.map((day, i) => {
-                const isToday =
-                  toDateStr(day) === new Date().toLocaleDateString("sv-SE", { timeZone: TZ });
-                return (
-                  <th
-                    key={i}
-                    className={`px-3 py-2 text-center text-xs font-medium border-b border-r border-gray-200 last:border-r-0 ${
-                      isToday ? "bg-gray-900 text-white" : "text-gray-500"
-                    }`}
-                  >
-                    <div>{DAYS[i]}</div>
-                    <div
-                      className={`text-base font-bold ${isToday ? "text-white" : "text-gray-900"}`}
-                    >
-                      {day.getDate()}
-                    </div>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {HOURS.map((hour) => (
-              <tr key={hour} className="border-b border-gray-100 last:border-b-0">
-                <td className="px-3 py-1 text-xs text-gray-400 border-r border-gray-200 align-top whitespace-nowrap">
-                  {String(hour).padStart(2, "0")}:00
-                </td>
-                {weekDays.map((day, i) => {
-                  const cellBookings = getBookingsForCell(day, hour);
-                  return (
-                    <td
-                      key={i}
-                      className="px-1 py-1 align-top border-r border-gray-100 last:border-r-0 min-w-[120px]"
-                    >
-                      <div className="space-y-1">
-                        {cellBookings.map((b) => (
-                          <Link
-                            key={b.id}
-                            href={`/backoffice/citas/${b.id}/editar`}
-                            className={`block rounded px-2 py-1 text-xs leading-tight hover:opacity-80 transition-opacity ${
-                              BOOKING_STATUS_COLORS[b.status] ?? "bg-gray-100 text-gray-700"
-                            }`}
-                          >
-                            <div className="font-medium truncate">
-                              {b.clients
-                                ? `${b.clients.first_name} ${b.clients.last_name}`.trim()
-                                : "—"}
-                            </div>
-                            <div className="truncate opacity-80">{b.services?.name ?? "—"}</div>
-                            {b.professionals && (
-                              <div className="truncate opacity-70">{b.professionals.name}</div>
-                            )}
-                            <div className="opacity-60">
-                              {BOOKING_STATUS_LABELS[b.status] ?? b.status}
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="flex flex-col h-[calc(100vh-80px)] gap-0">
+      <CalendarShell
+        events={allEvents}
+        professionals={professionals}
+        clients={clients}
+        services={services}
+        initialWeek={weekParam}
+        initialView={initialView}
+        initialProfId={filterProfId}
+      />
     </div>
   );
 }
