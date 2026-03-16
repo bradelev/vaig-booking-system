@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { notifyClientCancellation } from "@/lib/bot/notifications";
+import { notifyWaitlistForSlot } from "@/lib/bot/engine";
 
 export type CancellationReason =
   | "client_request"
@@ -24,7 +25,7 @@ export async function cancelBooking(
   const { data: booking, error: fetchError } = await client
     .from("bookings")
     .select(
-      `id, scheduled_at,
+      `id, scheduled_at, service_id, professional_id,
        clients(phone, first_name, last_name),
        services(name)`
     )
@@ -53,6 +54,15 @@ export async function cancelBooking(
       scheduledAt: booking.scheduled_at,
       reason,
     });
+  }
+
+  // VBS-72: Notify waitlist if slot freed
+  if (booking?.service_id && booking?.scheduled_at) {
+    void notifyWaitlistForSlot(
+      booking.service_id,
+      booking.professional_id ?? null,
+      booking.scheduled_at
+    );
   }
 
   revalidatePath("/backoffice/citas");
