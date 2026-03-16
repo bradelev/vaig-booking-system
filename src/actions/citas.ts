@@ -71,6 +71,30 @@ export async function updateBookingStatus(id: string, status: string) {
 
   if (error) throw new Error(error.message);
 
+  // VBS-68: If marking as realized, increment sessions_used on associated pack
+  if (status === "realized") {
+    const { data: booking } = await client
+      .from("bookings")
+      .select("client_package_id")
+      .eq("id", id)
+      .single();
+
+    if (booking?.client_package_id) {
+      const { data: cp } = await client
+        .from("client_packages")
+        .select("sessions_used")
+        .eq("id", booking.client_package_id)
+        .single();
+
+      if (cp) {
+        await client
+          .from("client_packages")
+          .update({ sessions_used: cp.sessions_used + 1 })
+          .eq("id", booking.client_package_id);
+      }
+    }
+  }
+
   revalidatePath("/backoffice/citas");
   revalidatePath("/backoffice");
 }
