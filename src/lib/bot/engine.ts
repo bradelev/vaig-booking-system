@@ -566,6 +566,47 @@ async function handleBookingConfirm(
   const kb = await buildKnowledgeBase();
   const service = kb.services.find((s) => s.id === context.selectedServiceId);
 
+  // VBS-67: Detect active pack for this client + service
+  let clientPackageId: string | null = null;
+  let packInfo: { name: string; sessionsUsed: number; sessionsTotal: number } | null = null;
+
+  if (clientId && context.selectedServiceId) {
+    const { data: clientPackages } = await dbClient
+      .from("client_packages")
+      .select(
+        `id, sessions_used, sessions_total, paid_at, expires_at,
+         service_packages(id, service_id, name)`
+      )
+      .eq("client_id", clientId);
+
+    const now = new Date();
+    const activePackage = (clientPackages ?? []).find((cp: {
+      id: string;
+      sessions_used: number;
+      sessions_total: number;
+      paid_at: string | null;
+      expires_at: string | null;
+      service_packages: { id: string; service_id: string; name: string } | null;
+    }) => {
+      const sp = cp.service_packages;
+      if (!sp) return false;
+      if (sp.service_id !== context.selectedServiceId) return false;
+      if (cp.sessions_used >= cp.sessions_total) return false;
+      if (!cp.paid_at) return false;
+      if (cp.expires_at && new Date(cp.expires_at) < now) return false;
+      return true;
+    });
+
+    if (activePackage) {
+      clientPackageId = activePackage.id as string;
+      packInfo = {
+        name: activePackage.service_packages!.name,
+        sessionsUsed: activePackage.sessions_used as number,
+        sessionsTotal: activePackage.sessions_total as number,
+      };
+    }
+  }
+
   // Create booking
   const { data: booking, error: bookingError } = await dbClient
     .from("bookings")
@@ -575,6 +616,7 @@ async function handleBookingConfirm(
       professional_id: context.selectedProfessionalId ?? null,
       scheduled_at: slot.start,
       status: "pending",
+      client_package_id: clientPackageId,
     })
     .select("id")
     .single();
@@ -596,6 +638,21 @@ async function handleBookingConfirm(
     scheduledAt: slot.start,
     depositAmount: service?.depositAmount ?? 0,
   });
+
+  // VBS-67: If client has an active pack, skip payment flow
+  if (packInfo && clientPackageId) {
+    const sessionNumber = packInfo.sessionsUsed + 1;
+    let packMsg = `🎉 *¡Reserva creada!*\n\n`;
+    packMsg += `📅 ${slot.label}\n`;
+    packMsg += `Servicio: ${service?.name ?? context.selectedServiceName}\n\n`;
+    packMsg += `📦 Sesión ${sessionNumber} de ${packInfo.sessionsTotal} de tu pack *${packInfo.name}*.\n`;
+    packMsg += `No necesitás abonar seña. ✅\n\n`;
+    packMsg += `¡Gracias! Escribí *hola* si necesitás algo más. 😊`;
+
+    await upsertSession(phone, "awaiting_payment", { pendingBookingId: bookingId });
+    await reply(phone, packMsg);
+    return;
+  }
 
   // Build payment message
   const autoHours = parseInt(await getConfigValue("auto_cancel_hours", "24"));
