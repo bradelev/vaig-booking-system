@@ -44,6 +44,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const businessName = await getConfigValue("business_name", "VAIG");
   const surveyUrl = await getConfigValue("survey_url", "");
+  const templateRaw = await getConfigValue(
+    "template_survey",
+    "⭐ *¿Cómo fue tu experiencia en {businessName}?*\n\nHola {firstName}! Gracias por tu visita de *{serviceName}*.\n\nNos importa mucho tu opinión. ¿Podés contarnos cómo estuvo tu experiencia?\n\n📝 Completá esta breve encuesta:\n{surveyUrl}\n\n¡Muchas gracias! 🙏"
+  );
   let sent = 0;
   let failed = 0;
 
@@ -54,16 +58,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const firstName = booking.clients?.first_name ?? "Cliente";
     const serviceName = booking.services?.name ?? "tu sesión";
 
-    let msg =
-      `⭐ *¿Cómo fue tu experiencia en ${businessName}?*\n\n` +
-      `Hola ${firstName}! Gracias por tu visita de *${serviceName}*.\n\n` +
-      `Nos importa mucho tu opinión. ¿Podés contarnos cómo estuvo tu experiencia?\n`;
+    let msg = templateRaw
+      .replace(/\{businessName\}/g, businessName)
+      .replace(/\{firstName\}/g, firstName)
+      .replace(/\{serviceName\}/g, serviceName)
+      .replace(/\{surveyUrl\}/g, surveyUrl);
 
-    if (surveyUrl) {
-      msg += `\n📝 Completá esta breve encuesta:\n${surveyUrl}\n`;
+    // If no survey URL configured, remove the survey link line
+    if (!surveyUrl) {
+      msg = msg.replace(/\n?📝 Completá esta breve encuesta:\n\n?/g, "").replace(/\n{3,}/g, "\n\n");
     }
-
-    msg += `\n¡Muchas gracias! 🙏`;
 
     try {
       await sendTextMessage({ to: phone, body: msg });
