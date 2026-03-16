@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { saveTemplates, TEMPLATE_KEYS, TEMPLATE_LABELS, TEMPLATE_PLACEHOLDERS } from "@/actions/templates";
+import { saveTemplates } from "@/actions/templates";
+import { TEMPLATE_KEYS, TEMPLATE_LABELS, TEMPLATE_PLACEHOLDERS } from "@/lib/templates";
 
 export default async function TemplatesPage() {
   const supabase = await createClient();
