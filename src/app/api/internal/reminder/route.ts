@@ -44,6 +44,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const businessName = await getConfigValue("business_name", "VAIG");
+  const templateRaw = await getConfigValue(
+    "template_reminder",
+    "⏰ *Recordatorio de turno — {businessName}*\n\nHola {firstName}! Te recordamos tu turno de *{serviceName}* para mañana:\n📅 {dateLabel}\n\n¿Confirmás tu asistencia? Respondé *confirmo* para confirmarlo o *cancelar* si necesitás cancelarlo. 😊"
+  );
   let sent = 0;
   let failed = 0;
 
@@ -65,11 +69,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       hour12: false,
     });
 
-    const msg =
-      `⏰ *Recordatorio de turno — ${businessName}*\n\n` +
-      `Hola ${firstName}! Te recordamos tu turno de *${serviceName}* para mañana:\n` +
-      `📅 ${dateLabel}\n\n` +
-      `¿Confirmás tu asistencia? Respondé *confirmo* para confirmarlo o *cancelar* si necesitás cancelarlo. 😊`;
+    const msg = templateRaw
+      .replace(/\{businessName\}/g, businessName)
+      .replace(/\{firstName\}/g, firstName)
+      .replace(/\{serviceName\}/g, serviceName)
+      .replace(/\{dateLabel\}/g, dateLabel);
 
     try {
       await sendTextMessage({ to: phone, body: msg });
