@@ -55,6 +55,16 @@ async function replyButtons(
 // ── State machine ─────────────────────────────────────────────────────────────
 
 export async function handleIncomingMessage(phone: string, messageText: string): Promise<void> {
+  // VBS-75: Blacklist check — silently ignore blocked clients
+  const supabaseCheck = await createClient();
+  const dbCheck = supabaseCheck as AnyClient;
+  const { data: clientCheck } = await dbCheck
+    .from("clients")
+    .select("is_blocked")
+    .eq("phone", phone)
+    .maybeSingle();
+  if (clientCheck?.is_blocked) return;
+
   // VBS-29: Rate limiting check
   const rateLimit = await checkRateLimit(phone);
   if (!rateLimit.allowed) {
