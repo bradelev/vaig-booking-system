@@ -39,6 +39,17 @@ function isCancelTrigger(text: string): boolean {
   return ["cancelar", "cancel", "salir"].some((kw) => t.includes(kw));
 }
 
+function isRescheduleTrigger(text: string): boolean {
+  const t = normalize(text);
+  return (
+    t.includes("cambiar turno") ||
+    t.includes("reagendar") ||
+    t.includes("reprogramar") ||
+    t.includes("cambiar cita") ||
+    t.includes("cambiar reserva")
+  );
+}
+
 function isMisTurnosTrigger(text: string): boolean {
   const t = normalize(text);
   return (
@@ -99,6 +110,11 @@ export async function handleIncomingMessage(phone: string, messageText: string):
     return handleMisTurnos(phone);
   }
 
+  // VBS-71: Global trigger for reschedule
+  if (isRescheduleTrigger(messageText)) {
+    return handleRescheduleStart(phone);
+  }
+
   const session = await getSession(phone);
   const state: BotConversationState = session?.state ?? "idle";
   const context: BookingFlowContext = session?.context ?? {};
@@ -146,6 +162,8 @@ async function route(
       return handlePackSelection(phone, text, context);
     case "waitlist_offer":
       return handleWaitlistConfirm(phone, text, context);
+    case "reschedule_confirm":
+      return handleRescheduleConfirm(phone, text, context);
     case "cancelling":
       return handleCancelConfirm(phone, text, context);
     default:
@@ -827,6 +845,160 @@ async function handleCancelConfirm(
 
   await clearSession(phone);
   await reply(phone, "✅ Tu reserva fue cancelada exitosamente.\nEscribí *hola* si necesitás algo más. 👋");
+}
+
+// ── Reschedule flow (VBS-71) ──────────────────────────────────────────────────
+
+async function handleRescheduleStart(phone: string): Promise<void> {
+  const supabase = await createClient();
+  const dbClient = supabase as AnyClient;
+
+  const { data: clientData } = await dbClient
+    .from("clients")
+    .select("id")
+    .eq("phone", phone)
+    .maybeSingle();
+
+  if (!clientData?.id) {
+    await reply(phone, "No encontramos un perfil asociado a tu número. Escribí *hola* para el menú. 😊");
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const { data: bookings } = await dbClient
+    .from("bookings")
+    .select("id, scheduled_at, services(name), service_id, professional_id")
+    .eq("client_id", clientData.id)
+    .in("status", ["pending", "deposit_paid", "confirmed"])
+    .gt("scheduled_at", now)
+    .order("scheduled_at", { ascending: true })
+    .limit(3);
+
+  if (!bookings || bookings.length === 0) {
+    await reply(phone, "No tenés turnos próximos para reagendar. Escribí *hola* para el menú. 😊");
+    return;
+  }
+
+  const TZ_OPT: Intl.DateTimeFormatOptions = {
+    timeZone: TZ, weekday: "long", day: "numeric", month: "long",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  };
+
+  let msg = "🔄 *Reagendar turno*\n\n¿Cuál turno querés cambiar?\n\n";
+  bookings.forEach((b: { id: string; scheduled_at: string; services?: { name: string } }, i: number) => {
+    const label = new Date(b.scheduled_at).toLocaleDateString("es-AR", TZ_OPT);
+    msg += `${i + 1}. ${b.services?.name ?? "Servicio"} — ${label}\n`;
+  });
+  msg += "\nRespondé con el número del turno.";
+
+  await upsertSession(phone, "reschedule_confirm", { _rescheduleBookings: bookings } as BookingFlowContext & { _rescheduleBookings: typeof bookings });
+  await reply(phone, msg);
+}
+
+async function handleRescheduleConfirm(
+  phone: string,
+  text: string,
+  context: BookingFlowContext & { _rescheduleBookings?: Array<{ id: string; scheduled_at: string; service_id: string; professional_id?: string | null; services?: { name: string } }>; _rescheduleBookingId?: string }
+): Promise<void> {
+  const t = normalize(text);
+
+  // Step 1: client picks which booking to reschedule
+  if (!context._rescheduleBookingId) {
+    const bookings = context._rescheduleBookings ?? [];
+    const idx = parseInt(t) - 1;
+    const booking = bookings[idx];
+    if (!booking) {
+      await reply(phone, "No reconocí esa opción. Respondé con el número del turno.");
+      return;
+    }
+
+    // Load next available slots for this service
+    const kb = await buildKnowledgeBase();
+    const service = kb.services.find((s) => s.id === booking.service_id);
+    if (!service) { await handleMenu(phone); return; }
+
+    const slots = await getNextAvailableSlots(
+      booking.professional_id ?? kb.professionals[0]?.id ?? "",
+      service.durationMinutes,
+      5,
+      parseInt(await getConfigValue("buffer_minutes", "0"))
+    );
+
+    if (slots.length === 0) {
+      await reply(phone, "No hay horarios disponibles en este momento. Intentá más tarde. 😔");
+      await clearSession(phone);
+      return;
+    }
+
+    let msg = `📅 *Nuevos horarios disponibles para ${service.name}:*\n\n`;
+    slots.forEach((s, i) => { msg += `${i + 1}. ${s.label}\n`; });
+    msg += "\nElegí un número o escribí *hola* para cancelar.";
+
+    await upsertSession(phone, "reschedule_confirm", {
+      ...context,
+      _rescheduleBookingId: booking.id,
+      _slots: slots,
+      selectedServiceId: booking.service_id,
+      selectedProfessionalId: booking.professional_id ?? null,
+    } as BookingFlowContext & { _rescheduleBookings: typeof bookings; _rescheduleBookingId: string; _slots: typeof slots });
+    await reply(phone, msg);
+    return;
+  }
+
+  // Step 2: client picks new slot
+  const slots = (context as BookingFlowContext & { _slots?: Array<{ start: string; end: string; label: string }> })._slots ?? [];
+  const idx = parseInt(t) - 1;
+  const newSlot = slots[idx];
+  if (!newSlot) {
+    await reply(phone, "No reconocí esa opción. Elegí un número de la lista.");
+    return;
+  }
+
+  const supabase = await createClient();
+  const dbClient = supabase as AnyClient;
+
+  // Cancel old booking, create new one linked via rescheduled_from
+  await dbClient
+    .from("bookings")
+    .update({ status: "cancelled", cancellation_reason: "client_request", cancelled_by: "client", cancellation_note: "Reagendado por el cliente" })
+    .eq("id", context._rescheduleBookingId);
+
+  const { data: oldBooking } = await dbClient
+    .from("bookings")
+    .select("client_id, service_id, professional_id, client_package_id")
+    .eq("id", context._rescheduleBookingId)
+    .single();
+
+  if (!oldBooking) {
+    await reply(phone, "Ocurrió un error. Por favor intentá nuevamente.");
+    await clearSession(phone);
+    return;
+  }
+
+  const { data: newBooking } = await dbClient
+    .from("bookings")
+    .insert({
+      client_id: oldBooking.client_id,
+      service_id: oldBooking.service_id,
+      professional_id: oldBooking.professional_id,
+      scheduled_at: newSlot.start,
+      status: "confirmed",
+      client_package_id: oldBooking.client_package_id ?? null,
+      rescheduled_from: context._rescheduleBookingId,
+    })
+    .select("id")
+    .single();
+
+  if (!newBooking) {
+    await reply(phone, "Ocurrió un error al crear el nuevo turno. Por favor intentá nuevamente.");
+    await clearSession(phone);
+    return;
+  }
+
+  await clearSession(phone);
+  await reply(phone,
+    `✅ *Turno reagendado correctamente*\n\n📅 ${newSlot.label}\n\n¡Te esperamos! Escribí *hola* si necesitás algo más. 😊`
+  );
 }
 
 // ── Waitlist flow (VBS-72) ────────────────────────────────────────────────────
