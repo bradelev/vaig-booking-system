@@ -52,21 +52,6 @@ export async function updateProfessional(id: string, formData: FormData) {
   redirect("/backoffice/profesionales");
 }
 
-export async function disconnectGoogleCalendar(id: string) {
-  const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
-
-  const { error } = await client
-    .from("professionals")
-    .update({ google_refresh_token: null, google_calendar_id: null })
-    .eq("id", id);
-
-  if (error) throw new Error(error.message);
-
-  revalidatePath(`/backoffice/profesionales/${id}/editar`);
-}
-
 export async function toggleProfessionalActive(id: string, isActive: boolean) {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

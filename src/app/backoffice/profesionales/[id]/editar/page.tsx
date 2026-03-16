@@ -1,33 +1,28 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { updateProfessional, toggleProfessionalActive, disconnectGoogleCalendar } from "@/actions/profesionales";
+import { updateProfessional, toggleProfessionalActive } from "@/actions/profesionales";
 
 interface Professional {
   id: string;
   name: string;
   specialties: string[] | null;
   is_active: boolean;
-  google_refresh_token: string | null;
-  google_calendar_id: string | null;
 }
 
 export default async function EditarProfesionalPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ gcal?: string }>;
 }) {
   const { id } = await params;
-  const { gcal } = await searchParams;
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
 
   const { data: raw } = await client
     .from("professionals")
-    .select("id, name, specialties, is_active, google_refresh_token, google_calendar_id")
+    .select("id, name, specialties, is_active")
     .eq("id", id)
     .single();
 
@@ -36,10 +31,6 @@ export default async function EditarProfesionalPage({
 
   const updateAction = updateProfessional.bind(null, id);
   const toggleAction = toggleProfessionalActive.bind(null, id, profesional.is_active);
-  const disconnectAction = disconnectGoogleCalendar.bind(null, id);
-
-  const isCalendarConnected = !!profesional.google_refresh_token;
-  const gcalConnectUrl = `/api/oauth/google?professionalId=${id}`;
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -49,17 +40,6 @@ export default async function EditarProfesionalPage({
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Editar profesional</h1>
       </div>
-
-      {gcal === "connected" && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-          Google Calendar conectado correctamente.
-        </div>
-      )}
-      {gcal === "error" && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          Error al conectar Google Calendar. Intentá de nuevo.
-        </div>
-      )}
 
       <form action={updateAction} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
         <div>
@@ -113,42 +93,6 @@ export default async function EditarProfesionalPage({
           </div>
         </div>
       </form>
-
-      {/* Google Calendar */}
-      <div className="rounded-lg border bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-base font-semibold text-gray-800">Google Calendar</h2>
-
-        {isCalendarConnected ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm text-green-700">
-              <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Calendario conectado. Los turnos confirmados se crean automáticamente.
-            </div>
-            <form action={disconnectAction}>
-              <button
-                type="submit"
-                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 transition-colors"
-              >
-                Desconectar Google Calendar
-              </button>
-            </form>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-gray-500">
-              Conectá el Google Calendar del profesional para crear eventos automáticamente al confirmar turnos.
-            </p>
-            <a
-              href={gcalConnectUrl}
-              className="inline-block rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Conectar Google Calendar
-            </a>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

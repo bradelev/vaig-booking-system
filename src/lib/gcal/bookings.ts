@@ -1,6 +1,6 @@
 /**
  * VBS-42/43 — Google Calendar hooks for bookings.
- * Called from server actions after booking status changes.
+ * Uses a shared Service Account calendar (GOOGLE_CALENDAR_ID).
  */
 import { createClient } from "@/lib/supabase/server";
 import { createCalendarEvent, deleteCalendarEvent } from "./index";
@@ -12,10 +12,12 @@ const TZ = "America/Argentina/Buenos_Aires";
 
 /**
  * Creates a Google Calendar event for a confirmed booking.
- * Looks up the professional's credentials and saves gcal_event_id back to the booking.
- * Silently skips if the professional has no calendar connected.
+ * Saves gcal_event_id back to the booking row.
+ * Silently skips if env vars are not configured.
  */
 export async function createBookingCalendarEvent(bookingId: string): Promise<void> {
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_CALENDAR_ID) return;
+
   const supabase = await createClient();
   const client = supabase as AnyClient;
 
@@ -25,7 +27,7 @@ export async function createBookingCalendarEvent(bookingId: string): Promise<voi
       `id, scheduled_at, gcal_event_id,
        clients(first_name, last_name, phone),
        services(name, duration_minutes),
-       professionals(id, name, google_refresh_token, google_calendar_id)`
+       professionals(name)`
     )
     .eq("id", bookingId)
     .single();
@@ -35,16 +37,13 @@ export async function createBookingCalendarEvent(bookingId: string): Promise<voi
     return;
   }
 
-  const professional = booking.professionals;
-  if (!professional?.google_refresh_token || !professional?.google_calendar_id) return;
-
   // Skip if event already created
   if (booking.gcal_event_id) return;
 
-  const clientName = [booking.clients?.first_name, booking.clients?.last_name]
-    .filter(Boolean)
-    .join(" ") || "Cliente";
+  const clientName =
+    [booking.clients?.first_name, booking.clients?.last_name].filter(Boolean).join(" ") || "Cliente";
   const serviceName = booking.services?.name ?? "Servicio";
+  const professionalName = booking.professionals?.name ?? null;
   const durationMs = (booking.services?.duration_minutes ?? 60) * 60_000;
 
   const startDate = new Date(booking.scheduled_at);
@@ -52,14 +51,12 @@ export async function createBookingCalendarEvent(bookingId: string): Promise<voi
 
   const description =
     `Teléfono: ${booking.clients?.phone ?? "-"}\n` +
-    `Profesional: ${professional.name}\n` +
+    (professionalName ? `Profesional: ${professionalName}\n` : "") +
     `Servicio: ${serviceName}\n` +
     `Duración: ${booking.services?.duration_minutes ?? 60} min`;
 
   try {
     const eventId = await createCalendarEvent({
-      calendarId: professional.google_calendar_id,
-      refreshToken: professional.google_refresh_token,
       summary: `VAIG: ${clientName} — ${serviceName}`,
       description,
       startIso: startDate.toISOString(),
@@ -76,36 +73,24 @@ export async function createBookingCalendarEvent(bookingId: string): Promise<voi
 
 /**
  * Deletes the Google Calendar event associated with a booking.
- * Silently skips if no event was created or professional has no calendar.
+ * Silently skips if no event was created or env vars not set.
  */
 export async function deleteBookingCalendarEvent(bookingId: string): Promise<void> {
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_CALENDAR_ID) return;
+
   const supabase = await createClient();
   const client = supabase as AnyClient;
 
   const { data: booking, error } = await client
     .from("bookings")
-    .select(
-      `id, gcal_event_id,
-       professionals(google_refresh_token, google_calendar_id)`
-    )
+    .select("id, gcal_event_id")
     .eq("id", bookingId)
     .single();
 
-  if (error || !booking) {
-    console.error(`[GCal] Failed to fetch booking ${bookingId}:`, error);
-    return;
-  }
-
-  const professional = booking.professionals;
-  if (!professional?.google_refresh_token || !professional?.google_calendar_id) return;
-  if (!booking.gcal_event_id) return;
+  if (error || !booking?.gcal_event_id) return;
 
   try {
-    await deleteCalendarEvent(
-      professional.google_calendar_id,
-      professional.google_refresh_token,
-      booking.gcal_event_id
-    );
+    await deleteCalendarEvent(booking.gcal_event_id);
     await client.from("bookings").update({ gcal_event_id: null }).eq("id", bookingId);
     console.log(`[GCal] Event deleted for booking ${bookingId}`);
   } catch (err) {
