@@ -7,18 +7,18 @@ const MON_WORKING_HOURS: WorkingHours[] = [
   { dayOfWeek: 1, startHour: 9, startMinute: 0, endHour: 12, endMinute: 0 },
 ];
 
-// Helper: create a Date on a specific Monday
+// Helper: create a Date on a specific Monday using local time
 function monday(h: number, m = 0): Date {
-  // 2026-03-16 is a Monday
-  const d = new Date("2026-03-16T00:00:00.000Z");
-  d.setUTCHours(h, m, 0, 0);
+  // 2026-03-16 is a Monday — use noon UTC to stay on Monday in any timezone
+  const d = new Date("2026-03-16T12:00:00.000Z");
+  d.setHours(h, m, 0, 0);
   return d;
 }
 
 describe("calculateAvailableSlots", () => {
   it("returns empty array when no working hours for that day", () => {
     // Sunday has no working hours
-    const sunday = new Date("2026-03-15T00:00:00.000Z");
+    const sunday = new Date("2026-03-15T12:00:00.000Z");
     const result = calculateAvailableSlots({
       date: sunday,
       durationMinutes: 60,
@@ -29,7 +29,7 @@ describe("calculateAvailableSlots", () => {
   });
 
   it("returns correct slots with no existing bookings", () => {
-    const date = new Date("2026-03-16T00:00:00.000Z");
+    const date = new Date("2026-03-16T12:00:00.000Z");
     // Working 9-12, 60 min slots => 9:00, 10:00, 11:00
     const result = calculateAvailableSlots({
       date,
@@ -41,7 +41,7 @@ describe("calculateAvailableSlots", () => {
   });
 
   it("excludes slots that overlap with existing booking", () => {
-    const date = new Date("2026-03-16T00:00:00.000Z");
+    const date = new Date("2026-03-16T12:00:00.000Z");
     const booking: TimeSlot = {
       start: monday(9),
       end: monday(10),
@@ -57,7 +57,7 @@ describe("calculateAvailableSlots", () => {
   });
 
   it("respects buffer minutes", () => {
-    const date = new Date("2026-03-16T00:00:00.000Z");
+    const date = new Date("2026-03-16T12:00:00.000Z");
     const booking: TimeSlot = {
       start: monday(9),
       end: monday(10),
