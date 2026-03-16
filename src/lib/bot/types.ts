@@ -57,9 +57,18 @@ export interface BookingFlowContext {
   [key: string]: any; // allows ephemeral underscore fields (_slots, _requestedSlot, etc.)
 }
 
+export interface PackageInfo {
+  packageName: string;
+  serviceName: string;
+  sessionCount: number;
+  price: number;
+  pricePerSession: number;
+}
+
 export interface KnowledgeBase {
   services: ServiceInfo[];
   professionals: ProfessionalInfo[];
+  packages: PackageInfo[];
   generatedAt: Date;
 }
 
