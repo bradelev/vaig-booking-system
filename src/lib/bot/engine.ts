@@ -111,6 +111,8 @@ async function route(
       return handleClientEmail(phone, text, context);
     case "booking_confirm":
       return handleBookingConfirm(phone, text, context);
+    case "awaiting_reminder_confirm":
+      return handleReminderConfirm(phone, text, context);
     case "cancelling":
       return handleCancelConfirm(phone, text, context);
     default:
@@ -773,6 +775,47 @@ async function handleCancelConfirm(
 
   await clearSession(phone);
   await reply(phone, "✅ Tu reserva fue cancelada exitosamente.\nEscribí *hola* si necesitás algo más. 👋");
+}
+
+// ── Reminder confirmation handler (VBS-46) ────────────────────────────────────
+
+async function handleReminderConfirm(
+  phone: string,
+  text: string,
+  context: BookingFlowContext
+): Promise<void> {
+  const t = normalize(text);
+
+  if (isCancelTrigger(text)) {
+    if (context.pendingBookingId) {
+      const supabase = await createClient();
+      const dbClient = supabase as AnyClient;
+      await dbClient
+        .from("bookings")
+        .update({ status: "cancelled", cancellation_reason: "client_request", cancelled_by: "client" })
+        .eq("id", context.pendingBookingId);
+    }
+    await clearSession(phone);
+    await reply(phone, "✅ Tu reserva fue cancelada.\nEscribí *hola* si necesitás algo más. 👋");
+    return;
+  }
+
+  if (!["si", "sí", "yes", "s", "confirmar", "confirmo"].includes(t)) {
+    await reply(phone, "Por favor respondé *confirmo* para confirmar tu turno o *cancelar* si necesitás cancelarlo.");
+    return;
+  }
+
+  if (context.pendingBookingId) {
+    const supabase = await createClient();
+    const dbClient = supabase as AnyClient;
+    await dbClient
+      .from("bookings")
+      .update({ client_confirmed_at: new Date().toISOString() })
+      .eq("id", context.pendingBookingId);
+  }
+
+  await clearSession(phone);
+  await reply(phone, "✅ ¡Turno confirmado! Te esperamos. 😊");
 }
 
 // ── Date parsing helpers ──────────────────────────────────────────────────────
