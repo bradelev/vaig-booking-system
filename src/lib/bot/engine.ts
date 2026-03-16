@@ -7,7 +7,7 @@ import { buildKnowledgeBase } from "./knowledge";
 import { getSession, upsertSession, clearSession } from "./session";
 import { getNextAvailableSlots, checkSlotAvailability } from "@/lib/scheduler/db";
 import { getConfigValue } from "@/lib/config";
-import { createMPPreference } from "@/lib/payments/mp";
+import { createMPPreference, createPackMPPreference } from "@/lib/payments/mp";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "./rate-limit";
 import { answerWithLLM } from "./llm";
@@ -113,6 +113,10 @@ async function route(
       return handleBookingConfirm(phone, text, context);
     case "awaiting_reminder_confirm":
       return handleReminderConfirm(phone, text, context);
+    case "pack_service":
+      return handlePackServiceSelection(phone, text, context);
+    case "pack_selection":
+      return handlePackSelection(phone, text, context);
     case "cancelling":
       return handleCancelConfirm(phone, text, context);
     default:
@@ -128,8 +132,8 @@ async function handleMenu(phone: string): Promise<void> {
     phone,
     "¡Hola! Soy el asistente de *VAIG*. ¿Qué necesitás?",
     [
-      { id: "info", title: "Servicios" },
       { id: "book", title: "Agendar turno" },
+      { id: "pack", title: "Comprar pack" },
       { id: "cancel", title: "Cancelar turno" },
     ]
   );
@@ -160,7 +164,11 @@ async function handleMenuSelection(
     return startBookingFlow(phone);
   }
 
-  if (t === "cancel" || t.includes("cancelar") || t === "3") {
+  if (t === "pack" || t.includes("pack") || t === "3") {
+    return startPackFlow(phone);
+  }
+
+  if (t === "cancel" || t.includes("cancelar") || t === "4") {
     return handleCancelFlow(phone);
   }
 
@@ -775,6 +783,160 @@ async function handleCancelConfirm(
 
   await clearSession(phone);
   await reply(phone, "✅ Tu reserva fue cancelada exitosamente.\nEscribí *hola* si necesitás algo más. 👋");
+}
+
+// ── Pack purchase flow (VBS-69) ───────────────────────────────────────────────
+
+async function startPackFlow(phone: string): Promise<void> {
+  const kb = await buildKnowledgeBase();
+
+  if (kb.services.length === 0) {
+    await reply(phone, "No hay servicios disponibles actualmente. Escribí *hola* para volver al menú.");
+    return;
+  }
+
+  await upsertSession(phone, "pack_service", {});
+
+  let msg = "📦 *Comprar pack de sesiones*\n\nElegí el servicio para ver los packs disponibles:\n\n";
+  kb.services.forEach((s, i) => {
+    msg += `${i + 1}. ${s.name}\n`;
+  });
+  msg += "\nRespondé con el número o el nombre del servicio.";
+  await reply(phone, msg);
+}
+
+async function handlePackServiceSelection(
+  phone: string,
+  text: string,
+  context: BookingFlowContext
+): Promise<void> {
+  const kb = await buildKnowledgeBase();
+  const t = normalize(text);
+
+  let service = kb.services.find((s, i) => String(i + 1) === t || normalize(s.name).includes(t));
+  if (!service) {
+    await reply(phone, "No reconocí ese servicio. Respondé con el número o nombre de la lista.");
+    return;
+  }
+
+  const supabase = await createClient();
+  const dbClient = supabase as AnyClient;
+  const mpEnabled = (await getConfigValue("mp_enabled", "false")) === "true";
+
+  if (!mpEnabled) {
+    await reply(phone, "La compra de packs por este medio no está disponible aún. Contactanos para más información.");
+    return;
+  }
+
+  // Fetch active packs for this service
+  const { data: packs } = await dbClient
+    .from("service_packages")
+    .select("id, name, session_count, price")
+    .eq("service_id", service.id)
+    .eq("is_active", true)
+    .order("session_count");
+
+  if (!packs || packs.length === 0) {
+    await reply(phone, `No hay packs disponibles para *${service.name}* en este momento. Escribí *hola* para volver al menú.`);
+    return;
+  }
+
+  await upsertSession(phone, "pack_selection", { selectedServiceId: service.id, selectedServiceName: service.name });
+
+  let msg = `📦 *Packs disponibles para ${service.name}:*\n\n`;
+  packs.forEach((p: { id: string; name: string; session_count: number; price: number }, i: number) => {
+    msg += `${i + 1}. *${p.name}* — ${p.session_count} sesiones — $${Number(p.price).toLocaleString("es-AR")}\n`;
+  });
+  msg += "\nRespondé con el número del pack que querés comprar o *hola* para cancelar.";
+  await reply(phone, msg);
+}
+
+async function handlePackSelection(
+  phone: string,
+  text: string,
+  context: BookingFlowContext
+): Promise<void> {
+  const supabase = await createClient();
+  const dbClient = supabase as AnyClient;
+
+  const { data: packs } = await dbClient
+    .from("service_packages")
+    .select("id, name, session_count, price")
+    .eq("service_id", context.selectedServiceId)
+    .eq("is_active", true)
+    .order("session_count");
+
+  if (!packs || packs.length === 0) {
+    await reply(phone, "No hay packs disponibles. Escribí *hola* para volver al menú.");
+    return;
+  }
+
+  const t = normalize(text);
+  const idx = parseInt(t) - 1;
+  const pack = packs[idx] ?? packs.find((p: { name: string }) => normalize(p.name).includes(t));
+
+  if (!pack) {
+    await reply(phone, "No reconocí esa opción. Respondé con el número del pack.");
+    return;
+  }
+
+  // Resolve or create client
+  let clientId: string | null = null;
+  const { data: clientData } = await dbClient
+    .from("clients")
+    .select("id")
+    .eq("phone", phone)
+    .maybeSingle();
+  clientId = clientData?.id ?? null;
+
+  if (!clientId) {
+    await reply(phone, "No encontramos tu perfil de cliente. Agendá una cita primero para registrarte. Escribí *hola* para el menú.");
+    return;
+  }
+
+  // Create unpaid client_package record
+  const { data: cp, error: cpError } = await dbClient
+    .from("client_packages")
+    .insert({
+      client_id: clientId,
+      package_id: pack.id,
+      sessions_total: pack.session_count,
+      sessions_used: 0,
+    })
+    .select("id")
+    .single();
+
+  if (cpError || !cp) {
+    console.error("[Bot] Failed to create client_package:", cpError);
+    await reply(phone, "Hubo un error al procesar tu solicitud. Por favor intentá más tarde.");
+    return;
+  }
+
+  try {
+    const pref = await createPackMPPreference({
+      clientPackageId: cp.id as string,
+      packName: pack.name,
+      price: Number(pack.price),
+      payerEmail: context.clientEmail,
+    });
+
+    await clearSession(phone);
+
+    let msg = `🛒 *Confirmá la compra de tu pack*\n\n`;
+    msg += `📦 *${pack.name}*\n`;
+    msg += `📋 Servicio: ${context.selectedServiceName}\n`;
+    msg += `✅ ${pack.session_count} sesiones\n`;
+    msg += `💰 Total: $${Number(pack.price).toLocaleString("es-AR")}\n\n`;
+    msg += `💳 *Pagar con Mercado Pago:*\n${pref.initPoint}\n\n`;
+    msg += `Una vez confirmado el pago, tus sesiones quedarán disponibles automáticamente. 😊`;
+
+    await reply(phone, msg);
+  } catch (err) {
+    console.error("[Bot] Pack MP preference error:", err);
+    // Rollback: delete the unpaid client_package
+    await dbClient.from("client_packages").delete().eq("id", cp.id);
+    await reply(phone, "Hubo un error al generar el link de pago. Por favor intentá más tarde.");
+  }
 }
 
 // ── Reminder confirmation handler (VBS-46) ────────────────────────────────────

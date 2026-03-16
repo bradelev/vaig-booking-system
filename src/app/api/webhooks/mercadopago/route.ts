@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { fetchMPPayment } from "@/lib/payments";
 import { createClient } from "@/lib/supabase/server";
-import { notifyAdminPaymentConfirmed } from "@/lib/bot/notifications";
+import { notifyAdminPaymentConfirmed, notifyClientPackPurchased } from "@/lib/bot/notifications";
 
 function verifySignature(
   payload: string,
@@ -36,13 +36,57 @@ function verifySignature(
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function handlePaymentNotification(paymentId: string, _payload?: string): Promise<void> {
   const payment = await fetchMPPayment(paymentId);
-  const bookingId = payment.external_reference;
+  const externalRef = payment.external_reference;
 
-  if (!bookingId) {
+  if (!externalRef) {
     console.warn("[MP Webhook] Payment without external_reference:", paymentId);
     return;
   }
 
+  // VBS-69: Pack purchase payments use "pack:{clientPackageId}" as external_reference
+  if (externalRef.startsWith("pack:")) {
+    if (payment.status !== "approved") {
+      console.log(`[MP Webhook] Pack payment ${paymentId} status: ${payment.status} (no action)`);
+      return;
+    }
+
+    const clientPackageId = externalRef.slice(5);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = (await createClient()) as any;
+
+    const { error } = await db
+      .from("client_packages")
+      .update({ paid_at: payment.date_approved ?? new Date().toISOString(), payment_reference: paymentId })
+      .eq("id", clientPackageId)
+      .is("paid_at", null);
+
+    if (error) {
+      console.error("[MP Webhook] Failed to activate client_package:", error);
+      return;
+    }
+
+    console.log(`[MP Webhook] Pack ${clientPackageId} activated`);
+
+    // Notify client
+    const { data: cpData } = await db
+      .from("client_packages")
+      .select("sessions_total, service_packages(name, services(name)), clients(phone, first_name, last_name)")
+      .eq("id", clientPackageId)
+      .single();
+
+    if (cpData?.clients?.phone) {
+      void notifyClientPackPurchased({
+        clientPhone: cpData.clients.phone,
+        clientName: `${cpData.clients.first_name ?? ""} ${cpData.clients.last_name ?? ""}`.trim(),
+        packName: cpData.service_packages?.name ?? "Pack",
+        serviceName: cpData.service_packages?.services?.name ?? "",
+        sessionsTotal: cpData.sessions_total,
+      });
+    }
+    return;
+  }
+
+  const bookingId = externalRef;
   const supabase = await createClient();
 
   if (payment.status === "approved") {
