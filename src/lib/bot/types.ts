@@ -13,6 +13,8 @@ export type BotConversationState =
   | "booking_confirm"
   | "awaiting_payment"
   | "awaiting_reminder_confirm"
+  | "pack_service"
+  | "pack_selection"
   | "cancelling";
 
 export interface ServiceInfo {

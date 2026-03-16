@@ -57,6 +57,31 @@ export async function notifyAdminNewBooking(params: NewBookingNotificationParams
   }
 }
 
+export interface PackPurchasedNotificationParams {
+  clientPhone: string;
+  clientName: string;
+  packName: string;
+  serviceName: string;
+  sessionsTotal: number;
+}
+
+export async function notifyClientPackPurchased(
+  params: PackPurchasedNotificationParams
+): Promise<void> {
+  let msg = `🎉 *¡Pack adquirido!*\n\n`;
+  msg += `Hola ${params.clientName}! Confirmamos la compra de tu pack:\n\n`;
+  msg += `📦 *${params.packName}*\n`;
+  msg += `📋 Servicio: ${params.serviceName}\n`;
+  msg += `✅ ${params.sessionsTotal} sesiones disponibles\n\n`;
+  msg += `Podés agendar tus turnos cuando quieras escribiéndonos. ¡Gracias! 😊`;
+
+  try {
+    await sendTextMessage({ to: params.clientPhone, body: msg });
+  } catch (err) {
+    console.error("[Notifications] Failed to send pack purchased notification:", err);
+  }
+}
+
 export interface ClientCancellationNotificationParams {
   clientPhone: string;
   clientName: string;
