@@ -57,6 +57,50 @@ export async function notifyAdminNewBooking(params: NewBookingNotificationParams
   }
 }
 
+export interface ClientCancellationNotificationParams {
+  clientPhone: string;
+  clientName: string;
+  serviceName: string;
+  scheduledAt: string;
+  reason: string;
+}
+
+const REASON_LABELS: Record<string, string> = {
+  client_request: "solicitaste la cancelación",
+  professional_unavailable: "la profesional no estará disponible",
+  scheduling_conflict: "hubo un conflicto de horario",
+  other: "surgió un imprevisto",
+};
+
+export async function notifyClientCancellation(
+  params: ClientCancellationNotificationParams
+): Promise<void> {
+  const date = new Date(params.scheduledAt);
+  const dateLabel = date.toLocaleDateString("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const reasonText = REASON_LABELS[params.reason] ?? "surgió un imprevisto";
+
+  let msg = `❌ *Reserva cancelada*\n\n`;
+  msg += `Hola ${params.clientName}, lamentablemente tu turno fue cancelado porque ${reasonText}.\n\n`;
+  msg += `📋 Servicio: ${params.serviceName}\n`;
+  msg += `📅 Turno: ${dateLabel}\n\n`;
+  msg += `Si querés, podés volver a reservar escribiéndonos cuando gustes. 😊`;
+
+  try {
+    await sendTextMessage({ to: params.clientPhone, body: msg });
+  } catch (err) {
+    console.error("[Notifications] Failed to send cancellation notification to client:", err);
+  }
+}
+
 export interface PaymentConfirmedNotificationParams {
   bookingId: string;
   clientName: string;
