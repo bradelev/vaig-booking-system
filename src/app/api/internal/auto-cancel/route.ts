@@ -36,7 +36,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const { error: updateError } = await client
     .from("bookings")
-    .update({ status: "cancelled" })
+    .update({
+      status: "cancelled",
+      cancellation_reason: "other",
+      cancellation_note: "Auto-cancelado por vencimiento de plazo de pago",
+      cancelled_by: "admin",
+    })
     .in("id", ids);
 
   if (updateError) {
