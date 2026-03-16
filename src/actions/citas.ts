@@ -153,6 +153,81 @@ export async function createBooking(formData: FormData) {
   redirect("/backoffice/citas");
 }
 
+export async function createBookingFromAgenda(data: {
+  client_id: string;
+  service_id: string;
+  professional_id: string | null;
+  scheduled_at: string;
+  notes: string | null;
+}): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+
+  const { data: inserted, error } = await client
+    .from("bookings")
+    .insert({
+      client_id: data.client_id,
+      service_id: data.service_id,
+      professional_id: data.professional_id,
+      scheduled_at: data.scheduled_at,
+      notes: data.notes,
+      status: "confirmed",
+    })
+    .select("id")
+    .single();
+
+  if (error) return { success: false, error: error.message };
+
+  if (inserted?.id) {
+    void createBookingCalendarEvent(inserted.id);
+  }
+
+  revalidatePath("/backoffice/agenda");
+  revalidatePath("/backoffice/citas");
+  return { success: true };
+}
+
+export async function moveBooking(
+  id: string,
+  newScheduledAt: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+
+  // Fetch booking + service duration
+  const { data: booking, error: fetchError } = await client
+    .from("bookings")
+    .select("id, gcal_event_id, services(duration_minutes)")
+    .eq("id", id)
+    .single();
+
+  if (fetchError || !booking) return { success: false, error: fetchError?.message ?? "Not found" };
+
+  const durationMinutes: number = booking.services?.duration_minutes ?? 60;
+  const newStart = new Date(newScheduledAt);
+  const newEnd = new Date(newStart.getTime() + durationMinutes * 60_000);
+
+  const { error } = await client
+    .from("bookings")
+    .update({
+      scheduled_at: newStart.toISOString(),
+      end_at: newEnd.toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) return { success: false, error: error.message };
+
+  // Recreate GCal event
+  if (booking.gcal_event_id) {
+    void deleteBookingCalendarEvent(id).then(() => createBookingCalendarEvent(id));
+  }
+
+  revalidatePath("/backoffice/agenda");
+  return { success: true };
+}
+
 export async function updateBooking(id: string, formData: FormData) {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
