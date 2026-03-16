@@ -17,8 +17,6 @@ const DAYS = [
   { value: 0, label: "Domingo" },
 ];
 
-export { DAYS };
-
 export async function upsertProfessionalSchedule(professionalId: string, formData: FormData) {
   const supabase = await createClient();
   const client = supabase as AnyClient;
