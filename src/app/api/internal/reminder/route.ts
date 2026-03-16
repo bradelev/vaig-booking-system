@@ -1,8 +1,8 @@
 /**
  * VBS-45 — 24h reminder cron
- * Runs hourly. Finds confirmed bookings scheduled 23–25h from now
- * that haven't received a reminder yet, sends a WA message, and
- * records confirmation_sent_at.
+ * Runs daily at 12:00 UTC (9am BsAs). Finds confirmed bookings scheduled
+ * in the next 0–36h that haven't received a reminder yet, sends a WA
+ * message, and records confirmation_sent_at.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -23,8 +23,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const client = supabase as any;
 
   const now = new Date();
-  const windowStart = new Date(now.getTime() + 23 * 3_600_000).toISOString();
-  const windowEnd = new Date(now.getTime() + 25 * 3_600_000).toISOString();
+  const windowStart = now.toISOString();
+  const windowEnd = new Date(now.getTime() + 36 * 3_600_000).toISOString();
 
   const { data: bookings, error } = await client
     .from("bookings")
