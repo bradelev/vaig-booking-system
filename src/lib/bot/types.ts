@@ -15,6 +15,7 @@ export type BotConversationState =
   | "awaiting_reminder_confirm"
   | "pack_service"
   | "pack_selection"
+  | "waitlist_offer"
   | "cancelling";
 
 export interface ServiceInfo {
