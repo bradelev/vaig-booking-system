@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { updateClient_ } from "@/actions/clientes";
+import { updateClient_, toggleClientBlocked } from "@/actions/clientes";
 
 interface Cliente {
   id: string;
@@ -11,6 +11,7 @@ interface Cliente {
   email: string | null;
   notes: string | null;
   source: string | null;
+  is_blocked: boolean;
 }
 
 const SOURCES = ["manual", "whatsapp", "instagram", "referido", "web"] as const;
@@ -27,7 +28,7 @@ export default async function EditarClientePage({
 
   const { data: raw } = await client
     .from("clients")
-    .select("id, first_name, last_name, phone, email, notes, source")
+    .select("id, first_name, last_name, phone, email, notes, source, is_blocked")
     .eq("id", id)
     .single();
 
@@ -127,6 +128,34 @@ export default async function EditarClientePage({
           </button>
         </div>
       </form>
+
+      {/* Block / unblock */}
+      <div className={`rounded-lg border p-4 ${cliente.is_blocked ? "border-red-200 bg-red-50" : "border-gray-200 bg-white"}`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-900">
+              {cliente.is_blocked ? "Cliente bloqueado" : "Bloquear cliente"}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {cliente.is_blocked
+                ? "Este cliente no puede usar el bot de WhatsApp."
+                : "El bot ignorará todos los mensajes de este cliente."}
+            </p>
+          </div>
+          <form action={toggleClientBlocked.bind(null, id, !cliente.is_blocked)}>
+            <button
+              type="submit"
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                cliente.is_blocked
+                  ? "bg-gray-900 text-white hover:bg-gray-700"
+                  : "border border-red-300 text-red-600 hover:bg-red-50"
+              }`}
+            >
+              {cliente.is_blocked ? "Desbloquear" : "Bloquear"}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

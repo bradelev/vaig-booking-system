@@ -24,6 +24,22 @@ export async function createClient_(formData: FormData) {
   redirect("/backoffice/clientes");
 }
 
+export async function toggleClientBlocked(id: string, blocked: boolean) {
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+
+  const { error } = await client
+    .from("clients")
+    .update({ is_blocked: blocked })
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/backoffice/clientes");
+  revalidatePath(`/backoffice/clientes/${id}/editar`);
+}
+
 export async function updateClient_(id: string, formData: FormData) {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
