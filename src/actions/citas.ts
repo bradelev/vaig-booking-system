@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { notifyClientCancellation } from "@/lib/bot/notifications";
 import { notifyWaitlistForSlot } from "@/lib/bot/engine";
+import { createBookingCalendarEvent, deleteBookingCalendarEvent } from "@/lib/gcal/bookings";
 
 export type CancellationReason =
   | "client_request"
@@ -56,6 +57,9 @@ export async function cancelBooking(
     });
   }
 
+  // VBS-43: Delete Google Calendar event if exists
+  void deleteBookingCalendarEvent(id);
+
   // VBS-72: Notify waitlist if slot freed
   if (booking?.service_id && booking?.scheduled_at) {
     void notifyWaitlistForSlot(
@@ -105,6 +109,16 @@ export async function updateBookingStatus(id: string, status: string) {
     }
   }
 
+  // VBS-42: Create Google Calendar event when booking is confirmed
+  if (status === "confirmed") {
+    void createBookingCalendarEvent(id);
+  }
+
+  // VBS-43: Delete Google Calendar event when booking is cancelled or no_show
+  if (status === "cancelled" || status === "no_show") {
+    void deleteBookingCalendarEvent(id);
+  }
+
   revalidatePath("/backoffice/citas");
   revalidatePath("/backoffice");
 }
@@ -114,16 +128,25 @@ export async function createBooking(formData: FormData) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
 
-  const { error } = await client.from("bookings").insert({
-    client_id: formData.get("client_id") as string,
-    service_id: formData.get("service_id") as string,
-    professional_id: (formData.get("professional_id") as string) || null,
-    scheduled_at: formData.get("scheduled_at") as string,
-    notes: (formData.get("notes") as string) || null,
-    status: "confirmed",
-  });
+  const { data: inserted, error } = await client
+    .from("bookings")
+    .insert({
+      client_id: formData.get("client_id") as string,
+      service_id: formData.get("service_id") as string,
+      professional_id: (formData.get("professional_id") as string) || null,
+      scheduled_at: formData.get("scheduled_at") as string,
+      notes: (formData.get("notes") as string) || null,
+      status: "confirmed",
+    })
+    .select("id")
+    .single();
 
   if (error) throw new Error(error.message);
+
+  // VBS-42: Create Google Calendar event (booking is confirmed from creation)
+  if (inserted?.id) {
+    void createBookingCalendarEvent(inserted.id);
+  }
 
   revalidatePath("/backoffice/citas");
   revalidatePath("/backoffice");
