@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { KnowledgeBase, ServiceInfo, ProfessionalInfo } from "./types";
+import type { KnowledgeBase, ServiceInfo, ProfessionalInfo, PackageInfo } from "./types";
 
 // Cache knowledge base in memory for a short TTL to avoid repeated DB queries
 let cache: { data: KnowledgeBase; expiresAt: number } | null = null;
@@ -18,7 +18,7 @@ export async function buildKnowledgeBase(): Promise<KnowledgeBase> {
 
   const supabase = await createClient();
 
-  const [servicesResult, professionalsResult] = await Promise.all([
+  const [servicesResult, professionalsResult, packagesResult] = await Promise.all([
     supabase
       .from("services")
       .select("id, name, description, duration_minutes, price, deposit_amount, default_professional_id")
@@ -27,6 +27,11 @@ export async function buildKnowledgeBase(): Promise<KnowledgeBase> {
     supabase
       .from("professionals")
       .select("id, name, specialties")
+      .eq("is_active", true)
+      .order("name"),
+    supabase
+      .from("service_packages")
+      .select("name, session_count, price, services(name)")
       .eq("is_active", true)
       .order("name"),
   ]);
@@ -55,6 +60,13 @@ export async function buildKnowledgeBase(): Promise<KnowledgeBase> {
     specialties: string[] | null;
   };
 
+  type PackageRow = {
+    name: string;
+    session_count: number;
+    price: number;
+    services: { name: string } | null;
+  };
+
   const services: ServiceInfo[] = (
     (servicesResult.data ?? []) as ServiceRow[]
   ).map((s) => ({
@@ -75,9 +87,22 @@ export async function buildKnowledgeBase(): Promise<KnowledgeBase> {
     specialties: p.specialties,
   }));
 
+  const packages: PackageInfo[] = (
+    (packagesResult.data ?? []) as PackageRow[]
+  )
+    .filter((pkg) => pkg.services !== null)
+    .map((pkg) => ({
+      packageName: pkg.name,
+      serviceName: pkg.services!.name,
+      sessionCount: pkg.session_count,
+      price: Number(pkg.price),
+      pricePerSession: Math.round(Number(pkg.price) / pkg.session_count),
+    }));
+
   const knowledge: KnowledgeBase = {
     services,
     professionals,
+    packages,
     generatedAt: new Date(),
   };
 
@@ -114,6 +139,19 @@ export function formatKnowledgeForLLM(knowledge: KnowledgeBase): string {
       lines.push(`   Especialidades: ${prof.specialties.join(", ")}`);
     }
     lines.push("");
+  }
+
+  if (knowledge.packages.length > 0) {
+    lines.push("=== Packs de sesiones ===", "");
+
+    for (const pkg of knowledge.packages) {
+      lines.push(`📦 ${pkg.packageName}`);
+      lines.push(`   Servicio: ${pkg.serviceName}`);
+      lines.push(`   Sesiones: ${pkg.sessionCount}`);
+      lines.push(`   Precio total: $${pkg.price.toLocaleString("es-AR")}`);
+      lines.push(`   Precio por sesión: $${pkg.pricePerSession.toLocaleString("es-AR")}`);
+      lines.push("");
+    }
   }
 
   return lines.join("\n");
