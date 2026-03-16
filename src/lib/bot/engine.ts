@@ -4,7 +4,7 @@
  */
 import { sendTextMessage, sendInteractiveButtons } from "@/lib/whatsapp";
 import { buildKnowledgeBase } from "./knowledge";
-import { getSession, upsertSession, clearSession } from "./session";
+import { getSession, upsertSession, clearSession, advanceFunnel } from "./session";
 import { getNextAvailableSlots, checkSlotAvailability } from "@/lib/scheduler/db";
 import { getConfigValue } from "@/lib/config";
 import { createMPPreference, createPackMPPreference } from "@/lib/payments/mp";
@@ -175,6 +175,7 @@ async function route(
 
 async function handleMenu(phone: string): Promise<void> {
   await upsertSession(phone, "menu", {});
+  void advanceFunnel(phone, "started");
   await replyButtons(
     phone,
     "¡Hola! Soy el asistente de *VAIG*. ¿Qué necesitás?",
@@ -573,6 +574,7 @@ async function handleClientEmail(
 
   const newContext = { ...context, clientEmail: email };
   await upsertSession(phone, "booking_confirm", newContext);
+  void advanceFunnel(phone, "data_completed");
   await showBookingConfirm(phone, newContext);
 }
 
