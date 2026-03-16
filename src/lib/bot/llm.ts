@@ -15,7 +15,8 @@ Respondé siempre en español, de forma amigable y concisa (máximo 3 párrafos 
 Usá la información del contexto. Si no sabés algo, decí que no tenés esa información
 y sugierí escribir "hola" para hablar con el equipo.
 NO inventes precios, horarios ni información que no esté en el contexto.
-NO hables de temas ajenos al negocio.`;
+NO hables de temas ajenos al negocio.
+Si el servicio que menciona el cliente tiene un pack disponible, sugerilo como opción de ahorro indicando el precio por sesión vs el precio individual.`;
 
 function getApiKey(): string {
   const key = process.env.ANTHROPIC_API_KEY;
