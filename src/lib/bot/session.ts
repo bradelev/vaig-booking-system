@@ -76,3 +76,35 @@ export async function clearSession(phone: string): Promise<void> {
 
   await client.from("conversation_sessions").delete().eq("phone", phone);
 }
+
+/**
+ * VBS-74 — Advance the funnel stage for a phone's current session.
+ * Stages (ordered): started → service_selected → data_completed → payment_done
+ * Only updates if the new stage is higher than the existing one.
+ */
+const FUNNEL_ORDER = ["started", "service_selected", "data_completed", "payment_done"];
+
+export async function advanceFunnel(
+  phone: string,
+  stage: "started" | "service_selected" | "data_completed" | "payment_done"
+): Promise<void> {
+  const supabase = await createClient();
+  const client = supabase as AnyClient;
+
+  const { data: existing } = await client
+    .from("conversation_sessions")
+    .select("id, funnel_stage")
+    .eq("phone", phone)
+    .maybeSingle();
+
+  if (!existing?.id) return;
+
+  const currentIdx = FUNNEL_ORDER.indexOf(existing.funnel_stage ?? "");
+  const newIdx = FUNNEL_ORDER.indexOf(stage);
+  if (newIdx > currentIdx) {
+    await client
+      .from("conversation_sessions")
+      .update({ funnel_stage: stage })
+      .eq("id", existing.id);
+  }
+}
