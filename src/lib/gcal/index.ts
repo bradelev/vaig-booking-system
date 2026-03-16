@@ -1,72 +1,40 @@
 /**
- * VBS-41/42/43/44 — Google Calendar API client.
- * OAuth per professional: each professional authorizes their own Google Calendar.
- * Tokens stored in professionals.google_refresh_token / google_calendar_id.
+ * Google Calendar API client — Service Account authentication.
+ * All events are created in a single shared calendar (GOOGLE_CALENDAR_ID).
+ * No OAuth per-professional flow required.
  */
 import { google } from "googleapis";
 import type { calendar_v3 } from "googleapis";
 
-function getOAuthClient() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/api/oauth/google/callback`;
+function getCalendarClient(): calendar_v3.Calendar {
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
-  if (!clientId || !clientSecret) {
-    throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set");
+  if (!email || !rawKey) {
+    throw new Error("GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY must be set");
   }
 
-  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-}
+  // Vercel stores the private key with literal \n — replace them
+  const privateKey = rawKey.replace(/\\n/g, "\n");
 
-/**
- * Returns the Google OAuth2 authorization URL for a professional.
- */
-export function getAuthUrl(professionalId: string): string {
-  const oauth2Client = getOAuthClient();
-  return oauth2Client.generateAuthUrl({
-    access_type: "offline",
-    prompt: "consent",
-    scope: ["https://www.googleapis.com/auth/calendar"],
-    state: professionalId,
+  const auth = new google.auth.GoogleAuth({
+    credentials: { client_email: email, private_key: privateKey },
+    scopes: ["https://www.googleapis.com/auth/calendar"],
   });
+
+  return google.calendar({ version: "v3", auth });
 }
 
-/**
- * Exchanges an authorization code for tokens.
- * Returns { refreshToken, calendarId } to be persisted.
- */
-export async function exchangeCodeForTokens(
-  code: string
-): Promise<{ refreshToken: string; accessToken: string }> {
-  const oauth2Client = getOAuthClient();
-  const { tokens } = await oauth2Client.getToken(code);
-
-  if (!tokens.refresh_token) {
-    throw new Error("No refresh_token received — user must re-authorize with prompt=consent");
-  }
-
-  return {
-    refreshToken: tokens.refresh_token,
-    accessToken: tokens.access_token ?? "",
-  };
-}
-
-/**
- * Builds an authenticated Google Calendar client for a professional
- * using their stored refresh token.
- */
-function getCalendarClient(refreshToken: string): calendar_v3.Calendar {
-  const oauth2Client = getOAuthClient();
-  oauth2Client.setCredentials({ refresh_token: refreshToken });
-  return google.calendar({ version: "v3", auth: oauth2Client });
+function getCalendarId(): string {
+  const id = process.env.GOOGLE_CALENDAR_ID;
+  if (!id) throw new Error("GOOGLE_CALENDAR_ID must be set");
+  return id;
 }
 
 export interface CalendarEventParams {
-  calendarId: string;       // e.g. "primary" or the professional's calendar ID
-  refreshToken: string;
-  summary: string;          // e.g. "VAIG: Juan Pérez — Masaje"
+  summary: string;
   description: string;
-  startIso: string;         // ISO 8601 string
+  startIso: string;
   endIso: string;
   timeZone?: string;
 }
@@ -75,15 +43,22 @@ export interface CalendarEventParams {
  * Creates a Google Calendar event and returns the event ID.
  */
 export async function createCalendarEvent(params: CalendarEventParams): Promise<string> {
-  const calendar = getCalendarClient(params.refreshToken);
+  const calendar = getCalendarClient();
+  const calendarId = getCalendarId();
 
   const event = await calendar.events.insert({
-    calendarId: params.calendarId,
+    calendarId,
     requestBody: {
       summary: params.summary,
       description: params.description,
-      start: { dateTime: params.startIso, timeZone: params.timeZone ?? "America/Argentina/Buenos_Aires" },
-      end: { dateTime: params.endIso, timeZone: params.timeZone ?? "America/Argentina/Buenos_Aires" },
+      start: {
+        dateTime: params.startIso,
+        timeZone: params.timeZone ?? "America/Argentina/Buenos_Aires",
+      },
+      end: {
+        dateTime: params.endIso,
+        timeZone: params.timeZone ?? "America/Argentina/Buenos_Aires",
+      },
     },
   });
 
@@ -94,19 +69,17 @@ export async function createCalendarEvent(params: CalendarEventParams): Promise<
 
 /**
  * Deletes a Google Calendar event by event ID.
- * Silently ignores 404 (event already deleted).
+ * Silently ignores 404/410 (event already deleted).
  */
-export async function deleteCalendarEvent(
-  calendarId: string,
-  refreshToken: string,
-  eventId: string
-): Promise<void> {
-  const calendar = getCalendarClient(refreshToken);
+export async function deleteCalendarEvent(eventId: string): Promise<void> {
+  const calendar = getCalendarClient();
+  const calendarId = getCalendarId();
+
   try {
     await calendar.events.delete({ calendarId, eventId });
   } catch (err: unknown) {
     const status = (err as { code?: number })?.code;
-    if (status === 404 || status === 410) return; // already gone
+    if (status === 404 || status === 410) return;
     throw err;
   }
 }
