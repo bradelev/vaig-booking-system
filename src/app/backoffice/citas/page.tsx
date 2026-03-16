@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import StatusBadge from "@/components/backoffice/status-badge";
 import { formatDate, formatTime } from "@/lib/utils";
 import { updateBookingStatus } from "@/actions/citas";
+import CancelModal from "@/components/backoffice/cancel-modal";
 
 interface Booking {
   id: string;
@@ -353,6 +354,9 @@ export default async function CitasPage({
                             </form>
                           );
                         })}
+                        {["pending", "deposit_paid", "confirmed"].includes(b.status) && (
+                          <CancelModal bookingId={b.id} />
+                        )}
                       </div>
                     </td>
                   </tr>

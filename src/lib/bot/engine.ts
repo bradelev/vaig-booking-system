@@ -711,7 +711,7 @@ async function handleCancelConfirm(
 
   await dbClient
     .from("bookings")
-    .update({ status: "cancelled" })
+    .update({ status: "cancelled", cancellation_reason: "client_request", cancelled_by: "client" })
     .eq("id", context.pendingBookingId);
 
   await clearSession(phone);
