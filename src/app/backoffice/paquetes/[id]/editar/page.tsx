@@ -1,25 +1,23 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { updateService, toggleServiceActive } from "@/actions/servicios";
+import { updatePackage, togglePackageActive } from "@/actions/paquetes";
+
+interface Paquete {
+  id: string;
+  name: string;
+  service_id: string;
+  session_count: number;
+  price: number;
+  is_active: boolean;
+}
 
 interface Servicio {
   id: string;
   name: string;
-  description: string | null;
-  duration_minutes: number;
-  price: number;
-  deposit_amount: number;
-  is_active: boolean;
-  default_professional_id: string | null;
 }
 
-interface Professional {
-  id: string;
-  name: string;
-}
-
-export default async function EditarServicioPage({
+export default async function EditarPaquetePage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -29,26 +27,26 @@ export default async function EditarServicioPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
 
-  const [{ data: raw }, { data: profsRaw }] = await Promise.all([
-    client.from("services").select("*").eq("id", id).single(),
-    client.from("professionals").select("id, name").eq("is_active", true).order("name"),
+  const [{ data: raw }, { data: serviciosRaw }] = await Promise.all([
+    client.from("service_packages").select("*").eq("id", id).single(),
+    client.from("services").select("id, name").eq("is_active", true).order("name"),
   ]);
 
-  const servicio = raw as Servicio | null;
-  if (!servicio) notFound();
+  const paquete = raw as Paquete | null;
+  if (!paquete) notFound();
 
-  const professionals = (profsRaw ?? []) as Professional[];
+  const servicios = (serviciosRaw ?? []) as Servicio[];
 
-  const updateAction = updateService.bind(null, id);
-  const toggleAction = toggleServiceActive.bind(null, id, servicio.is_active);
+  const updateAction = updatePackage.bind(null, id);
+  const toggleAction = togglePackageActive.bind(null, id, paquete.is_active);
 
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/backoffice/servicios" className="text-sm text-gray-500 hover:text-gray-800">
-          ← Servicios
+        <Link href="/backoffice/paquetes" className="text-sm text-gray-500 hover:text-gray-800">
+          ← Paquetes
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Editar servicio</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Editar paquete</h1>
       </div>
 
       <form action={updateAction} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
@@ -57,30 +55,37 @@ export default async function EditarServicioPage({
           <input
             name="name"
             required
-            defaultValue={servicio.name}
+            defaultValue={paquete.name}
             className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Descripción</label>
-          <textarea
-            name="description"
-            rows={3}
-            defaultValue={servicio.description ?? ""}
+          <label className="block text-sm font-medium text-gray-700">Servicio *</label>
+          <select
+            name="service_id"
+            required
+            defaultValue={paquete.service_id}
             className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
-          />
+          >
+            <option value="">Seleccionar servicio</option>
+            {servicios.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Duración (min) *</label>
+            <label className="block text-sm font-medium text-gray-700">Cantidad de sesiones *</label>
             <input
-              name="duration_minutes"
+              name="session_count"
               type="number"
               min={1}
               required
-              defaultValue={servicio.duration_minutes}
+              defaultValue={paquete.session_count}
               className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
             />
           </div>
@@ -92,39 +97,10 @@ export default async function EditarServicioPage({
               min={0}
               step="0.01"
               required
-              defaultValue={Number(servicio.price)}
+              defaultValue={Number(paquete.price)}
               className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
             />
           </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Monto de seña *</label>
-          <input
-            name="deposit_amount"
-            type="number"
-            min={0}
-            step="0.01"
-            required
-            defaultValue={Number(servicio.deposit_amount)}
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Profesional por defecto</label>
-          <select
-            name="default_professional_id"
-            defaultValue={servicio.default_professional_id ?? ""}
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
-          >
-            <option value="">Sin asignar</option>
-            {professionals.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
         </div>
 
         <div className="flex justify-between items-center pt-2">
@@ -132,18 +108,18 @@ export default async function EditarServicioPage({
             <button
               type="submit"
               className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                servicio.is_active
+                paquete.is_active
                   ? "border-red-300 text-red-700 hover:bg-red-50"
                   : "border-green-300 text-green-700 hover:bg-green-50"
               }`}
             >
-              {servicio.is_active ? "Desactivar servicio" : "Activar servicio"}
+              {paquete.is_active ? "Desactivar paquete" : "Activar paquete"}
             </button>
           </form>
 
           <div className="flex gap-3">
             <Link
-              href="/backoffice/servicios"
+              href="/backoffice/paquetes"
               className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Cancelar
