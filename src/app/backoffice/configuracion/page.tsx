@@ -79,7 +79,7 @@ export default async function ConfiguracionPage() {
 
         <h2 className="text-base font-semibold text-gray-800 border-b pb-2 pt-2">Reservas</h2>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Cancelación automática (horas)</label>
             <input
