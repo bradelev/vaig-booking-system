@@ -1,7 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { upsertProfessionalSchedule, DAYS } from "@/actions/schedule";
+import { upsertProfessionalSchedule } from "@/actions/schedule";
+
+const DAYS = [
+  { value: 1, label: "Lunes" },
+  { value: 2, label: "Martes" },
+  { value: 3, label: "Miércoles" },
+  { value: 4, label: "Jueves" },
+  { value: 5, label: "Viernes" },
+  { value: 6, label: "Sábado" },
+  { value: 0, label: "Domingo" },
+];
 
 interface ScheduleRow {
   day_of_week: number;
