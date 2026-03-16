@@ -1223,12 +1223,12 @@ async function startPackFlow(phone: string): Promise<void> {
 async function handlePackServiceSelection(
   phone: string,
   text: string,
-  context: BookingFlowContext
+  _context: BookingFlowContext
 ): Promise<void> {
   const kb = await buildKnowledgeBase();
   const t = normalize(text);
 
-  let service = kb.services.find((s, i) => String(i + 1) === t || normalize(s.name).includes(t));
+  const service = kb.services.find((s, i) => String(i + 1) === t || normalize(s.name).includes(t));
   if (!service) {
     await reply(phone, "No reconocí ese servicio. Respondé con el número o nombre de la lista.");
     return;
