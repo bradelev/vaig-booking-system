@@ -39,6 +39,18 @@ function isCancelTrigger(text: string): boolean {
   return ["cancelar", "cancel", "salir"].some((kw) => t.includes(kw));
 }
 
+function isMisTurnosTrigger(text: string): boolean {
+  const t = normalize(text);
+  return (
+    t.includes("mis turnos") ||
+    t.includes("mis citas") ||
+    t.includes("mis reservas") ||
+    t.includes("ver turno") ||
+    t.includes("ver reserva") ||
+    t === "historial"
+  );
+}
+
 async function reply(phone: string, text: string): Promise<void> {
   await sendTextMessage({ to: phone, body: text });
 }
@@ -80,6 +92,11 @@ export async function handleIncomingMessage(phone: string, messageText: string):
     await clearSession(phone);
     await reply(phone, "Operación cancelada. Escribí *hola* para volver al menú. 👋");
     return;
+  }
+
+  // VBS-73: Global trigger for "mis turnos"
+  if (isMisTurnosTrigger(messageText)) {
+    return handleMisTurnos(phone);
   }
 
   const session = await getSession(phone);
@@ -793,6 +810,105 @@ async function handleCancelConfirm(
 
   await clearSession(phone);
   await reply(phone, "✅ Tu reserva fue cancelada exitosamente.\nEscribí *hola* si necesitás algo más. 👋");
+}
+
+// ── Historial del cliente (VBS-73) ────────────────────────────────────────────
+
+async function handleMisTurnos(phone: string): Promise<void> {
+  const supabase = await createClient();
+  const dbClient = supabase as AnyClient;
+
+  const { data: clientData } = await dbClient
+    .from("clients")
+    .select("id, first_name")
+    .eq("phone", phone)
+    .maybeSingle();
+
+  if (!clientData) {
+    await reply(phone, "No encontramos un perfil asociado a tu número. Agendá tu primer turno escribiendo *hola*. 😊");
+    return;
+  }
+
+  const now = new Date().toISOString();
+
+  // Upcoming confirmed bookings (up to 3)
+  const { data: upcoming } = await dbClient
+    .from("bookings")
+    .select("scheduled_at, status, services(name)")
+    .eq("client_id", clientData.id)
+    .in("status", ["pending", "deposit_paid", "confirmed"])
+    .gt("scheduled_at", now)
+    .order("scheduled_at", { ascending: true })
+    .limit(3);
+
+  // Last realized bookings (up to 3)
+  const { data: past } = await dbClient
+    .from("bookings")
+    .select("scheduled_at, services(name)")
+    .eq("client_id", clientData.id)
+    .eq("status", "realized")
+    .lte("scheduled_at", now)
+    .order("scheduled_at", { ascending: false })
+    .limit(3);
+
+  // Active packs
+  const { data: activePacks } = await dbClient
+    .from("client_packages")
+    .select("sessions_used, sessions_total, service_packages(name)")
+    .eq("client_id", clientData.id)
+    .not("paid_at", "is", null);
+
+  const TZ_OPT: Intl.DateTimeFormatOptions = {
+    timeZone: TZ,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  };
+
+  let msg = `📋 *Tus turnos, ${clientData.first_name}*\n\n`;
+
+  if ((upcoming ?? []).length > 0) {
+    msg += `*Próximos turnos:*\n`;
+    for (const b of upcoming!) {
+      const dateLabel = new Date(b.scheduled_at).toLocaleDateString("es-AR", TZ_OPT);
+      const statusLabel: Record<string, string> = {
+        pending: "⏳ pendiente seña",
+        deposit_paid: "💰 seña pagada",
+        confirmed: "✅ confirmado",
+      };
+      msg += `• ${b.services?.name ?? "Servicio"} — ${dateLabel} (${statusLabel[b.status] ?? b.status})\n`;
+    }
+    msg += "\n";
+  } else {
+    msg += `No tenés turnos próximos.\n\n`;
+  }
+
+  if ((past ?? []).length > 0) {
+    msg += `*Últimas sesiones:*\n`;
+    for (const b of past!) {
+      const dateLabel = new Date(b.scheduled_at).toLocaleDateString("es-AR", TZ_OPT);
+      msg += `• ${b.services?.name ?? "Servicio"} — ${dateLabel}\n`;
+    }
+    msg += "\n";
+  }
+
+  const validPacks = (activePacks ?? []).filter(
+    (cp: { sessions_used: number; sessions_total: number }) => cp.sessions_used < cp.sessions_total
+  );
+  if (validPacks.length > 0) {
+    msg += `*Packs activos:*\n`;
+    for (const cp of validPacks) {
+      const remaining = cp.sessions_total - cp.sessions_used;
+      msg += `• ${cp.service_packages?.name ?? "Pack"} — ${remaining} sesión/es restante/s\n`;
+    }
+    msg += "\n";
+  }
+
+  msg += `Escribí *hola* para volver al menú. 😊`;
+  await reply(phone, msg);
 }
 
 // ── Pack purchase flow (VBS-69) ───────────────────────────────────────────────
