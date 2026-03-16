@@ -144,6 +144,8 @@ async function route(
       return handlePackServiceSelection(phone, text, context);
     case "pack_selection":
       return handlePackSelection(phone, text, context);
+    case "waitlist_offer":
+      return handleWaitlistConfirm(phone, text, context);
     case "cancelling":
       return handleCancelConfirm(phone, text, context);
     default:
@@ -421,10 +423,20 @@ async function proceedToSlotSelection(context: BookingFlowContext, phone: string
 async function handleSlotSelection(
   phone: string,
   text: string,
-  context: BookingFlowContext & { _slots?: SlotOption[] }
+  context: BookingFlowContext & { _slots?: SlotOption[]; _requestedSlot?: string }
 ): Promise<void> {
   const slots = context._slots ?? [];
   const t = normalize(text);
+
+  // VBS-72: Waitlist offer
+  if ((t === "espera" || t.includes("lista de espera") || t.includes("anotarme")) && context._requestedSlot) {
+    await upsertSession(phone, "waitlist_offer", {
+      ...context,
+      _requestedSlot: context._requestedSlot,
+    });
+    await reply(phone, `¿Querés anotarte en lista de espera para ese horario? Si se libera un lugar te avisamos automáticamente.\n\nRespondé *sí* para confirmar o *hola* para volver al menú.`);
+    return;
+  }
   let selectedSlot: SlotOption | undefined;
 
   const num = parseInt(t);
@@ -469,7 +481,12 @@ async function handleSlotSelection(
         alternatives.slice(0, 3).forEach((alt, i) => {
           msg += `*${i + 1}.* ${alt.label}\n`;
         });
-        const contextWithAlts = { ...context, _slots: alternatives } as BookingFlowContext & { _slots: SlotOption[] };
+        msg += `\nTambién podés respondé *espera* para anotarte en lista de espera para ese horario.`;
+        const contextWithAlts = {
+          ...context,
+          _slots: alternatives,
+          _requestedSlot: parsedDate.toISOString(),
+        } as BookingFlowContext & { _slots: SlotOption[]; _requestedSlot: string };
         await upsertSession(phone, "booking_slots", contextWithAlts);
         await reply(phone, msg);
         return;
@@ -810,6 +827,104 @@ async function handleCancelConfirm(
 
   await clearSession(phone);
   await reply(phone, "✅ Tu reserva fue cancelada exitosamente.\nEscribí *hola* si necesitás algo más. 👋");
+}
+
+// ── Waitlist flow (VBS-72) ────────────────────────────────────────────────────
+
+async function handleWaitlistConfirm(
+  phone: string,
+  text: string,
+  context: BookingFlowContext & { _requestedSlot?: string }
+): Promise<void> {
+  const t = normalize(text);
+
+  if (!["si", "sí", "yes", "s"].includes(t)) {
+    await clearSession(phone);
+    await reply(phone, "Entendido. Escribí *hola* cuando quieras ver otros horarios. 👋");
+    return;
+  }
+
+  const supabase = await createClient();
+  const dbClient = supabase as AnyClient;
+
+  const { data: clientData } = await dbClient
+    .from("clients")
+    .select("id")
+    .eq("phone", phone)
+    .maybeSingle();
+
+  if (!clientData?.id || !context.selectedServiceId || !context._requestedSlot) {
+    await clearSession(phone);
+    await reply(phone, "No pudimos registrarte en la lista de espera. Intentá nuevamente desde el menú.");
+    return;
+  }
+
+  await dbClient.from("waitlist").insert({
+    client_id: clientData.id,
+    service_id: context.selectedServiceId,
+    professional_id: context.selectedProfessionalId ?? null,
+    requested_slot: context._requestedSlot,
+  });
+
+  await clearSession(phone);
+  await reply(phone, "✅ Quedaste anotado/a en lista de espera. Si se libera ese horario te avisamos automáticamente. 😊\n\nEscribí *hola* si necesitás algo más.");
+}
+
+export async function notifyWaitlistForSlot(
+  serviceId: string,
+  professionalId: string | null,
+  slotStart: string
+): Promise<void> {
+  const supabase = await createClient();
+  const dbClient = supabase as AnyClient;
+
+  const slotDate = new Date(slotStart);
+  // Check waitlist for entries within 30 min of this slot
+  const slotEnd = new Date(slotDate.getTime() + 30 * 60_000).toISOString();
+
+  const { data: waiting } = await dbClient
+    .from("waitlist")
+    .select("id, clients(phone, first_name), service_id")
+    .eq("service_id", serviceId)
+    .is("notified_at", null)
+    .gte("requested_slot", slotDate.toISOString())
+    .lte("requested_slot", slotEnd)
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  if (!waiting || waiting.length === 0) return;
+
+  const entry = waiting[0];
+  const phone = entry.clients?.phone;
+  if (!phone) return;
+
+  const firstName = entry.clients?.first_name ?? "Cliente";
+  const dateLabel = slotDate.toLocaleDateString("es-AR", {
+    timeZone: TZ,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const msg =
+    `🎉 *¡Se liberó un turno!*\n\n` +
+    `Hola ${firstName}! Tenemos una disponibilidad para el horario que pediste:\n\n` +
+    `📅 ${dateLabel}\n\n` +
+    `Escribí *hola* para agendar antes de que se ocupe. ¡Rápido! ⚡`;
+
+  try {
+    const { sendTextMessage: send } = await import("@/lib/whatsapp");
+    await send({ to: phone, body: msg });
+    await dbClient
+      .from("waitlist")
+      .update({ notified_at: new Date().toISOString() })
+      .eq("id", entry.id);
+  } catch (err) {
+    console.error("[Waitlist] Failed to notify:", err);
+  }
 }
 
 // ── Historial del cliente (VBS-73) ────────────────────────────────────────────
