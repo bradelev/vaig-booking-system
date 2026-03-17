@@ -1,6 +1,6 @@
 // Types, constants, and helpers for the agenda calendar
 
-export type CalendarView = "week" | "day" | "month";
+export type CalendarView = "week" | "4days" | "day" | "month";
 
 export interface AgendaEvent {
   id: string;
@@ -12,6 +12,11 @@ export interface AgendaEvent {
   serviceName: string;
   professionalName?: string;
   gcalColorId?: string;
+  // Extended fields for popover
+  client_id?: string;
+  service_id?: string;
+  professional_id?: string;
+  notes?: string;
 }
 
 export interface Professional {
@@ -42,27 +47,37 @@ export const GCAL_COLOR_MAP: Record<string, { name: string; classes: string; sol
   "10": { name: "Joana",    classes: "border-green-400 bg-green-50 text-green-800",       solidBg: "bg-green-500" },
 };
 
-// Solid background colors by professional name
-export const PROFESSIONAL_COLORS: Record<string, { bg: string; border: string }> = {
-  "Angel":    { bg: "bg-gray-500",   border: "border-gray-700" },
-  "Cynthia":  { bg: "bg-orange-400", border: "border-orange-600" },
-  "Iara":     { bg: "bg-blue-500",   border: "border-blue-700" },
-  "Lucia":    { bg: "bg-sky-400",    border: "border-sky-600" },
-  "Stephany": { bg: "bg-purple-500", border: "border-purple-700" },
-  "Joana":    { bg: "bg-green-500",  border: "border-green-700" },
+// Pastel colors by professional name (GCal style: light bg, dark text, colored border)
+export const PROFESSIONAL_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  "Angel":    { bg: "bg-gray-200",    text: "text-gray-800",    border: "border-gray-400" },
+  "Cynthia":  { bg: "bg-orange-100",  text: "text-orange-800",  border: "border-orange-400" },
+  "Iara":     { bg: "bg-blue-100",    text: "text-blue-800",    border: "border-blue-400" },
+  "Lucia":    { bg: "bg-sky-100",     text: "text-sky-800",     border: "border-sky-400" },
+  "Stephany": { bg: "bg-purple-100",  text: "text-purple-800",  border: "border-purple-400" },
+  "Joana":    { bg: "bg-green-100",   text: "text-green-800",   border: "border-green-400" },
 };
 
-export const PROFESSIONAL_COLORS_FALLBACK = { bg: "bg-gray-400", border: "border-gray-600" };
+export const PROFESSIONAL_COLORS_FALLBACK = { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-400" };
 
-export const HOURS = Array.from({ length: 13 }, (_, i) => i + 8); // 08:00 to 20:00
+// Solid dot colors for the month view and filter chips
+export const PROFESSIONAL_DOT_COLORS: Record<string, string> = {
+  "Angel":    "bg-gray-500",
+  "Cynthia":  "bg-orange-400",
+  "Iara":     "bg-blue-500",
+  "Lucia":    "bg-sky-400",
+  "Stephany": "bg-purple-500",
+  "Joana":    "bg-green-500",
+};
+
+export const HOURS = Array.from({ length: 24 }, (_, i) => i); // 00:00 to 23:00
 export const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 export const TZ = "America/Argentina/Buenos_Aires";
 
 // Grid constants
-export const GRID_START_HOUR = 8;
-export const GRID_END_HOUR = 20;
+export const GRID_START_HOUR = 0;
+export const GRID_END_HOUR = 24;
 export const ROWS_PER_HOUR = 12; // 5-min granularity
-export const ROW_HEIGHT_PX = 6; // each 5-min slot = 6px → 1hr = 72px
+export const ROW_HEIGHT_PX = 10; // each 5-min slot = 10px → 1hr = 120px (GCal-like)
 
 /**
  * Returns { hour, minute } for an ISO timestamp in Argentina TZ
@@ -117,4 +132,23 @@ export function formatWeekLabel(monday: Date): string {
   sunday.setDate(monday.getDate() + 6);
   const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
   return `${monday.toLocaleDateString("es-AR", { ...opts, timeZone: TZ })} – ${sunday.toLocaleDateString("es-AR", { ...opts, timeZone: TZ })}`;
+}
+
+/**
+ * Returns formatted time range string like "10:30 – 11:15"
+ */
+export function formatTimeRange(scheduled_at: string, end_at: string): string {
+  const fmt = (iso: string) => {
+    const { hour, minute } = getLocalTime(iso);
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  };
+  return `${fmt(scheduled_at)} – ${fmt(end_at)}`;
+}
+
+/**
+ * Returns formatted start time like "10:30"
+ */
+export function formatStartTime(scheduled_at: string): string {
+  const { hour, minute } = getLocalTime(scheduled_at);
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
