@@ -23,6 +23,10 @@ const MIN_H_RANGE = 48;  // show full range
 const MIN_H_PROF = 38;   // show professional
 const MIN_H_SVC  = 60;   // show service
 
+// GCal-style partial overlap constants
+const OVERLAP_OFFSET_PCT = 15; // each column shifts 15% to the right
+const MIN_WIDTH_PCT = 60;      // no event narrower than 60% of the day column
+
 interface EventPillProps {
   event: AgendaEvent;
   topPx: number;
@@ -38,21 +42,17 @@ export default function EventPill({
   topPx,
   heightPx,
   col,
-  totalCols, // eslint-disable-line @typescript-eslint/no-unused-vars
   onDragStart,
   onEventClick,
 }: EventPillProps) {
-  // GCal-style partial overlap: each event keeps a generous width and shifts
-  // slightly to the right instead of dividing the column equally.
-  const OVERLAP_OFFSET_PCT = 15;
-  const MIN_WIDTH_PCT = 60;
+  const h = Math.max(heightPx - 2, 10);
   const leftPct  = col * OVERLAP_OFFSET_PCT;
   const widthPct = Math.max(MIN_WIDTH_PCT, 100 - leftPct);
 
   const style: React.CSSProperties = {
     position: "absolute",
     top:    topPx + 1,
-    height: Math.max(heightPx - 2, 10),
+    height: h,
     left:   `calc(${leftPct}% + 1px)`,
     width:  `calc(${widthPct}% - 2px)`,
     zIndex: 10 + col,
@@ -77,7 +77,6 @@ export default function EventPill({
 
   const dotColor = STATUS_DOT[event.status] ?? "bg-gray-400";
   const isDraggable = event.source === "booking";
-  const h = Math.max(heightPx - 2, 10);
 
   return (
     <button
