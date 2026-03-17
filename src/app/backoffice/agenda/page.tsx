@@ -14,6 +14,10 @@ interface AgendaBooking {
   end_at?: string;
   gcal_event_id?: string;
   status: string;
+  notes?: string;
+  client_id?: string;
+  service_id?: string;
+  professional_id?: string;
   clients: { first_name: string; last_name: string } | null;
   services: { name: string; duration_minutes: number } | null;
   professionals: { id: string; name: string } | null;
@@ -46,7 +50,7 @@ export default async function AgendaPage({
     client
       .from("bookings")
       .select(
-        `id, scheduled_at, end_at, gcal_event_id, status,
+        `id, scheduled_at, end_at, gcal_event_id, status, notes, client_id, service_id, professional_id,
          clients(first_name, last_name),
          services(name, duration_minutes),
          professionals(id, name)`
@@ -84,6 +88,10 @@ export default async function AgendaPage({
       : "—",
     serviceName: b.services?.name ?? "—",
     professionalName: b.professionals?.name,
+    client_id: b.client_id,
+    service_id: b.service_id,
+    professional_id: b.professional_id,
+    notes: b.notes,
   }));
 
   // Convert GCal events (skip ones already linked to a booking)
@@ -106,7 +114,7 @@ export default async function AgendaPage({
   );
 
   const initialView: CalendarView =
-    vista === "day" || vista === "month" ? (vista as CalendarView) : "week";
+    vista === "day" || vista === "month" || vista === "4days" ? (vista as CalendarView) : "week";
 
   return (
     <div className="flex flex-col h-[calc(100vh-80px)] gap-0">
