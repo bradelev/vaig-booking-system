@@ -1,124 +1,130 @@
 "use client";
 
-import Link from "next/link";
 import {
   AgendaEvent,
   PROFESSIONAL_COLORS,
   PROFESSIONAL_COLORS_FALLBACK,
   GCAL_COLOR_MAP,
-  getLocalTime,
-  timeToGridRow,
-  durationToRows,
-  GRID_START_HOUR,
-  GRID_END_HOUR,
-  ROWS_PER_HOUR,
+  formatStartTime,
+  formatTimeRange,
 } from "./agenda-types";
 
 const STATUS_DOT: Record<string, string> = {
-  confirmed: "bg-green-400",
-  pending:   "bg-yellow-400",
-  realized:  "bg-blue-400",
-  no_show:   "bg-red-400",
+  confirmed:    "bg-green-500",
+  pending:      "bg-yellow-500",
+  deposit_paid: "bg-blue-500",
+  realized:     "bg-gray-500",
+  no_show:      "bg-red-500",
 };
+
+// Minimum height in px to show extra lines
+const MIN_H_TIME = 20;   // show start time
+const MIN_H_RANGE = 48;  // show full range
+const MIN_H_PROF = 38;   // show professional
+const MIN_H_SVC  = 60;   // show service
+
+// GCal-style partial overlap constants
+const OVERLAP_OFFSET_PCT = 15; // each column shifts 15% to the right
+const MIN_WIDTH_PCT = 60;      // no event narrower than 60% of the day column
 
 interface EventPillProps {
   event: AgendaEvent;
-  dayCol: number; // 1-indexed column within the time grid (after the hour label col)
+  topPx: number;
+  heightPx: number;
+  col: number;        // 0-indexed overlap column
+  totalCols: number;  // total overlap columns for this event's cluster
   onDragStart?: (eventId: string) => void;
+  onEventClick: (event: AgendaEvent) => void;
 }
 
-export default function EventPill({ event, dayCol, onDragStart }: EventPillProps) {
-  const { hour: startHour, minute: startMinute } = getLocalTime(event.scheduled_at);
-  const { hour: endHour, minute: endMinute } = getLocalTime(event.end_at);
-
-  // Clamp to grid bounds
-  const clampedStartHour = Math.max(startHour, GRID_START_HOUR);
-  const clampedStartMinute = startHour < GRID_START_HOUR ? 0 : startMinute;
-  const clampedEndHour = Math.min(endHour, GRID_END_HOUR);
-  const clampedEndMinute = endHour > GRID_END_HOUR ? 0 : endMinute;
-
-  const startRow = timeToGridRow(clampedStartHour, clampedStartMinute);
-  const durationMinutes =
-    (clampedEndHour * 60 + clampedEndMinute) - (clampedStartHour * 60 + clampedStartMinute);
-  const rowSpan = durationToRows(durationMinutes > 0 ? durationMinutes : 30);
-  const endRow = startRow + rowSpan;
-
-  // Out of grid entirely
-  if (startRow > (GRID_END_HOUR - GRID_START_HOUR) * ROWS_PER_HOUR || endRow < 1) return null;
-
-  // Color
-  let bgClass: string;
-  let borderClass: string;
-
-  if (event.source === "booking" && event.professionalName) {
-    const colors = PROFESSIONAL_COLORS[event.professionalName] ?? PROFESSIONAL_COLORS_FALLBACK;
-    bgClass = colors.bg;
-    borderClass = colors.border;
-  } else if (event.source === "gcal" && event.gcalColorId && GCAL_COLOR_MAP[event.gcalColorId]) {
-    bgClass = GCAL_COLOR_MAP[event.gcalColorId].solidBg;
-    borderClass = "border-black/20";
-  } else {
-    bgClass = PROFESSIONAL_COLORS_FALLBACK.bg;
-    borderClass = PROFESSIONAL_COLORS_FALLBACK.border;
-  }
-
-  const dotColor = STATUS_DOT[event.status] ?? "bg-gray-300";
-  const isDraggable = event.source === "booking";
-
-  const content = (
-    <div className="h-full overflow-hidden px-1.5 py-0.5">
-      <div className="flex items-center gap-1 min-w-0">
-        {event.source === "booking" && (
-          <span className={`shrink-0 h-1.5 w-1.5 rounded-full ${dotColor}`} />
-        )}
-        <span className="truncate text-[11px] font-semibold leading-tight text-white">
-          {event.clientName}
-        </span>
-      </div>
-      {rowSpan >= 4 && event.professionalName && (
-        <div className="truncate text-[10px] leading-tight text-white/80">
-          {event.professionalName}
-        </div>
-      )}
-      {rowSpan >= 6 && event.serviceName && (
-        <div className="truncate text-[10px] leading-tight text-white/70">
-          {event.serviceName}
-        </div>
-      )}
-    </div>
-  );
+export default function EventPill({
+  event,
+  topPx,
+  heightPx,
+  col,
+  onDragStart,
+  onEventClick,
+}: EventPillProps) {
+  const h = Math.max(heightPx - 2, 10);
+  const leftPct  = col * OVERLAP_OFFSET_PCT;
+  const widthPct = Math.max(MIN_WIDTH_PCT, 100 - leftPct);
 
   const style: React.CSSProperties = {
-    gridRow: `${startRow} / ${endRow}`,
-    gridColumn: `${dayCol + 1}`, // +1 because col 1 is the hour label
-    zIndex: 10,
-    minHeight: "12px",
+    position: "absolute",
+    top:    topPx + 1,
+    height: h,
+    left:   `calc(${leftPct}% + 1px)`,
+    width:  `calc(${widthPct}% - 2px)`,
+    zIndex: 10 + col,
+    minHeight: 12,
+    boxShadow: col > 0 ? "-2px 0 4px rgba(0,0,0,0.15)" : undefined,
   };
 
-  const className = `relative rounded-md border-l-[3px] ${bgClass} ${borderClass} overflow-hidden cursor-pointer hover:brightness-110 transition-all select-none`;
+  // Determine color classes
+  let containerClass: string;
+  let textMutedClass: string;
 
-  if (event.source === "booking") {
-    return (
-      <Link
-        href={`/backoffice/citas/${event.id}/editar`}
-        style={style}
-        className={className}
-        draggable={isDraggable}
-        onDragStart={isDraggable && onDragStart ? (e) => {
-          e.dataTransfer.setData("text/plain", event.id);
-          e.dataTransfer.effectAllowed = "move";
-          onDragStart(event.id);
-        } : undefined}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {content}
-      </Link>
-    );
+  if (event.source === "gcal" && event.gcalColorId && GCAL_COLOR_MAP[event.gcalColorId]) {
+    containerClass = `rounded-md border-l-[3px] ${GCAL_COLOR_MAP[event.gcalColorId].classes} overflow-hidden cursor-pointer hover:opacity-80 transition-all select-none text-left`;
+    textMutedClass = "opacity-70";
+  } else {
+    const colors = event.source === "booking" && event.professionalName
+      ? (PROFESSIONAL_COLORS[event.professionalName] ?? PROFESSIONAL_COLORS_FALLBACK)
+      : PROFESSIONAL_COLORS_FALLBACK;
+    containerClass = `rounded-md border-l-[3px] ${colors.bg} ${colors.text} ${colors.border} overflow-hidden cursor-pointer hover:opacity-80 transition-all select-none text-left`;
+    textMutedClass = "opacity-70";
   }
 
+  const dotColor = STATUS_DOT[event.status] ?? "bg-gray-400";
+  const isDraggable = event.source === "booking";
+
   return (
-    <div style={style} className={className}>
-      {content}
-    </div>
+    <button
+      type="button"
+      style={style}
+      className={containerClass}
+      draggable={isDraggable}
+      onDragStart={isDraggable && onDragStart ? (e) => {
+        e.dataTransfer.setData("text/plain", event.id);
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart(event.id);
+      } : undefined}
+      onClick={(e) => {
+        e.stopPropagation();
+        onEventClick(event);
+      }}
+    >
+      <div className="h-full overflow-hidden px-1.5 py-0.5">
+        {/* Client name row */}
+        <div className="flex items-center gap-1 min-w-0">
+          {event.source === "booking" && (
+            <span className={`shrink-0 h-1.5 w-1.5 rounded-full ${dotColor}`} />
+          )}
+          <span className="truncate text-[11px] font-semibold leading-tight">
+            {event.clientName}
+          </span>
+        </div>
+        {/* Time */}
+        {h >= MIN_H_TIME && (
+          <div className={`text-[10px] leading-tight ${textMutedClass}`}>
+            {h >= MIN_H_RANGE
+              ? formatTimeRange(event.scheduled_at, event.end_at)
+              : formatStartTime(event.scheduled_at)}
+          </div>
+        )}
+        {/* Professional */}
+        {h >= MIN_H_PROF && event.professionalName && (
+          <div className={`truncate text-[10px] leading-tight ${textMutedClass}`}>
+            {event.professionalName}
+          </div>
+        )}
+        {/* Service */}
+        {h >= MIN_H_SVC && event.serviceName && (
+          <div className={`truncate text-[10px] leading-tight ${textMutedClass}`}>
+            {event.serviceName}
+          </div>
+        )}
+      </div>
+    </button>
   );
 }
