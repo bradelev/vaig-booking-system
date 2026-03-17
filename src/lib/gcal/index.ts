@@ -83,3 +83,64 @@ export async function deleteCalendarEvent(eventId: string): Promise<void> {
     throw err;
   }
 }
+
+export interface CalendarEvent {
+  id: string;
+  summary: string;
+  description?: string;
+  start: string; // ISO datetime
+  end: string;   // ISO datetime
+  colorId?: string;
+}
+
+/**
+ * Lists calendar events in a time range.
+ * Returns [] if env vars are not configured (graceful degradation).
+ * Paginates automatically if there are more than 250 events.
+ */
+export async function listCalendarEvents(
+  timeMin: string,
+  timeMax: string,
+): Promise<CalendarEvent[]> {
+  if (
+    !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ||
+    !process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ||
+    !process.env.GOOGLE_CALENDAR_ID
+  ) {
+    return [];
+  }
+
+  const calendar = getCalendarClient();
+  const calendarId = getCalendarId();
+  const results: CalendarEvent[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const res = await calendar.events.list({
+      calendarId,
+      timeMin,
+      timeMax,
+      singleEvents: true,
+      orderBy: "startTime",
+      timeZone: "America/Argentina/Buenos_Aires",
+      maxResults: 250,
+      pageToken,
+    });
+
+    for (const event of res.data.items ?? []) {
+      if (!event.id) continue;
+      results.push({
+        id: event.id,
+        summary: event.summary ?? "(sin título)",
+        description: event.description ?? undefined,
+        start: event.start?.dateTime ?? event.start?.date ?? "",
+        end: event.end?.dateTime ?? event.end?.date ?? "",
+        colorId: event.colorId ?? undefined,
+      });
+    }
+
+    pageToken = res.data.nextPageToken ?? undefined;
+  } while (pageToken);
+
+  return results;
+}
