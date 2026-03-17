@@ -4,24 +4,23 @@ import { useEffect, useRef } from "react";
 import { AgendaEvent, TZ, GRID_START_HOUR, ROW_HEIGHT_PX, timeToGridRow } from "./agenda-types";
 import TimeGrid, { TimeGridHeader } from "./time-grid";
 
-interface WeekViewProps {
-  monday: Date;
+interface FourDayViewProps {
+  startDay: Date;
   events: AgendaEvent[];
   onSlotClick: (date: Date, hour: number, minute: number) => void;
   onEventDrop: (eventId: string, newScheduledAt: string) => void;
   onEventClick: (event: AgendaEvent) => void;
 }
 
-export default function WeekView({ monday, events, onSlotClick, onEventDrop, onEventClick }: WeekViewProps) {
+export default function FourDayView({ startDay, events, onSlotClick, onEventDrop, onEventClick }: FourDayViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
+  const days = Array.from({ length: 4 }, (_, i) => {
+    const d = new Date(startDay);
+    d.setDate(startDay.getDate() + i);
     return d;
   });
 
-  // Auto-scroll to current time on mount
   useEffect(() => {
     const now = new Date();
     const hour = parseInt(
@@ -39,9 +38,7 @@ export default function WeekView({ monday, events, onSlotClick, onEventDrop, onE
 
   return (
     <div className="flex-1 flex flex-col rounded-lg border bg-white shadow-sm min-h-0 overflow-hidden">
-      {/* Fixed header — stays visible while scrolling */}
       <TimeGridHeader days={days} />
-      {/* Scrollable body */}
       <div ref={scrollRef} className="flex-1 overflow-auto">
         <TimeGrid
           days={days}

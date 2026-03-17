@@ -8,6 +8,7 @@ import {
   GCAL_COLOR_MAP,
   getLocalDate,
   toDateStr,
+  formatStartTime,
 } from "./agenda-types";
 
 interface MonthViewProps {
@@ -41,14 +42,15 @@ function getMonthGrid(currentDate: Date): (Date | null)[][] {
   return weeks;
 }
 
-function getEventColor(event: AgendaEvent): string {
+function getEventClasses(event: AgendaEvent): string {
   if (event.source === "booking" && event.professionalName) {
-    return (PROFESSIONAL_COLORS[event.professionalName] ?? PROFESSIONAL_COLORS_FALLBACK).bg;
+    const c = PROFESSIONAL_COLORS[event.professionalName] ?? PROFESSIONAL_COLORS_FALLBACK;
+    return `${c.bg} ${c.text} border-l-2 ${c.border}`;
   }
   if (event.source === "gcal" && event.gcalColorId && GCAL_COLOR_MAP[event.gcalColorId]) {
-    return GCAL_COLOR_MAP[event.gcalColorId].solidBg;
+    return GCAL_COLOR_MAP[event.gcalColorId].classes + " border-l-2";
   }
-  return PROFESSIONAL_COLORS_FALLBACK.bg;
+  return `${PROFESSIONAL_COLORS_FALLBACK.bg} ${PROFESSIONAL_COLORS_FALLBACK.text} border-l-2 ${PROFESSIONAL_COLORS_FALLBACK.border}`;
 }
 
 const DAY_NAMES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -102,8 +104,9 @@ export default function MonthView({ currentDate, events, onDayClick }: MonthView
                   {dayEvents.map((event) => (
                     <div
                       key={event.id}
-                      className={`truncate rounded px-1 py-0.5 text-[10px] text-white font-medium ${getEventColor(event)}`}
+                      className={`truncate rounded px-1 py-0.5 text-[10px] font-medium ${getEventClasses(event)}`}
                     >
+                      <span className="opacity-60 mr-0.5">{formatStartTime(event.scheduled_at)}</span>
                       {event.clientName}
                     </div>
                   ))}
