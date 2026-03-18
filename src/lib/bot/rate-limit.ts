@@ -6,7 +6,7 @@
  *   rate_limit_window_minutes  — rolling window (default: 60)
  *   rate_limit_max_messages    — max messages in the window (default: 30)
  */
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,8 +26,7 @@ export async function checkRateLimit(phone: string): Promise<RateLimitResult> {
   const windowMinutes = Math.max(1, parseInt(windowMinutesStr) || 60);
   const maxMessages = Math.max(1, parseInt(maxMessagesStr) || 30);
 
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const client = createAdminClient() as AnyClient;
 
   const windowStart = new Date(Date.now() - windowMinutes * 60_000).toISOString();
 
