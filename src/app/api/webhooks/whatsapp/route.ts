@@ -133,14 +133,7 @@ export async function POST(request: NextRequest) {
 
   const messages = parseWebhookPayload(payload);
 
-  // Use waitUntil if available (Vercel Edge), otherwise fire-and-forget
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ctx = (globalThis as any)[Symbol.for("next.request.context")];
-  if (ctx?.waitUntil) {
-    ctx.waitUntil(processMessages(messages));
-  } else {
-    void processMessages(messages);
-  }
+  await processMessages(messages);
 
   return NextResponse.json({ status: "ok" }, { status: 200 });
 }
