@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { fetchMPPayment } from "@/lib/payments";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyAdminPaymentConfirmed, notifyClientPackPurchased } from "@/lib/bot/notifications";
 
 function verifySignature(
@@ -52,7 +52,7 @@ async function handlePaymentNotification(paymentId: string, _payload?: string): 
 
     const clientPackageId = externalRef.slice(5);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = (await createClient()) as any;
+    const db = createAdminClient() as any;
 
     const { error } = await db
       .from("client_packages")
@@ -87,11 +87,10 @@ async function handlePaymentNotification(paymentId: string, _payload?: string): 
   }
 
   const bookingId = externalRef;
-  const supabase = await createClient();
 
   if (payment.status === "approved") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = supabase as any;
+    const db = createAdminClient() as any;
     const { error } = await db
       .from("bookings")
       .update({
