@@ -8,7 +8,7 @@
  * If not configured, the message is sent without a link.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
 import { sendTextMessage } from "@/lib/whatsapp";
 
@@ -20,9 +20,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
+  const client = createAdminClient() as any;
 
   const now = new Date().toISOString();
 
