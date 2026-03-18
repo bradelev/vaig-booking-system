@@ -2,7 +2,7 @@
  * VBS-42/43 — Google Calendar hooks for bookings.
  * Uses a shared Service Account calendar (GOOGLE_CALENDAR_ID).
  */
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createCalendarEvent, deleteCalendarEvent } from "./index";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -18,8 +18,7 @@ const TZ = "America/Argentina/Buenos_Aires";
 export async function createBookingCalendarEvent(bookingId: string): Promise<void> {
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_CALENDAR_ID) return;
 
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const client = createAdminClient() as AnyClient;
 
   const { data: booking, error } = await client
     .from("bookings")
@@ -78,8 +77,7 @@ export async function createBookingCalendarEvent(bookingId: string): Promise<voi
 export async function deleteBookingCalendarEvent(bookingId: string): Promise<void> {
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_CALENDAR_ID) return;
 
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const client = createAdminClient() as AnyClient;
 
   const { data: booking, error } = await client
     .from("bookings")

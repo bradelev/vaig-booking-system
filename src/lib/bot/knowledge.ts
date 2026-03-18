@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { KnowledgeBase, ServiceInfo, ProfessionalInfo, PackageInfo } from "./types";
 
 // Cache knowledge base in memory for a short TTL to avoid repeated DB queries
@@ -16,7 +16,7 @@ export async function buildKnowledgeBase(): Promise<KnowledgeBase> {
     return cache.data;
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const [servicesResult, professionalsResult, packagesResult] = await Promise.all([
     supabase
