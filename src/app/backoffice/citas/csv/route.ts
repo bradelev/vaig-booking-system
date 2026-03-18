@@ -39,7 +39,7 @@ function escapeCell(value: string): string {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const filtro = searchParams.get("filtro") ?? "hoy";
+  const filtro = searchParams.get("filtro") ?? "semana";
   const desde = searchParams.get("desde") ?? undefined;
   const hasta = searchParams.get("hasta") ?? undefined;
   const estado = searchParams.get("estado") ?? "";
