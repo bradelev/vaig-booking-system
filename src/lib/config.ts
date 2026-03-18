@@ -1,7 +1,7 @@
 /**
  * System configuration — reads from system_config table.
  */
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
@@ -14,8 +14,7 @@ export async function getConfig(): Promise<Record<string, string>> {
   const now = Date.now();
   if (configCache && now < cacheExpiry) return configCache;
 
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const client = createAdminClient() as AnyClient;
 
   const { data } = await client.from("system_config").select("key, value");
   const cfg: Record<string, string> = {};

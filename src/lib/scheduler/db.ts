@@ -1,7 +1,7 @@
 /**
  * Scheduler DB helpers — fetches real availability from Supabase.
  */
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { calculateAvailableSlots } from "./index";
 import type { TimeSlot, WorkingHours } from "./types";
 import type { SlotOption } from "@/lib/bot/types";
@@ -37,8 +37,7 @@ function formatSlotLabel(date: Date): string {
  * Falls back to default Mon-Fri 9-18 if no schedule configured.
  */
 async function getProfessionalWorkingHours(professionalId: string): Promise<WorkingHours[]> {
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const client = createAdminClient() as AnyClient;
 
   const { data } = await client
     .from("professional_schedule")
@@ -77,8 +76,7 @@ async function getExistingBookings(
   professionalId: string,
   date: Date
 ): Promise<TimeSlot[]> {
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const client = createAdminClient() as AnyClient;
 
   // Day range in UTC based on TZ date
   const dateStr = date.toLocaleDateString("sv-SE", { timeZone: TZ });

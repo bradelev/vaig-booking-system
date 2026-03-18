@@ -1,7 +1,7 @@
 /**
  * Conversation session management — reads/writes to conversation_sessions table.
  */
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { BotConversationState, BookingFlowContext } from "./types";
 
 export interface ConversationSession {
@@ -16,8 +16,7 @@ export interface ConversationSession {
 type AnyClient = any;
 
 export async function getSession(phone: string): Promise<ConversationSession | null> {
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const client = createAdminClient() as AnyClient;
 
   const { data } = await client
     .from("conversation_sessions")
@@ -43,8 +42,7 @@ export async function upsertSession(
   state: BotConversationState,
   context: BookingFlowContext
 ): Promise<void> {
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const client = createAdminClient() as AnyClient;
 
   // Check if session exists
   const { data: existing } = await client
@@ -71,8 +69,7 @@ export async function upsertSession(
 }
 
 export async function clearSession(phone: string): Promise<void> {
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const client = createAdminClient() as AnyClient;
 
   await client.from("conversation_sessions").delete().eq("phone", phone);
 }
@@ -88,8 +85,7 @@ export async function advanceFunnel(
   phone: string,
   stage: "started" | "service_selected" | "data_completed" | "payment_done"
 ): Promise<void> {
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const client = createAdminClient() as AnyClient;
 
   const { data: existing } = await client
     .from("conversation_sessions")

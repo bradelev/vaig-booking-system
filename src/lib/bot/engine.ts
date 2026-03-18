@@ -8,7 +8,7 @@ import { getSession, upsertSession, clearSession, advanceFunnel } from "./sessio
 import { getNextAvailableSlots, checkSlotAvailability } from "@/lib/scheduler/db";
 import { getConfigValue } from "@/lib/config";
 import { createMPPreference, createPackMPPreference } from "@/lib/payments/mp";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "./rate-limit";
 import { answerWithLLM } from "./llm";
 import { notifyAdminNewBooking } from "./notifications";
@@ -79,8 +79,7 @@ async function replyButtons(
 
 export async function handleIncomingMessage(phone: string, messageText: string): Promise<void> {
   // VBS-75: Blacklist check — silently ignore blocked clients
-  const supabaseCheck = await createClient();
-  const dbCheck = supabaseCheck as AnyClient;
+  const dbCheck = createAdminClient() as AnyClient;
   const { data: clientCheck } = await dbCheck
     .from("clients")
     .select("is_blocked")
@@ -520,8 +519,7 @@ async function handleSlotSelection(
   delete (newContext as BookingFlowContext & { _slots?: unknown })._slots;
 
   // Check if client already exists by phone
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const client = createAdminClient() as AnyClient;
   const { data: existingClient } = await client
     .from("clients")
     .select("id, first_name, last_name, email")
@@ -612,8 +610,7 @@ async function handleBookingConfirm(
   }
 
   // Create or fetch client
-  const supabase = await createClient();
-  const dbClient = supabase as AnyClient;
+  const dbClient = createAdminClient() as AnyClient;
 
   let clientId = context.clientId;
   if (!clientId) {
@@ -772,8 +769,7 @@ async function handleBookingConfirm(
 // ── Cancel flow ───────────────────────────────────────────────────────────────
 
 async function handleCancelFlow(phone: string): Promise<void> {
-  const supabase = await createClient();
-  const dbClient = supabase as AnyClient;
+  const dbClient = createAdminClient() as AnyClient;
 
   // Find client by phone
   const { data: clientData } = await dbClient
@@ -837,8 +833,7 @@ async function handleCancelConfirm(
     return;
   }
 
-  const supabase = await createClient();
-  const dbClient = supabase as AnyClient;
+  const dbClient = createAdminClient() as AnyClient;
 
   await dbClient
     .from("bookings")
@@ -852,8 +847,7 @@ async function handleCancelConfirm(
 // ── Reschedule flow (VBS-71) ──────────────────────────────────────────────────
 
 async function handleRescheduleStart(phone: string): Promise<void> {
-  const supabase = await createClient();
-  const dbClient = supabase as AnyClient;
+  const dbClient = createAdminClient() as AnyClient;
 
   const { data: clientData } = await dbClient
     .from("clients")
@@ -956,8 +950,7 @@ async function handleRescheduleConfirm(
     return;
   }
 
-  const supabase = await createClient();
-  const dbClient = supabase as AnyClient;
+  const dbClient = createAdminClient() as AnyClient;
 
   // Cancel old booking, create new one linked via rescheduled_from
   await dbClient
@@ -1018,8 +1011,7 @@ async function handleWaitlistConfirm(
     return;
   }
 
-  const supabase = await createClient();
-  const dbClient = supabase as AnyClient;
+  const dbClient = createAdminClient() as AnyClient;
 
   const { data: clientData } = await dbClient
     .from("clients")
@@ -1049,8 +1041,7 @@ export async function notifyWaitlistForSlot(
   professionalId: string | null,
   slotStart: string
 ): Promise<void> {
-  const supabase = await createClient();
-  const dbClient = supabase as AnyClient;
+  const dbClient = createAdminClient() as AnyClient;
 
   const slotDate = new Date(slotStart);
   // Check waitlist for entries within 30 min of this slot
@@ -1104,8 +1095,7 @@ export async function notifyWaitlistForSlot(
 // ── Historial del cliente (VBS-73) ────────────────────────────────────────────
 
 async function handleMisTurnos(phone: string): Promise<void> {
-  const supabase = await createClient();
-  const dbClient = supabase as AnyClient;
+  const dbClient = createAdminClient() as AnyClient;
 
   const { data: clientData } = await dbClient
     .from("clients")
@@ -1234,8 +1224,7 @@ async function handlePackServiceSelection(
     return;
   }
 
-  const supabase = await createClient();
-  const dbClient = supabase as AnyClient;
+  const dbClient = createAdminClient() as AnyClient;
   const mpEnabled = (await getConfigValue("mp_enabled", "false")) === "true";
 
   if (!mpEnabled) {
@@ -1271,8 +1260,7 @@ async function handlePackSelection(
   text: string,
   context: BookingFlowContext
 ): Promise<void> {
-  const supabase = await createClient();
-  const dbClient = supabase as AnyClient;
+  const dbClient = createAdminClient() as AnyClient;
 
   const { data: packs } = await dbClient
     .from("service_packages")
@@ -1365,8 +1353,7 @@ async function handleReminderConfirm(
 
   if (isCancelTrigger(text)) {
     if (context.pendingBookingId) {
-      const supabase = await createClient();
-      const dbClient = supabase as AnyClient;
+      const dbClient = createAdminClient() as AnyClient;
       await dbClient
         .from("bookings")
         .update({ status: "cancelled", cancellation_reason: "client_request", cancelled_by: "client" })
@@ -1383,8 +1370,7 @@ async function handleReminderConfirm(
   }
 
   if (context.pendingBookingId) {
-    const supabase = await createClient();
-    const dbClient = supabase as AnyClient;
+    const dbClient = createAdminClient() as AnyClient;
     await dbClient
       .from("bookings")
       .update({ client_confirmed_at: new Date().toISOString() })
