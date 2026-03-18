@@ -95,7 +95,7 @@ export default async function CitasPage({
   }>;
 }) {
   const params = await searchParams;
-  const filtro = params.filtro ?? "hoy";
+  const filtro = params.filtro ?? "semana";
   const desde = params.desde;
   const hasta = params.hasta;
   const estado = params.estado ?? "";
