@@ -60,5 +60,6 @@ export async function updateClient_(id: string, formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/backoffice/clientes");
-  redirect("/backoffice/clientes");
+  revalidatePath(`/backoffice/clientes/${id}`);
+  redirect(`/backoffice/clientes/${id}`);
 }
