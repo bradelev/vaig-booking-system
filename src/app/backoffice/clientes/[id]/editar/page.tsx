@@ -40,8 +40,8 @@ export default async function EditarClientePage({
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/backoffice/clientes" className="text-sm text-gray-500 hover:text-gray-800">
-          ← Clientes
+        <Link href={`/backoffice/clientes/${id}`} className="text-sm text-gray-500 hover:text-gray-800">
+          ← Cliente
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Editar cliente</h1>
       </div>
@@ -115,7 +115,7 @@ export default async function EditarClientePage({
 
         <div className="flex justify-end gap-3 pt-2">
           <Link
-            href="/backoffice/clientes"
+            href={`/backoffice/clientes/${id}`}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Cancelar
