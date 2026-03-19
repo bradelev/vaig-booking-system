@@ -13,14 +13,13 @@ interface ClienteMetrica {
   email: string | null;
   source: string | null;
   instagram: string | null;
-  notas: string | null;
   categoria: string | null;
   total_sesiones: number | null;
   total_cobrado: number | null;
   ticket_promedio: number | null;
   dias_inactivo: number | null;
-  tiene_cross_sell: boolean | null;
-  requiere_reactivacion: boolean | null;
+  oportunidad_cross_sell: boolean | null;
+  candidata_reactivacion: boolean | null;
 }
 
 interface Booking {
@@ -169,7 +168,7 @@ export default async function ClienteDetailPage({
             <h1 className="text-2xl font-bold text-gray-900">{nombre}</h1>
             {metrica.categoria && (
               <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${categoriaColor}`}>
-                {metrica.categoria.replace("_", " ")}
+                {metrica.categoria.replaceAll("_", " ")}
               </span>
             )}
           </div>
@@ -180,12 +179,12 @@ export default async function ClienteDetailPage({
             {metrica.source && <span className="capitalize">{metrica.source}</span>}
           </div>
           <div className="mt-2 flex gap-2">
-            {metrica.tiene_cross_sell && (
+            {metrica.oportunidad_cross_sell && (
               <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">
                 Cross-sell
               </span>
             )}
-            {metrica.requiere_reactivacion && (
+            {metrica.candidata_reactivacion && (
               <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">
                 Reactivar
               </span>
