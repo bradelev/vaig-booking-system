@@ -21,8 +21,9 @@ import { distance } from 'fastest-levenshtein'
 import { createClient } from '@supabase/supabase-js'
 import { config } from 'dotenv'
 
-// Load env from .env.local
+// Load env from .env.local or .env
 config({ path: path.resolve(process.cwd(), '.env.local') })
+config({ path: path.resolve(process.cwd(), '.env') })
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -503,10 +504,11 @@ async function paso4InsertSesiones(
     const monto_lista = parseMontoUY(row['Monto del servicio'])
     const monto_cobrado = parseMontoUY(row['Monto cobrado'])
 
-    // Calculate discount percentage
+    // Calculate discount percentage; null if out of NUMERIC(5,2) range
     let descuento_pct: number | null = null
     if (monto_lista && monto_cobrado && monto_lista > 0) {
-      descuento_pct = Math.round(((monto_lista - monto_cobrado) / monto_lista) * 100 * 100) / 100
+      const raw_pct = Math.round(((monto_lista - monto_cobrado) / monto_lista) * 100 * 100) / 100
+      if (raw_pct >= -999.99 && raw_pct <= 999.99) descuento_pct = raw_pct
     }
 
     const metodo_pago = row['Metodo de pago']
