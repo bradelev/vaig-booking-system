@@ -78,6 +78,10 @@ const CATEGORIA_COLORS: Record<string, string> = {
   sin_visitas: "bg-blue-100 text-blue-800",
 };
 
+function isPlaceholderPhone(phone: string): boolean {
+  return phone.startsWith("historico_") || phone.startsWith("migrated_nophone_");
+}
+
 export default async function ClienteDetailPage({
   params,
 }: {
@@ -173,7 +177,7 @@ export default async function ClienteDetailPage({
             )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-gray-500">
-            <span>{metrica.phone}</span>
+            {!isPlaceholderPhone(metrica.phone) && <span>{metrica.phone}</span>}
             {metrica.email && <span>{metrica.email}</span>}
             {metrica.instagram && <span>@{metrica.instagram}</span>}
             {metrica.source && <span className="capitalize">{metrica.source}</span>}

@@ -12,6 +12,10 @@ interface Cliente {
   created_at: string;
 }
 
+function isPlaceholderPhone(phone: string): boolean {
+  return phone.startsWith("historico_") || phone.startsWith("migrated_nophone_");
+}
+
 export default async function ClientesPage() {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,7 +69,7 @@ export default async function ClientesPage() {
                       {c.first_name} {c.last_name}
                     </Link>
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{c.phone}</td>
+                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{isPlaceholderPhone(c.phone) ? "—" : c.phone}</td>
                   <td className="px-6 py-4 text-sm text-gray-700">{c.email ?? "—"}</td>
                   <td className="px-6 py-4 text-sm text-gray-700 capitalize">{c.source ?? "—"}</td>
                   <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
