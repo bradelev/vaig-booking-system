@@ -61,7 +61,9 @@ export default async function ClientesPage() {
               clientes.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                    {c.first_name} {c.last_name}
+                    <Link href={`/backoffice/clientes/${c.id}`} className="hover:underline">
+                      {c.first_name} {c.last_name}
+                    </Link>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{c.phone}</td>
                   <td className="px-6 py-4 text-sm text-gray-700">{c.email ?? "—"}</td>
@@ -71,10 +73,10 @@ export default async function ClientesPage() {
                   </td>
                   <td className="px-6 py-4">
                     <Link
-                      href={`/backoffice/clientes/${c.id}/editar`}
+                      href={`/backoffice/clientes/${c.id}`}
                       className="text-sm text-blue-600 hover:underline"
                     >
-                      Editar
+                      Ver
                     </Link>
                   </td>
                 </tr>
