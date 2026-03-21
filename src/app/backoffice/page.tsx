@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = { title: "Dashboard" };
 import StatCard from "@/components/backoffice/stat-card";
 import StatusBadge from "@/components/backoffice/status-badge";
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils";
