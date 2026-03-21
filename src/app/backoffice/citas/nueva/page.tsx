@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createBooking } from "@/actions/citas";
+import ValidatedForm from "@/components/backoffice/validated-form";
 
 interface Cliente {
   id: string;
@@ -48,7 +49,7 @@ export default async function NuevaCitaPage() {
         <h1 className="text-2xl font-bold text-gray-900">Nueva cita</h1>
       </div>
 
-      <form action={createBooking} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
+      <ValidatedForm action={createBooking} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700">Cliente *</label>
           <select
@@ -130,7 +131,7 @@ export default async function NuevaCitaPage() {
             Crear cita
           </button>
         </div>
-      </form>
+      </ValidatedForm>
     </div>
   );
 }
