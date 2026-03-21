@@ -25,6 +25,11 @@ interface PendingBooking {
   services: { name: string; deposit_amount: number } | null;
 }
 
+function calcTrend(current: number, previous: number): number {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
 export default async function BackofficePage() {
   const supabase = await createClient();
 
@@ -32,6 +37,12 @@ export default async function BackofficePage() {
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
+
+  // Yesterday range
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  const yesterdayEnd = new Date(todayEnd);
+  yesterdayEnd.setDate(yesterdayEnd.getDate() - 1);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
@@ -43,6 +54,8 @@ export default async function BackofficePage() {
     { data: todayBookingsRaw },
     { data: todayPaymentsRaw },
     { data: pendingBookingsRaw },
+    { count: yesterdayCount },
+    { data: yesterdayPaymentsRaw },
   ] = await Promise.all([
     supabase
       .from("bookings")
@@ -80,23 +93,38 @@ export default async function BackofficePage() {
       .eq("status", "pending")
       .order("scheduled_at")
       .limit(20),
+    supabase
+      .from("bookings")
+      .select("*", { count: "exact", head: true })
+      .gte("scheduled_at", yesterdayStart.toISOString())
+      .lte("scheduled_at", yesterdayEnd.toISOString()),
+    supabase
+      .from("payments")
+      .select("amount")
+      .gte("created_at", yesterdayStart.toISOString())
+      .lte("created_at", yesterdayEnd.toISOString()),
   ]);
 
   const todayBookings = (todayBookingsRaw ?? []) as unknown as TodayBooking[];
   const todayPayments = (todayPaymentsRaw ?? []) as unknown as Payment[];
   const pendingBookings = (pendingBookingsRaw ?? []) as unknown as PendingBooking[];
+  const yesterdayPayments = (yesterdayPaymentsRaw ?? []) as unknown as Payment[];
 
   const ingresos = todayPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const ingresosAyer = yesterdayPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const citasTrend = calcTrend(todayCount ?? 0, yesterdayCount ?? 0);
+  const ingresosTrend = calcTrend(ingresos, ingresosAyer);
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Citas hoy" value={todayCount ?? 0} />
+        <StatCard title="Citas hoy" value={todayCount ?? 0} trend={{ value: citasTrend, label: "vs ayer" }} />
         <StatCard title="Pendientes" value={pendingCount ?? 0} subtitle="sin seña" />
         <StatCard title="Clientes" value={clientsCount ?? 0} subtitle="total registrados" />
-        <StatCard title="Ingresos hoy" value={formatCurrency(ingresos)} subtitle="cobros del día" />
+        <StatCard title="Ingresos hoy" value={formatCurrency(ingresos)} subtitle="cobros del día" trend={{ value: ingresosTrend, label: "vs ayer" }} />
       </div>
 
       <div className="rounded-lg border bg-white shadow-sm">
