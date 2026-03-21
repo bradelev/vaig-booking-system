@@ -3,7 +3,10 @@
  * Shows bookings in "pending" status awaiting deposit payment and allows
  * the admin to mark them as paid (bank transfer confirmation).
  */
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = { title: "Pagos" };
 import { confirmPayment } from "@/actions/pagos";
 import { formatDate, formatTime } from "@/lib/utils";
 import StatusBadge from "@/components/backoffice/status-badge";

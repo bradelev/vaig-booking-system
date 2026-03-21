@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = { title: "Agenda" };
 import { listCalendarEvents } from "@/lib/gcal";
 import type { CalendarEvent } from "@/lib/gcal";
 import CalendarShell from "@/components/backoffice/agenda/calendar-shell";
