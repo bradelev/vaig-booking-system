@@ -47,15 +47,19 @@ export async function notifyAdminNewBooking(params: NewBookingNotificationParams
     hour12: false,
   });
 
-  let msg = `🔔 *Nueva reserva creada*\n\n`;
-  msg += `👤 Cliente: ${params.clientName} (${params.clientPhone})\n`;
-  msg += `📋 Servicio: ${params.serviceName}\n`;
-  if (params.professionalName) {
-    msg += `💆 Profesional: ${params.professionalName}\n`;
-  }
-  msg += `📅 Turno: ${dateLabel}\n`;
-  msg += `💰 Seña pendiente: $${params.depositAmount.toLocaleString("es-AR")}\n`;
-  msg += `\n_Reserva ID: ${params.bookingId.slice(0, 8)}..._`;
+  const adminTemplate = await getConfigValue(
+    "template_admin_new_booking",
+    "🔔 *Nueva reserva creada*\n\n👤 Cliente: {clientName} ({clientPhone})\n📋 Servicio: {serviceName}\n💆 Profesional: {professionalName}\n📅 Turno: {dateLabel}\n💰 Seña pendiente: ${depositAmount}\n\n_Reserva ID: {bookingId}_"
+  );
+  const msg = applyTemplate(adminTemplate, {
+    clientName: params.clientName,
+    clientPhone: params.clientPhone,
+    serviceName: params.serviceName,
+    professionalName: params.professionalName ?? "-",
+    dateLabel,
+    depositAmount: params.depositAmount.toLocaleString("es-AR"),
+    bookingId: `${params.bookingId.slice(0, 8)}...`,
+  });
 
   try {
     await sendTextMessage({ to: adminPhone, body: msg });
@@ -171,12 +175,19 @@ export async function notifyAdminPaymentConfirmed(
 
   const methodLabel = params.method === "mercadopago" ? "Mercado Pago" : "Transferencia manual";
 
-  let msg = `✅ *Seña confirmada*\n\n`;
-  msg += `👤 Cliente: ${params.clientName} (${params.clientPhone})\n`;
-  msg += `📋 Servicio: ${params.serviceName}\n`;
-  msg += `📅 Turno: ${dateLabel}\n`;
-  msg += `💰 Monto: $${params.amount.toLocaleString("es-AR")} (${methodLabel})\n`;
-  msg += `\n_Reserva ID: ${params.bookingId.slice(0, 8)}..._`;
+  const paymentTemplate = await getConfigValue(
+    "template_admin_payment_confirmed",
+    "✅ *Seña confirmada*\n\n👤 Cliente: {clientName} ({clientPhone})\n📋 Servicio: {serviceName}\n📅 Turno: {dateLabel}\n💰 Monto: ${amount} ({methodLabel})\n\n_Reserva ID: {bookingId}_"
+  );
+  const msg = applyTemplate(paymentTemplate, {
+    clientName: params.clientName,
+    clientPhone: params.clientPhone,
+    serviceName: params.serviceName,
+    dateLabel,
+    amount: params.amount.toLocaleString("es-AR"),
+    methodLabel,
+    bookingId: `${params.bookingId.slice(0, 8)}...`,
+  });
 
   try {
     await sendTextMessage({ to: adminPhone, body: msg });
