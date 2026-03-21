@@ -82,7 +82,7 @@ export async function handleIncomingMessage(phone: string, messageText: string):
   const dbCheck = createAdminClient() as AnyClient;
   const { data: clientCheck } = await dbCheck
     .from("clients")
-    .select("is_blocked")
+    .select("is_blocked, consent_accepted_at")
     .eq("phone", phone)
     .maybeSingle();
   if (clientCheck?.is_blocked) return;
@@ -104,6 +104,18 @@ export async function handleIncomingMessage(phone: string, messageText: string):
     return;
   }
 
+  // VBS-87: RNPD consent gate
+  const session = await getSession(phone);
+  const state: BotConversationState = session?.state ?? "idle";
+  const context: BookingFlowContext = session?.context ?? {};
+
+  if (clientCheck && !clientCheck.consent_accepted_at) {
+    if (state === "awaiting_consent") {
+      return handleConsentResponse(phone, messageText);
+    }
+    return handleConsentRequest(phone);
+  }
+
   // VBS-73: Global trigger for "mis turnos"
   if (isMisTurnosTrigger(messageText)) {
     return handleMisTurnos(phone);
@@ -113,10 +125,6 @@ export async function handleIncomingMessage(phone: string, messageText: string):
   if (isRescheduleTrigger(messageText)) {
     return handleRescheduleStart(phone);
   }
-
-  const session = await getSession(phone);
-  const state: BotConversationState = session?.state ?? "idle";
-  const context: BookingFlowContext = session?.context ?? {};
 
   try {
     await route(phone, messageText, state, context);
@@ -167,8 +175,41 @@ async function route(
       return handleCancelConfirm(phone, text, context);
     case "awaiting_survey_response":
       return handleSurveyResponse(phone, text, context);
+    case "awaiting_consent":
+      return handleConsentResponse(phone, text);
     default:
       return handleMenu(phone);
+  }
+}
+
+// ── RNPD consent handlers (VBS-87) ────────────────────────────────────────────
+
+async function handleConsentRequest(phone: string): Promise<void> {
+  await upsertSession(phone, "awaiting_consent", {});
+  const businessName = await getConfigValue("business_name", "VAIG");
+  const privacyUrl = await getConfigValue("privacy_policy_url", "");
+  const privacyLine = privacyUrl ? `\n\n📄 Política de privacidad: ${privacyUrl}` : "";
+  await reply(
+    phone,
+    `Hola! Antes de continuar, *${businessName}* necesita tu consentimiento para el tratamiento de tus datos personales según la Ley 18.331 (RNPD — Uruguay).${privacyLine}\n\nTus datos serán usados únicamente para gestionar tus reservas y comunicaciones con el centro.\n\n¿Aceptás el tratamiento de tus datos? Respondé *acepto* para continuar.`
+  );
+}
+
+async function handleConsentResponse(phone: string, text: string): Promise<void> {
+  const t = normalize(text);
+  if (t === "acepto" || t.includes("acepto") || t === "si" || t === "sí" || t === "ok") {
+    const db = createAdminClient() as AnyClient;
+    await db
+      .from("clients")
+      .update({ consent_accepted_at: new Date().toISOString() })
+      .eq("phone", phone);
+    await clearSession(phone);
+    await reply(phone, "¡Gracias! Tu consentimiento ha sido registrado. 🙏\n\nEscribí *hola* para continuar.");
+  } else {
+    await reply(
+      phone,
+      "Entendemos. Sin tu consentimiento no podemos procesar tus datos ni gestionar reservas.\n\nSi cambiás de opinión, escribinos cuando quieras y te enviamos el formulario nuevamente."
+    );
   }
 }
 
