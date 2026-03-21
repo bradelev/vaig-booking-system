@@ -191,6 +191,7 @@ export async function createBookingFromAgenda(data: {
 export async function quickCreateClient(data: {
   first_name: string;
   last_name: string;
+  phone: string;
 }): Promise<{ id: string; first_name: string; last_name: string } | { error: string }> {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -198,7 +199,11 @@ export async function quickCreateClient(data: {
 
   const { data: row, error } = await client
     .from("clients")
-    .insert({ first_name: data.first_name.trim(), last_name: data.last_name.trim() })
+    .insert({
+      first_name: data.first_name.trim(),
+      last_name: data.last_name.trim(),
+      phone: data.phone.trim(),
+    })
     .select("id, first_name, last_name")
     .single();
 
@@ -209,6 +214,8 @@ export async function quickCreateClient(data: {
 export async function quickCreateService(data: {
   name: string;
   duration_minutes: number;
+  price: number;
+  deposit_amount: number;
 }): Promise<{ id: string; name: string; duration_minutes: number } | { error: string }> {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -216,7 +223,12 @@ export async function quickCreateService(data: {
 
   const { data: row, error } = await client
     .from("services")
-    .insert({ name: data.name.trim(), duration_minutes: data.duration_minutes })
+    .insert({
+      name: data.name.trim(),
+      duration_minutes: data.duration_minutes,
+      price: data.price,
+      deposit_amount: data.deposit_amount,
+    })
     .select("id, name, duration_minutes")
     .single();
 
