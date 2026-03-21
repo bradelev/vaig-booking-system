@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import DailyActivityChart from "@/components/backoffice/metrics/daily-activity-chart";
 import FunnelChart from "@/components/backoffice/metrics/funnel-chart";
+
+export const metadata: Metadata = { title: "Métricas" };
 
 const FUNNEL_STAGES = [
   { key: "started", label: "Conversaciones iniciadas" },
