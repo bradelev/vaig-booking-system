@@ -19,6 +19,10 @@
     {
       "path": "/api/internal/next-session",
       "schedule": "0 10 * * 1"
+    },
+    {
+      "path": "/api/internal/payment-reminder",
+      "schedule": "0 */4 * * *"
     }
   ]
 }
