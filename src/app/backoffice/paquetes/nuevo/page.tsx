@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createPackage } from "@/actions/paquetes";
+import ValidatedForm from "@/components/backoffice/validated-form";
 
 interface Servicio {
   id: string;
@@ -29,7 +30,7 @@ export default async function NuevoPaquetePage() {
         <h1 className="text-2xl font-bold text-gray-900">Nuevo paquete</h1>
       </div>
 
-      <form action={createPackage} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
+      <ValidatedForm action={createPackage} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700">Nombre *</label>
           <input
@@ -93,7 +94,7 @@ export default async function NuevoPaquetePage() {
             Crear paquete
           </button>
         </div>
-      </form>
+      </ValidatedForm>
     </div>
   );
 }
