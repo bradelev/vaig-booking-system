@@ -25,7 +25,7 @@ function getAccessToken(): string {
   return token;
 }
 
-async function sendMessage(body: Record<string, unknown>): Promise<void> {
+async function sendMessage(body: Record<string, unknown>): Promise<string> {
   const phoneNumberId = getPhoneNumberId();
   const token = getAccessToken();
 
@@ -38,14 +38,22 @@ async function sendMessage(body: Record<string, unknown>): Promise<void> {
     body: JSON.stringify(body),
   });
 
+  const json = await res.json();
+
   if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`WhatsApp API error ${res.status}: ${error}`);
+    const detail = json?.error?.message ?? JSON.stringify(json);
+    throw new Error(`WhatsApp API error ${res.status}: ${detail}`);
   }
+
+  if (json.error) {
+    throw new Error(`WhatsApp API error: ${json.error.message} (code ${json.error.code})`);
+  }
+
+  return json.messages?.[0]?.id ?? "unknown";
 }
 
-export async function sendTextMessage({ to, body }: SendTextMessageParams): Promise<void> {
-  await sendMessage({
+export async function sendTextMessage({ to, body }: SendTextMessageParams): Promise<string> {
+  return sendMessage({
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to,
@@ -58,8 +66,8 @@ export async function sendInteractiveButtons({
   to,
   body,
   buttons,
-}: SendInteractiveButtonsParams): Promise<void> {
-  await sendMessage({
+}: SendInteractiveButtonsParams): Promise<string> {
+  return sendMessage({
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to,
@@ -90,8 +98,8 @@ export async function sendListMessage({
     title: string;
     rows: Array<{ id: string; title: string; description?: string }>;
   }>;
-}): Promise<void> {
-  await sendMessage({
+}): Promise<string> {
+  return sendMessage({
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to,
