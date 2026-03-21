@@ -24,7 +24,7 @@ export const TEMPLATE_PLACEHOLDERS: Record<TemplateKey, string[]> = {
   template_reminder: ["{firstName}", "{serviceName}", "{businessName}", "{dateLabel}"],
   template_survey: ["{firstName}", "{serviceName}", "{businessName}", "{surveyUrl}"],
   template_google_review: ["{firstName}", "{businessName}", "{googleReviewUrl}"],
-  template_payment_reminder: ["{firstName}", "{serviceName}", "{businessName}", "{paymentLink}", "{hoursRemaining}"],
+  template_payment_reminder: ["{firstName}", "{serviceName}", "{businessName}", "{paymentLine}", "{hoursRemaining}"],
   template_cancel_client: ["{firstName}", "{serviceName}", "{dateLabel}", "{reasonText}"],
   template_pack_purchased: ["{firstName}", "{packName}", "{serviceName}", "{sessionsTotal}"],
 };
