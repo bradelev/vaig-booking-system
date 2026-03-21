@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { saveTemplates } from "@/actions/templates";
+
+export const metadata: Metadata = { title: "Templates" };
 import { TEMPLATE_KEYS, TEMPLATE_LABELS, TEMPLATE_PLACEHOLDERS } from "@/lib/templates";
 
 export default async function TemplatesPage() {

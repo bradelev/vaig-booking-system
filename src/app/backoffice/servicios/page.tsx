@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { toggleServiceActive } from "@/actions/servicios";
+
+export const metadata: Metadata = { title: "Servicios" };
 import { formatCurrency } from "@/lib/utils";
 import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
 
