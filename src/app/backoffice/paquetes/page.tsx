@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { togglePackageActive } from "@/actions/paquetes";
 import { formatCurrency } from "@/lib/utils";
+import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
 
 interface Paquete {
   id: string;
@@ -24,6 +25,70 @@ export default async function PaquetesPage() {
 
   const paquetes = (raw ?? []) as Paquete[];
 
+  const columns: TableColumn<Paquete>[] = [
+    {
+      header: "Nombre",
+      primaryOnMobile: true,
+      accessor: (p) => (
+        <p className="text-sm font-medium text-gray-900">{p.name}</p>
+      ),
+    },
+    {
+      header: "Servicio",
+      accessor: (p) => p.services?.name ?? "—",
+    },
+    {
+      header: "Sesiones",
+      accessor: (p) => (
+        <span className="whitespace-nowrap">{p.session_count}</span>
+      ),
+    },
+    {
+      header: "Precio",
+      accessor: (p) => (
+        <span className="whitespace-nowrap">{formatCurrency(p.price)}</span>
+      ),
+    },
+    {
+      header: "Estado",
+      accessor: (p) => (
+        <span
+          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            p.is_active
+              ? "bg-green-100 text-green-800"
+              : "bg-gray-100 text-gray-600"
+          }`}
+        >
+          {p.is_active ? "Activo" : "Inactivo"}
+        </span>
+      ),
+    },
+    {
+      header: "Acciones",
+      accessor: (p) => {
+        const toggleAction = togglePackageActive.bind(null, p.id, p.is_active);
+        return (
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/backoffice/paquetes/${p.id}/editar`}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Editar
+            </Link>
+            <form action={toggleAction}>
+              <button
+                type="submit"
+                className="text-sm text-gray-500 hover:text-gray-800 hover:underline"
+              >
+                {p.is_active ? "Desactivar" : "Activar"}
+              </button>
+            </form>
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -36,80 +101,12 @@ export default async function PaquetesPage() {
         </Link>
       </div>
 
-      <div className="rounded-lg border bg-white shadow-sm overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              {["Nombre", "Servicio", "Sesiones", "Precio", "Estado", "Acciones"].map((h) => (
-                <th
-                  key={h}
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
-            {paquetes.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">
-                  No hay paquetes creados aún
-                </td>
-              </tr>
-            ) : (
-              paquetes.map((p) => {
-                const toggleAction = togglePackageActive.bind(null, p.id, p.is_active);
-                return (
-                  <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {p.services?.name ?? "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
-                      {p.session_count}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
-                      {formatCurrency(p.price)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          p.is_active
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {p.is_active ? "Activo" : "Inactivo"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <Link
-                          href={`/backoffice/paquetes/${p.id}/editar`}
-                          className="text-sm text-blue-600 hover:underline"
-                        >
-                          Editar
-                        </Link>
-                        <form action={toggleAction}>
-                          <button
-                            type="submit"
-                            className="text-sm text-gray-500 hover:text-gray-800 hover:underline"
-                          >
-                            {p.is_active ? "Desactivar" : "Activar"}
-                          </button>
-                        </form>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ResponsiveTable
+        columns={columns}
+        data={paquetes}
+        keyExtractor={(p) => p.id}
+        emptyMessage="No hay paquetes creados aún"
+      />
     </div>
   );
 }
