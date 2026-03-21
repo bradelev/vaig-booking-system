@@ -1,7 +1,7 @@
 /**
  * VBS-84 — Payment reminder cron
  *
- * Runs every 4 hours. Finds bookings with status=pending where:
+ * Runs once daily at 14:00 UTC (11:00 ART). Finds bookings with status=pending where:
  * - created_at is older than payment_reminder_after_hours (default 12h)
  * - created_at is younger than auto_cancel_hours (default 24h)
  * - payment_reminder_sent_at IS NULL (not yet reminded)
