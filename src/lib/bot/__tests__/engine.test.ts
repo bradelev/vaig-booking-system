@@ -10,7 +10,7 @@ import {
   isCancelTrigger,
   isRescheduleTrigger,
   isMisTurnosTrigger,
-} from "../helpers";
+} from "../engine";
 import type { BotConversationState } from "../types";
 
 // ── Router logic (mirrors engine.ts route() function) ──────────────────────────
