@@ -3,11 +3,37 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Brand colors */
+  --brand-primary: #171717;
+  --brand-primary-hover: #404040;
+  --brand-accent: #2563eb;
+  --brand-danger: #dc2626;
+  --brand-danger-hover: #b91c1c;
+  --brand-success: #16a34a;
+  --brand-warning: #d97706;
+  --brand-muted: #6b7280;
+
+  /* Surface colors */
+  --surface-base: #ffffff;
+  --surface-subtle: #f9fafb;
+  --surface-border: #e5e7eb;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-brand: var(--brand-primary);
+  --color-brand-hover: var(--brand-primary-hover);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-danger: var(--brand-danger);
+  --color-brand-danger-hover: var(--brand-danger-hover);
+  --color-brand-success: var(--brand-success);
+  --color-brand-warning: var(--brand-warning);
+  --color-brand-muted: var(--brand-muted);
+  --color-surface-base: var(--surface-base);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-border: var(--surface-border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
