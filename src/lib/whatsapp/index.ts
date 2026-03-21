@@ -38,7 +38,13 @@ async function sendMessage(body: Record<string, unknown>): Promise<string> {
     body: JSON.stringify(body),
   });
 
-  const json = await res.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let json: any;
+  try {
+    json = await res.json();
+  } catch {
+    throw new Error(`WhatsApp API error ${res.status}: (non-JSON response)`);
+  }
 
   if (!res.ok) {
     const detail = json?.error?.message ?? JSON.stringify(json);
@@ -46,7 +52,7 @@ async function sendMessage(body: Record<string, unknown>): Promise<string> {
   }
 
   if (json.error) {
-    throw new Error(`WhatsApp API error: ${json.error.message} (code ${json.error.code})`);
+    throw new Error(`WhatsApp API error: ${json.error?.message ?? JSON.stringify(json.error)} (code ${json.error?.code})`);
   }
 
   return json.messages?.[0]?.id ?? "unknown";
