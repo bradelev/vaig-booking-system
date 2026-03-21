@@ -188,6 +188,54 @@ export async function createBookingFromAgenda(data: {
   return { success: true };
 }
 
+export async function quickCreateClient(data: {
+  first_name: string;
+  last_name: string;
+  phone: string;
+}): Promise<{ id: string; first_name: string; last_name: string } | { error: string }> {
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+
+  const { data: row, error } = await client
+    .from("clients")
+    .insert({
+      first_name: data.first_name.trim(),
+      last_name: data.last_name.trim(),
+      phone: data.phone.trim(),
+    })
+    .select("id, first_name, last_name")
+    .single();
+
+  if (error) return { error: error.message };
+  return { id: row.id, first_name: row.first_name, last_name: row.last_name };
+}
+
+export async function quickCreateService(data: {
+  name: string;
+  duration_minutes: number;
+  price: number;
+  deposit_amount: number;
+}): Promise<{ id: string; name: string; duration_minutes: number } | { error: string }> {
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+
+  const { data: row, error } = await client
+    .from("services")
+    .insert({
+      name: data.name.trim(),
+      duration_minutes: data.duration_minutes,
+      price: data.price,
+      deposit_amount: data.deposit_amount,
+    })
+    .select("id, name, duration_minutes")
+    .single();
+
+  if (error) return { error: error.message };
+  return { id: row.id, name: row.name, duration_minutes: row.duration_minutes };
+}
+
 export async function moveBooking(
   id: string,
   newScheduledAt: string
