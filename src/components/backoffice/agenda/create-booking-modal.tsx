@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBookingFromAgenda, quickCreateClient, quickCreateService } from "@/actions/citas";
 import type { Client, Service, Professional } from "./agenda-types";
 import Combobox, { type ComboboxItem } from "./combobox";
+import Modal from "@/components/backoffice/modal";
 
 interface CreateBookingModalProps {
   slot: { date: Date; hour: number; minute: number };
@@ -165,11 +166,8 @@ export default function CreateBookingModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">Nuevo turno</h2>
-
-        <form onSubmit={handleSubmit} className="space-y-3">
+    <Modal open={true} onClose={onClose} title="Nuevo turno">
+      <form onSubmit={handleSubmit} className="space-y-3">
           {/* Date and time */}
           <div className="flex gap-3">
             <div className="flex-1">
@@ -377,8 +375,7 @@ export default function CreateBookingModal({
               {isPending ? "Creando..." : "Crear turno"}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }
