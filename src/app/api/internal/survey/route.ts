@@ -1,16 +1,17 @@
 /**
  * VBS-47 — Post-attention survey cron
- * Runs daily. Finds bookings with status=realized and survey_sent_at IS NULL
- * where scheduled_at is in the past. Sends a WA survey message and
- * records survey_sent_at.
+ * VBS-48 — Google review trigger based on survey score
  *
- * Survey link is read from system_config key "survey_url".
- * If not configured, the message is sent without a link.
+ * Runs daily. Finds bookings with status=realized and survey_sent_at IS NULL
+ * where scheduled_at is in the past. Sends a WA message asking for a 1-5 rating
+ * and sets the bot state to awaiting_survey_response so the bot can capture
+ * the reply and trigger a Google review request for high scores.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
 import { sendTextMessage } from "@/lib/whatsapp";
+import { upsertSession } from "@/lib/bot/session";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const authHeader = request.headers.get("authorization");
@@ -45,8 +46,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const surveyUrl = await getConfigValue("survey_url", "");
   const templateRaw = await getConfigValue(
     "template_survey",
-    "⭐ *¿Cómo fue tu experiencia en {businessName}?*\n\nHola {firstName}! Gracias por tu visita de *{serviceName}*.\n\nNos importa mucho tu opinión. ¿Podés contarnos cómo estuvo tu experiencia?\n\n📝 Completá esta breve encuesta:\n{surveyUrl}\n\n¡Muchas gracias! 🙏"
+    "⭐ *¿Cómo fue tu experiencia en {businessName}?*\n\nHola {firstName}! Gracias por tu visita de *{serviceName}*.\n\nNos importa mucho tu opinión. Respondé con un número del *1 al 5*:\n\n1️⃣ Muy mala  2️⃣ Mala  3️⃣ Regular  4️⃣ Buena  5️⃣ Excelente{surveyUrlLine}\n\n¡Muchas gracias! 🙏"
   );
+
   let sent = 0;
   let failed = 0;
 
@@ -57,16 +59,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const firstName = booking.clients?.first_name ?? "Cliente";
     const serviceName = booking.services?.name ?? "tu sesión";
 
-    let msg = templateRaw
+    const surveyUrlLine = surveyUrl
+      ? `\n\n📝 También podés completar nuestra encuesta:\n${surveyUrl}`
+      : "";
+
+    const msg = templateRaw
       .replace(/\{businessName\}/g, businessName)
       .replace(/\{firstName\}/g, firstName)
       .replace(/\{serviceName\}/g, serviceName)
+      .replace(/\{surveyUrlLine\}/g, surveyUrlLine)
+      // legacy placeholder compatibility
       .replace(/\{surveyUrl\}/g, surveyUrl);
-
-    // If no survey URL configured, remove the survey link line
-    if (!surveyUrl) {
-      msg = msg.replace(/\n?📝 Completá esta breve encuesta:\n\n?/g, "").replace(/\n{3,}/g, "\n\n");
-    }
 
     try {
       await sendTextMessage({ to: phone, body: msg });
@@ -74,6 +77,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         .from("bookings")
         .update({ survey_sent_at: new Date().toISOString() })
         .eq("id", booking.id);
+
+      // Set bot state so the next message from this client is treated as their score
+      await upsertSession(phone, "awaiting_survey_response", { pendingBookingId: booking.id });
+
       sent++;
     } catch (err) {
       console.error(`[Survey] Failed for booking ${booking.id}:`, err);
