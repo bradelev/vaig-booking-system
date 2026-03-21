@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createProfessional } from "@/actions/profesionales";
+import ValidatedForm from "@/components/backoffice/validated-form";
 
 export default function NuevoProfesionalPage() {
   return (
@@ -11,7 +12,7 @@ export default function NuevoProfesionalPage() {
         <h1 className="text-2xl font-bold text-gray-900">Nuevo profesional</h1>
       </div>
 
-      <form action={createProfessional} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
+      <ValidatedForm action={createProfessional} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700">Nombre *</label>
           <input
@@ -45,7 +46,7 @@ export default function NuevoProfesionalPage() {
             Crear profesional
           </button>
         </div>
-      </form>
+      </ValidatedForm>
     </div>
   );
 }
