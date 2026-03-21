@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient_ } from "@/actions/clientes";
+import ValidatedForm from "@/components/backoffice/validated-form";
 
 const SOURCES = ["manual", "whatsapp", "instagram", "referido", "web"] as const;
 
@@ -13,7 +14,7 @@ export default function NuevoClientePage() {
         <h1 className="text-2xl font-bold text-gray-900">Nuevo cliente</h1>
       </div>
 
-      <form action={createClient_} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
+      <ValidatedForm action={createClient_} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Nombre *</label>
@@ -89,7 +90,7 @@ export default function NuevoClientePage() {
             Crear cliente
           </button>
         </div>
-      </form>
+      </ValidatedForm>
     </div>
   );
 }

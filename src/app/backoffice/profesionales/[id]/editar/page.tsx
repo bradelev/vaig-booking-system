@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateProfessional, toggleProfessionalActive } from "@/actions/profesionales";
+import ValidatedForm from "@/components/backoffice/validated-form";
 
 interface Professional {
   id: string;
@@ -41,7 +42,7 @@ export default async function EditarProfesionalPage({
         <h1 className="text-2xl font-bold text-gray-900">Editar profesional</h1>
       </div>
 
-      <form action={updateAction} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
+      <ValidatedForm action={updateAction} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700">Nombre *</label>
           <input
@@ -92,7 +93,7 @@ export default async function EditarProfesionalPage({
             </button>
           </div>
         </div>
-      </form>
+      </ValidatedForm>
     </div>
   );
 }
