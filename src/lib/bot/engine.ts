@@ -29,17 +29,17 @@ function normalize(text: string): string {
     .trim();
 }
 
-function isMenuTrigger(text: string): boolean {
+export function isMenuTrigger(text: string): boolean {
   const t = normalize(text);
   return ["menu", "inicio", "hola", "hi", "0", "volver"].some((kw) => t.includes(kw));
 }
 
-function isCancelTrigger(text: string): boolean {
+export function isCancelTrigger(text: string): boolean {
   const t = normalize(text);
   return ["cancelar", "cancel", "salir"].some((kw) => t.includes(kw));
 }
 
-function isRescheduleTrigger(text: string): boolean {
+export function isRescheduleTrigger(text: string): boolean {
   const t = normalize(text);
   return (
     t.includes("cambiar turno") ||
@@ -50,7 +50,7 @@ function isRescheduleTrigger(text: string): boolean {
   );
 }
 
-function isMisTurnosTrigger(text: string): boolean {
+export function isMisTurnosTrigger(text: string): boolean {
   const t = normalize(text);
   return (
     t.includes("mis turnos") ||
