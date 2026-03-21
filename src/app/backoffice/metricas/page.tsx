@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = { title: "Métricas" };
 
 const FUNNEL_STAGES = [
   { key: "started", label: "Conversaciones iniciadas" },
