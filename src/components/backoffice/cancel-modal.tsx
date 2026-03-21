@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
+import { toast } from "sonner";
 import { cancelBooking, CancellationReason } from "@/actions/citas";
 
 const REASON_OPTIONS: { value: CancellationReason; label: string }[] = [
@@ -18,8 +19,13 @@ export default function CancelModal({ bookingId }: { bookingId: string }) {
 
   function handleConfirm() {
     startTransition(async () => {
-      await cancelBooking(bookingId, reason, note.trim() || null, "admin");
-      setOpen(false);
+      try {
+        await cancelBooking(bookingId, reason, note.trim() || null, "admin");
+        setOpen(false);
+        toast.success("Reserva cancelada");
+      } catch {
+        toast.error("Error al cancelar la reserva");
+      }
     });
   }
 

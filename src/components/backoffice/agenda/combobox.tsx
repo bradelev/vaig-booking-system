@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useId } from "react";
 
 export interface ComboboxItem {
   id: string;
@@ -22,6 +22,9 @@ export default function Combobox({
   onCreateNew,
   placeholder = "Buscar...",
 }: ComboboxProps) {
+  const uid = useId();
+  const listboxId = `${uid}-listbox`;
+
   const [inputText, setInputText] = useState(() => {
     const item = items.find((i) => i.id === value);
     return item?.label ?? "";
@@ -107,11 +110,17 @@ export default function Combobox({
   }, [selectedLabel]);
 
   const displayValue = value ? selectedLabel : inputText;
+  const activeOptionId = activeIndex >= 0 ? `${uid}-option-${activeIndex}` : undefined;
 
   return (
     <div ref={containerRef} className="relative">
       <input
         type="text"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        aria-activedescendant={activeOptionId}
+        aria-autocomplete="list"
         value={displayValue}
         placeholder={placeholder}
         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
@@ -126,10 +135,17 @@ export default function Combobox({
         autoComplete="off"
       />
       {open && visibleOptions.length > 0 && (
-        <ul className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+        <ul
+          id={listboxId}
+          role="listbox"
+          className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+        >
           {visibleOptions.map((item, idx) => (
             <li
               key={item.id}
+              id={`${uid}-option-${idx}`}
+              role="option"
+              aria-selected={idx === activeIndex}
               className={`cursor-pointer px-3 py-2 text-sm ${
                 idx === activeIndex
                   ? "bg-gray-100 text-gray-900"
