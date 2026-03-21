@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { toggleProfessionalActive } from "@/actions/profesionales";
+
+export const metadata: Metadata = { title: "Profesionales" };
 import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
 
 interface Professional {
