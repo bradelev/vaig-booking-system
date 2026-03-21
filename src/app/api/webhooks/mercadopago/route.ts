@@ -4,7 +4,7 @@ import { fetchMPPayment } from "@/lib/payments";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyAdminPaymentConfirmed, notifyClientPackPurchased } from "@/lib/bot/notifications";
 
-function verifySignature(
+export function verifySignature(
   payload: string,
   xSignature: string | null,
   xRequestId: string | null,
