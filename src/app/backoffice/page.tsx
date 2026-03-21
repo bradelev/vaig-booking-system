@@ -3,6 +3,7 @@ import StatCard from "@/components/backoffice/stat-card";
 import StatusBadge from "@/components/backoffice/status-badge";
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils";
 import { confirmPayment } from "@/actions/pagos";
+import ConfirmPaymentButton from "./confirm-payment-button";
 
 interface TodayBooking {
   id: string;
@@ -195,14 +196,7 @@ export default async function BackofficePage() {
                         {formatDate(b.scheduled_at)}
                       </td>
                       <td className="px-6 py-4">
-                        <form action={confirmAction}>
-                          <button
-                            type="submit"
-                            className="rounded border border-green-300 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-50 transition-colors"
-                          >
-                            Confirmar pago
-                          </button>
-                        </form>
+                        <ConfirmPaymentButton action={confirmAction} />
                       </td>
                     </tr>
                   );
