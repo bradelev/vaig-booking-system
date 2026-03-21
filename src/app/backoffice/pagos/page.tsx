@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { confirmPayment } from "@/actions/pagos";
 import { formatDate, formatTime } from "@/lib/utils";
 import StatusBadge from "@/components/backoffice/status-badge";
+import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
 
 interface PendingBooking {
   id: string;
@@ -36,6 +37,73 @@ export default async function PagosPage() {
 
   const bookings = (raw ?? []) as PendingBooking[];
 
+  const columns: TableColumn<PendingBooking>[] = [
+    {
+      header: "Turno",
+      primaryOnMobile: true,
+      accessor: (b) => (
+        <div>
+          <p className="font-medium">{formatDate(b.scheduled_at)}</p>
+          <p className="text-gray-500">{formatTime(b.scheduled_at)}</p>
+        </div>
+      ),
+    },
+    {
+      header: "Cliente",
+      accessor: (b) =>
+        b.clients
+          ? `${b.clients.first_name} ${b.clients.last_name}`.trim()
+          : "—",
+    },
+    {
+      header: "Teléfono",
+      hideOnMobile: true,
+      accessor: (b) => (
+        <span className="whitespace-nowrap">{b.clients?.phone ?? "—"}</span>
+      ),
+    },
+    {
+      header: "Servicio",
+      accessor: (b) => b.services?.name ?? "—",
+    },
+    {
+      header: "Seña",
+      accessor: (b) => {
+        const depositAmount = b.services?.deposit_amount ?? 0;
+        return (
+          <span className="whitespace-nowrap font-medium text-gray-900">
+            ${Number(depositAmount).toLocaleString("es-AR")}
+          </span>
+        );
+      },
+    },
+    {
+      header: "Profesional",
+      hideOnMobile: true,
+      accessor: (b) => b.professionals?.name ?? "—",
+    },
+    {
+      header: "Estado",
+      accessor: (b) => <StatusBadge status={b.status} />,
+    },
+    {
+      header: "Acción",
+      accessor: (b) => {
+        const confirmFn = confirmPayment.bind(null, b.id);
+        return (
+          <form action={confirmFn}>
+            <button
+              type="submit"
+              className="whitespace-nowrap rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 transition-colors"
+            >
+              Confirmar seña
+            </button>
+          </form>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -55,66 +123,12 @@ export default async function PagosPage() {
           <p className="text-gray-500">No hay pagos pendientes de confirmación.</p>
         </div>
       ) : (
-        <div className="rounded-lg border bg-white shadow-sm overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                {["Turno", "Cliente", "Teléfono", "Servicio", "Seña", "Profesional", "Estado", "Acción"].map((h) => (
-                  <th
-                    key={h}
-                    className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {bookings.map((b) => {
-                const clientName = b.clients
-                  ? `${b.clients.first_name} ${b.clients.last_name}`.trim()
-                  : "—";
-                const depositAmount = b.services?.deposit_amount ?? 0;
-                const confirmFn = confirmPayment.bind(null, b.id);
-
-                return (
-                  <tr key={b.id} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      <p className="font-medium">{formatDate(b.scheduled_at)}</p>
-                      <p className="text-gray-500">{formatTime(b.scheduled_at)}</p>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{clientName}</td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                      {b.clients?.phone ?? "—"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {b.services?.name ?? "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
-                      ${Number(depositAmount).toLocaleString("es-AR")}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {b.professionals?.name ?? "—"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={b.status} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <form action={confirmFn}>
-                        <button
-                          type="submit"
-                          className="whitespace-nowrap rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 transition-colors"
-                        >
-                          Confirmar seña
-                        </button>
-                      </form>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <ResponsiveTable
+          columns={columns}
+          data={bookings}
+          keyExtractor={(b) => b.id}
+          emptyMessage="No hay pagos pendientes de confirmación."
+        />
       )}
     </div>
   );
