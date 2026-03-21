@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { createBookingFromAgenda, quickCreateClient, quickCreateService } from "@/actions/citas";
 import type { Client, Service, Professional } from "./agenda-types";
 import Combobox, { type ComboboxItem } from "./combobox";
@@ -156,10 +157,11 @@ export default function CreateBookingModal({
         notes: notes.trim() || null,
       });
       if (result.success) {
+        toast.success("Cita creada correctamente");
         router.refresh();
         onClose();
       } else {
-        setError(result.error ?? "Error al crear el turno.");
+        toast.error(result.error ?? "Error al crear el turno.");
       }
     });
   }
