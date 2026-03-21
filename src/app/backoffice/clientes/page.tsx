@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
 
 interface Cliente {
   id: string;
@@ -112,6 +113,71 @@ export default async function ClientesPage({
 
   const baseParams = { busqueda: busqueda || undefined, segmento: segmento || undefined, orden: orden !== "nombre_asc" ? orden : undefined };
 
+  const columns: TableColumn<Cliente>[] = [
+    {
+      header: "Nombre",
+      primaryOnMobile: true,
+      accessor: (c) => (
+        <Link href={`/backoffice/clientes/${c.id}`} className="text-sm font-medium text-gray-900 hover:underline">
+          {c.first_name} {c.last_name}
+        </Link>
+      ),
+    },
+    {
+      header: "Teléfono",
+      accessor: (c) => (
+        <span className="whitespace-nowrap">
+          {isPlaceholderPhone(c.phone) ? "—" : c.phone}
+        </span>
+      ),
+    },
+    {
+      header: "Email",
+      hideOnMobile: true,
+      accessor: (c) => c.email ?? "—",
+    },
+    {
+      header: "Sesiones",
+      accessor: (c) => (
+        <span className="whitespace-nowrap">{c.total_sesiones}</span>
+      ),
+    },
+    {
+      header: "Última visita",
+      hideOnMobile: true,
+      accessor: (c) => (
+        <span className="whitespace-nowrap">
+          {c.dias_inactivo != null ? `hace ${c.dias_inactivo} días` : "—"}
+        </span>
+      ),
+    },
+    {
+      header: "Segmento",
+      accessor: (c) => {
+        const badge = c.segmento ? SEGMENTO_BADGE[c.segmento] : null;
+        return badge ? (
+          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.cls}`}>
+            {badge.label}
+          </span>
+        ) : (
+          <span className="text-gray-400 text-sm">—</span>
+        );
+      },
+    },
+    {
+      header: "Acciones",
+      hideOnMobile: true,
+      accessor: (c) => (
+        <Link
+          href={`/backoffice/clientes/${c.id}`}
+          className="text-sm text-blue-600 hover:underline"
+        >
+          Ver
+        </Link>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -176,71 +242,12 @@ export default async function ClientesPage({
         )}
       </form>
 
-      <div className="rounded-lg border bg-white shadow-sm overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              {["Nombre", "Teléfono", "Email", "Sesiones", "Última visita", "Segmento", "Acciones"].map((h) => (
-                <th
-                  key={h}
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
-            {clientes.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
-                  No hay clientes que coincidan con los filtros
-                </td>
-              </tr>
-            ) : (
-              clientes.map((c) => {
-                const badge = c.segmento ? SEGMENTO_BADGE[c.segmento] : null;
-                return (
-                  <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      <Link href={`/backoffice/clientes/${c.id}`} className="hover:underline">
-                        {c.first_name} {c.last_name}
-                      </Link>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
-                      {isPlaceholderPhone(c.phone) ? "—" : c.phone}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{c.email ?? "—"}</td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700 text-center">
-                      {c.total_sesiones}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                      {c.dias_inactivo != null ? `hace ${c.dias_inactivo} días` : "—"}
-                    </td>
-                    <td className="px-6 py-4">
-                      {badge ? (
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.cls}`}>
-                          {badge.label}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 text-sm">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <Link
-                        href={`/backoffice/clientes/${c.id}`}
-                        className="text-sm text-blue-600 hover:underline"
-                      >
-                        Ver
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ResponsiveTable
+        columns={columns}
+        data={clientes}
+        keyExtractor={(c) => c.id}
+        emptyMessage="No hay clientes que coincidan con los filtros"
+      />
 
       {/* Paginación */}
       <div className="flex items-center justify-between text-sm text-gray-600">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { toggleProfessionalActive } from "@/actions/profesionales";
+import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
 
 interface Professional {
   id: string;
@@ -21,6 +22,67 @@ export default async function ProfesionalesPage() {
 
   const profesionales = (raw ?? []) as Professional[];
 
+  const columns: TableColumn<Professional>[] = [
+    {
+      header: "Nombre",
+      primaryOnMobile: true,
+      accessor: (p) => (
+        <span className="text-sm font-medium text-gray-900">{p.name}</span>
+      ),
+    },
+    {
+      header: "Especialidades",
+      accessor: (p) =>
+        p.specialties && p.specialties.length > 0
+          ? p.specialties.join(", ")
+          : "—",
+    },
+    {
+      header: "Estado",
+      accessor: (p) => (
+        <span
+          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            p.is_active
+              ? "bg-green-100 text-green-800"
+              : "bg-gray-100 text-gray-600"
+          }`}
+        >
+          {p.is_active ? "Activo" : "Inactivo"}
+        </span>
+      ),
+    },
+    {
+      header: "Acciones",
+      accessor: (p) => {
+        const toggleAction = toggleProfessionalActive.bind(null, p.id, p.is_active);
+        return (
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/backoffice/profesionales/${p.id}/editar`}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Editar
+            </Link>
+            <Link
+              href={`/backoffice/profesionales/${p.id}/horario`}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Horario
+            </Link>
+            <form action={toggleAction}>
+              <button
+                type="submit"
+                className="text-sm text-gray-500 hover:text-gray-800 hover:underline"
+              >
+                {p.is_active ? "Desactivar" : "Activar"}
+              </button>
+            </form>
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -33,80 +95,12 @@ export default async function ProfesionalesPage() {
         </Link>
       </div>
 
-      <div className="rounded-lg border bg-white shadow-sm overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              {["Nombre", "Especialidades", "Estado", "Acciones"].map((h) => (
-                <th
-                  key={h}
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
-            {profesionales.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-500">
-                  No hay profesionales creados aún
-                </td>
-              </tr>
-            ) : (
-              profesionales.map((p) => {
-                const toggleAction = toggleProfessionalActive.bind(null, p.id, p.is_active);
-                return (
-                  <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{p.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {p.specialties && p.specialties.length > 0
-                        ? p.specialties.join(", ")
-                        : "—"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          p.is_active
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {p.is_active ? "Activo" : "Inactivo"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <Link
-                          href={`/backoffice/profesionales/${p.id}/editar`}
-                          className="text-sm text-blue-600 hover:underline"
-                        >
-                          Editar
-                        </Link>
-                        <Link
-                          href={`/backoffice/profesionales/${p.id}/horario`}
-                          className="text-sm text-blue-600 hover:underline"
-                        >
-                          Horario
-                        </Link>
-                        <form action={toggleAction}>
-                          <button
-                            type="submit"
-                            className="text-sm text-gray-500 hover:text-gray-800 hover:underline"
-                          >
-                            {p.is_active ? "Desactivar" : "Activar"}
-                          </button>
-                        </form>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ResponsiveTable
+        columns={columns}
+        data={profesionales}
+        keyExtractor={(p) => p.id}
+        emptyMessage="No hay profesionales creados aún"
+      />
     </div>
   );
 }
