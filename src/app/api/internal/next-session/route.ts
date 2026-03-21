@@ -106,12 +106,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       month: "long",
     });
 
-    const msg =
-      `💆 *¿Ya es hora de tu próxima sesión?*\n\n` +
-      `Hola ${firstName}! Han pasado aproximadamente ${intervalDays} días desde tu última sesión de *${serviceName}*.\n\n` +
-      `📅 Te sugerimos agendarla alrededor del ${dateLabel}.\n\n` +
-      `Respondé *hola* para ver los turnos disponibles o ignorá este mensaje si ya tenés uno coordinado. 😊\n\n` +
-      `_${businessName}_`;
+    const templateRaw = await getConfigValue(
+      "template_next_session",
+      "💆 *¿Ya es hora de tu próxima sesión?*\n\nHola {firstName}! Han pasado aproximadamente {intervalDays} días desde tu última sesión de *{serviceName}*.\n\n📅 Te sugerimos agendarla alrededor del {dateLabel}.\n\nRespondé *hola* para ver los turnos disponibles o ignorá este mensaje si ya tenés uno coordinado. 😊\n\n_{businessName}_"
+    );
+    const msg = templateRaw
+      .replace(/\{firstName\}/g, firstName)
+      .replace(/\{serviceName\}/g, serviceName)
+      .replace(/\{dateLabel\}/g, dateLabel)
+      .replace(/\{intervalDays\}/g, String(intervalDays))
+      .replace(/\{businessName\}/g, businessName);
 
     try {
       await sendTextMessage({ to: phone, body: msg });

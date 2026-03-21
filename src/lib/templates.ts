@@ -5,6 +5,7 @@ export const TEMPLATE_KEYS = [
   "template_survey",
   "template_google_review",
   "template_payment_reminder",
+  "template_next_session",
   "template_cancel_client",
   "template_pack_purchased",
 ] as const;
@@ -16,6 +17,7 @@ export const TEMPLATE_LABELS: Record<TemplateKey, string> = {
   template_survey: "Encuesta post-atención",
   template_google_review: "Pedido de reseña Google",
   template_payment_reminder: "Recordatorio de pago pendiente",
+  template_next_session: "Sugerencia próxima sesión",
   template_cancel_client: "Cancelación de turno (cliente)",
   template_pack_purchased: "Confirmación compra de pack",
 };
@@ -25,6 +27,7 @@ export const TEMPLATE_PLACEHOLDERS: Record<TemplateKey, string[]> = {
   template_survey: ["{firstName}", "{serviceName}", "{businessName}", "{surveyUrl}"],
   template_google_review: ["{firstName}", "{businessName}", "{googleReviewUrl}"],
   template_payment_reminder: ["{firstName}", "{serviceName}", "{businessName}", "{paymentLine}", "{hoursRemaining}"],
+  template_next_session: ["{firstName}", "{serviceName}", "{businessName}", "{dateLabel}", "{intervalDays}"],
   template_cancel_client: ["{firstName}", "{serviceName}", "{dateLabel}", "{reasonText}"],
   template_pack_purchased: ["{firstName}", "{packName}", "{serviceName}", "{sessionsTotal}"],
 };
