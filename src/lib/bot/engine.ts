@@ -165,6 +165,8 @@ async function route(
       return handleRescheduleConfirm(phone, text, context);
     case "cancelling":
       return handleCancelConfirm(phone, text, context);
+    case "awaiting_survey_response":
+      return handleSurveyResponse(phone, text, context);
     default:
       return handleMenu(phone);
   }
@@ -1379,6 +1381,67 @@ async function handleReminderConfirm(
 
   await clearSession(phone);
   await reply(phone, "✅ ¡Turno confirmado! Te esperamos. 😊");
+}
+
+// ── VBS-48: Survey response + Google review trigger ───────────────────────────
+
+async function handleSurveyResponse(
+  phone: string,
+  text: string,
+  context: BookingFlowContext
+): Promise<void> {
+  const score = parseInt(text.trim(), 10);
+
+  if (isNaN(score) || score < 1 || score > 5) {
+    await reply(
+      phone,
+      "Por favor respondé con un número del *1 al 5* para calificar tu experiencia.\n\n1️⃣ Muy mala  2️⃣ Mala  3️⃣ Regular  4️⃣ Buena  5️⃣ Excelente"
+    );
+    return;
+  }
+
+  const dbClient = createAdminClient() as AnyClient;
+
+  if (context.pendingBookingId) {
+    await dbClient
+      .from("bookings")
+      .update({ survey_response: { score, answered_at: new Date().toISOString() } })
+      .eq("id", context.pendingBookingId);
+  }
+
+  await clearSession(phone);
+
+  const reviewThresholdStr = await getConfigValue("google_review_score_threshold", "4");
+  const reviewThreshold = parseInt(reviewThresholdStr, 10) || 4;
+
+  if (score >= reviewThreshold) {
+    const googleReviewUrl = await getConfigValue("google_review_url", "");
+    if (googleReviewUrl) {
+      const businessName = await getConfigValue("business_name", "VAIG");
+      const { data: client } = await dbClient
+        .from("clients")
+        .select("first_name")
+        .eq("phone", phone)
+        .maybeSingle();
+      const firstName = client?.first_name ?? "Cliente";
+
+      const templateRaw = await getConfigValue(
+        "template_google_review",
+        "🌟 *¡Gracias por tu calificación, {firstName}!*\n\nNos alegra saber que tuviste una buena experiencia en *{businessName}*.\n\n¿Te gustaría compartirla con otras personas? Tu reseña nos ayuda a crecer 🙏\n\n👉 {googleReviewUrl}"
+      );
+
+      const msg = templateRaw
+        .replace(/\{firstName\}/g, firstName)
+        .replace(/\{businessName\}/g, businessName)
+        .replace(/\{googleReviewUrl\}/g, googleReviewUrl);
+
+      await reply(phone, msg);
+      console.log(`[Survey] Google review sent to ${phone} (score: ${score})`);
+      return;
+    }
+  }
+
+  await reply(phone, "¡Gracias por tu calificación! Nos ayuda a mejorar. 🙏");
 }
 
 // ── Date parsing helpers ──────────────────────────────────────────────────────
