@@ -49,6 +49,7 @@ export default function CreateBookingModal({
   const [showNewClient, setShowNewClient] = useState(false);
   const [newClientFirst, setNewClientFirst] = useState("");
   const [newClientLast, setNewClientLast] = useState("");
+  const [newClientPhone, setNewClientPhone] = useState("");
   const [clientCreating, setClientCreating] = useState(false);
 
   // Service state
@@ -57,6 +58,8 @@ export default function CreateBookingModal({
   const [showNewService, setShowNewService] = useState(false);
   const [newServiceName, setNewServiceName] = useState("");
   const [newServiceDuration, setNewServiceDuration] = useState(60);
+  const [newServicePrice, setNewServicePrice] = useState(0);
+  const [newServiceDeposit, setNewServiceDeposit] = useState(0);
   const [serviceCreating, setServiceCreating] = useState(false);
 
   const [professionalId, setProfessionalId] = useState("");
@@ -79,11 +82,12 @@ export default function CreateBookingModal({
   }));
 
   async function handleCreateClient() {
-    if (!newClientFirst.trim() || !newClientLast.trim()) return;
+    if (!newClientFirst.trim() || !newClientLast.trim() || !newClientPhone.trim()) return;
     setClientCreating(true);
     const result = await quickCreateClient({
       first_name: newClientFirst,
       last_name: newClientLast,
+      phone: newClientPhone,
     });
     setClientCreating(false);
     if ("error" in result) {
@@ -100,6 +104,7 @@ export default function CreateBookingModal({
     setShowNewClient(false);
     setNewClientFirst("");
     setNewClientLast("");
+    setNewClientPhone("");
   }
 
   async function handleCreateService() {
@@ -108,6 +113,8 @@ export default function CreateBookingModal({
     const result = await quickCreateService({
       name: newServiceName,
       duration_minutes: newServiceDuration,
+      price: newServicePrice,
+      deposit_amount: newServiceDeposit,
     });
     setServiceCreating(false);
     if ("error" in result) {
@@ -124,6 +131,8 @@ export default function CreateBookingModal({
     setShowNewService(false);
     setNewServiceName("");
     setNewServiceDuration(60);
+    setNewServicePrice(0);
+    setNewServiceDeposit(0);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -218,6 +227,13 @@ export default function CreateBookingModal({
                     className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none"
                   />
                 </div>
+                <input
+                  type="tel"
+                  value={newClientPhone}
+                  onChange={(e) => setNewClientPhone(e.target.value)}
+                  placeholder="Teléfono (ej: 5491112345678)"
+                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none"
+                />
                 <div className="flex gap-2 justify-end">
                   <button
                     type="button"
@@ -229,7 +245,7 @@ export default function CreateBookingModal({
                   <button
                     type="button"
                     onClick={handleCreateClient}
-                    disabled={clientCreating || !newClientFirst.trim() || !newClientLast.trim()}
+                    disabled={clientCreating || !newClientFirst.trim() || !newClientLast.trim() || !newClientPhone.trim()}
                     className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                   >
                     {clientCreating ? "Creando..." : "Crear"}
@@ -263,16 +279,38 @@ export default function CreateBookingModal({
                   placeholder="Nombre del servicio"
                   className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none"
                 />
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-600 whitespace-nowrap">Duración (min)</label>
-                  <input
-                    type="number"
-                    value={newServiceDuration}
-                    onChange={(e) => setNewServiceDuration(Number(e.target.value))}
-                    min={5}
-                    max={480}
-                    className="w-20 rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none"
-                  />
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-gray-600">Duración (min)</label>
+                    <input
+                      type="number"
+                      value={newServiceDuration}
+                      onChange={(e) => setNewServiceDuration(Number(e.target.value))}
+                      min={5}
+                      max={480}
+                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-gray-600">Precio</label>
+                    <input
+                      type="number"
+                      value={newServicePrice}
+                      onChange={(e) => setNewServicePrice(Number(e.target.value))}
+                      min={0}
+                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-gray-600">Seña</label>
+                    <input
+                      type="number"
+                      value={newServiceDeposit}
+                      onChange={(e) => setNewServiceDeposit(Number(e.target.value))}
+                      min={0}
+                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none"
+                    />
+                  </div>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <button
