@@ -1,8 +1,9 @@
 /**
- * Scheduler DB helpers — fetches real availability from Supabase.
+ * Scheduler DB helpers — fetches real availability from Supabase and Google Calendar.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { calculateAvailableSlots } from "./index";
+import { listCalendarEvents } from "@/lib/gcal";
 import type { TimeSlot, WorkingHours } from "./types";
 import type { SlotOption } from "@/lib/bot/types";
 
@@ -71,6 +72,8 @@ async function getProfessionalWorkingHours(professionalId: string): Promise<Work
 
 /**
  * Gets existing bookings for a professional on a specific date.
+ * Also fetches Google Calendar events to block manually-reserved slots (VBS-85).
+ * GCal fetch degrades gracefully: returns [] if env vars are missing or API fails.
  */
 async function getExistingBookings(
   professionalId: string,
@@ -83,23 +86,36 @@ async function getExistingBookings(
   const dayStart = new Date(`${dateStr}T00:00:00-03:00`);
   const dayEnd = new Date(`${dateStr}T23:59:59-03:00`);
 
-  const { data } = await client
-    .from("bookings")
-    .select("scheduled_at, services(duration_minutes)")
-    .eq("professional_id", professionalId)
-    .gte("scheduled_at", dayStart.toISOString())
-    .lte("scheduled_at", dayEnd.toISOString())
-    .not("status", "in", '("cancelled","no_show")');
+  const [dbResult, gcalEvents] = await Promise.all([
+    client
+      .from("bookings")
+      .select("scheduled_at, services(duration_minutes)")
+      .eq("professional_id", professionalId)
+      .gte("scheduled_at", dayStart.toISOString())
+      .lte("scheduled_at", dayEnd.toISOString())
+      .not("status", "in", '("cancelled","no_show")'),
+    listCalendarEvents(dayStart.toISOString(), dayEnd.toISOString()).catch((err: unknown) => {
+      console.error("[Scheduler] GCal fetch failed, ignoring:", err);
+      return [];
+    }),
+  ]);
 
-  if (!data) return [];
+  const bookingSlots: TimeSlot[] = (
+    dbResult.data as Array<{ scheduled_at: string; services: { duration_minutes: number } | null }> ?? []
+  ).map((b) => {
+    const start = new Date(b.scheduled_at);
+    const durationMs = (b.services?.duration_minutes ?? 60) * 60_000;
+    return { start, end: new Date(start.getTime() + durationMs) };
+  });
 
-  return (data as Array<{ scheduled_at: string; services: { duration_minutes: number } | null }>).map(
-    (b) => {
-      const start = new Date(b.scheduled_at);
-      const durationMs = (b.services?.duration_minutes ?? 60) * 60_000;
-      return { start, end: new Date(start.getTime() + durationMs) };
-    }
-  );
+  const gcalSlots: TimeSlot[] = gcalEvents
+    .filter((e) => e.start && e.end)
+    .map((e) => ({
+      start: new Date(e.start),
+      end: new Date(e.end),
+    }));
+
+  return [...bookingSlots, ...gcalSlots];
 }
 
 /**
