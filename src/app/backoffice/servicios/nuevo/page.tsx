@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createService } from "@/actions/servicios";
+import ValidatedForm from "@/components/backoffice/validated-form";
 
 interface Professional {
   id: string;
@@ -29,7 +30,7 @@ export default async function NuevoServicioPage() {
         <h1 className="text-2xl font-bold text-gray-900">Nuevo servicio</h1>
       </div>
 
-      <form action={createService} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
+      <ValidatedForm action={createService} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700">Nombre *</label>
           <input
@@ -113,7 +114,7 @@ export default async function NuevoServicioPage() {
             Crear servicio
           </button>
         </div>
-      </form>
+      </ValidatedForm>
     </div>
   );
 }
