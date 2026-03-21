@@ -18,7 +18,8 @@ export type BotConversationState =
   | "waitlist_offer"
   | "reschedule_confirm"
   | "cancelling"
-  | "awaiting_survey_response";
+  | "awaiting_survey_response"
+  | "awaiting_consent";
 
 export interface ServiceInfo {
   id: string;
