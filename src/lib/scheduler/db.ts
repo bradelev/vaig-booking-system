@@ -16,7 +16,7 @@ const TZ = "America/Argentina/Buenos_Aires";
  * Formats a Date in Buenos Aires timezone as a human-readable label.
  * e.g. "Lunes 17/03 a las 10:00"
  */
-function formatSlotLabel(date: Date): string {
+export function formatSlotLabel(date: Date): string {
   const dayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
   const dayOfWeek = dayNames[
     parseInt(date.toLocaleDateString("es-AR", { timeZone: TZ, weekday: "short" }).charAt(0) === "D"
