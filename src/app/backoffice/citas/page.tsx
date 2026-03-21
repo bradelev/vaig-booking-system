@@ -4,6 +4,7 @@ import StatusBadge from "@/components/backoffice/status-badge";
 import { formatDate, formatTime } from "@/lib/utils";
 import { updateBookingStatus } from "@/actions/citas";
 import CancelModal from "@/components/backoffice/cancel-modal";
+import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
 
 interface Booking {
   id: string;
@@ -167,6 +168,78 @@ export default async function CitasPage({
   // Current params for pagination links
   const baseParams = { filtro, desde, hasta, estado, profesional: profesionalId, servicio: servicioId, busqueda };
 
+  const columns: TableColumn<Booking>[] = [
+    {
+      header: "Fecha/Hora",
+      primaryOnMobile: true,
+      accessor: (b) => (
+        <div>
+          <p className="font-medium">{formatDate(b.scheduled_at)}</p>
+          <p className="text-gray-500">{formatTime(b.scheduled_at)}</p>
+        </div>
+      ),
+    },
+    {
+      header: "Cliente",
+      accessor: (b) =>
+        b.clients
+          ? `${b.clients.first_name} ${b.clients.last_name}`.trim()
+          : "—",
+    },
+    {
+      header: "Teléfono",
+      hideOnMobile: true,
+      accessor: (b) => (
+        <span className="whitespace-nowrap">{b.clients?.phone ?? "—"}</span>
+      ),
+    },
+    {
+      header: "Servicio",
+      accessor: (b) => b.services?.name ?? "—",
+    },
+    {
+      header: "Profesional",
+      hideOnMobile: true,
+      accessor: (b) => b.professionals?.name ?? "—",
+    },
+    {
+      header: "Estado",
+      accessor: (b) => <StatusBadge status={b.status} />,
+    },
+    {
+      header: "Acciones",
+      accessor: (b) => {
+        const actions = NEXT_STATUS[b.status] ?? [];
+        return (
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href={`/backoffice/citas/${b.id}/editar`}
+              className="whitespace-nowrap text-sm text-blue-600 hover:underline"
+            >
+              Editar
+            </Link>
+            {actions.map((action) => {
+              const actionFn = updateBookingStatus.bind(null, b.id, action.status);
+              return (
+                <form key={action.status} action={actionFn}>
+                  <button
+                    type="submit"
+                    className="whitespace-nowrap rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    {action.label}
+                  </button>
+                </form>
+              );
+            })}
+            {["pending", "deposit_paid", "confirmed"].includes(b.status) && (
+              <CancelModal bookingId={b.id} />
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -286,86 +359,12 @@ export default async function CitasPage({
       </form>
 
       {/* Table */}
-      <div className="rounded-lg border bg-white shadow-sm overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              {["Fecha/Hora", "Cliente", "Teléfono", "Servicio", "Profesional", "Estado", "Acciones"].map((h) => (
-                <th
-                  key={h}
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
-            {bookings.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
-                  No hay citas con los filtros seleccionados
-                </td>
-              </tr>
-            ) : (
-              bookings.map((b) => {
-                const actions = NEXT_STATUS[b.status] ?? [];
-                const clientName = b.clients
-                  ? `${b.clients.first_name} ${b.clients.last_name}`.trim()
-                  : "—";
-
-                return (
-                  <tr key={b.id} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      <p className="font-medium">{formatDate(b.scheduled_at)}</p>
-                      <p className="text-gray-500">{formatTime(b.scheduled_at)}</p>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{clientName}</td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                      {b.clients?.phone ?? "—"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {b.services?.name ?? "—"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {b.professionals?.name ?? "—"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={b.status} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/backoffice/citas/${b.id}/editar`}
-                          className="whitespace-nowrap text-sm text-blue-600 hover:underline"
-                        >
-                          Editar
-                        </Link>
-                        {actions.map((action) => {
-                          const actionFn = updateBookingStatus.bind(null, b.id, action.status);
-                          return (
-                            <form key={action.status} action={actionFn}>
-                              <button
-                                type="submit"
-                                className="whitespace-nowrap rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-                              >
-                                {action.label}
-                              </button>
-                            </form>
-                          );
-                        })}
-                        {["pending", "deposit_paid", "confirmed"].includes(b.status) && (
-                          <CancelModal bookingId={b.id} />
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ResponsiveTable
+        columns={columns}
+        data={bookings}
+        keyExtractor={(b) => b.id}
+        emptyMessage="No hay citas con los filtros seleccionados"
+      />
 
       {/* Pagination */}
       {total > 0 && (
