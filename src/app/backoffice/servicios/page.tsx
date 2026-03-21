@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { toggleServiceActive } from "@/actions/servicios";
 import { formatCurrency } from "@/lib/utils";
+import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
 
 interface Servicio {
   id: string;
@@ -29,6 +30,81 @@ export default async function ServiciosPage() {
 
   const servicios = (raw ?? []) as Servicio[];
 
+  const columns: TableColumn<Servicio>[] = [
+    {
+      header: "Nombre",
+      primaryOnMobile: true,
+      accessor: (s) => (
+        <div>
+          <p className="text-sm font-medium text-gray-900">{s.name}</p>
+          {s.description && (
+            <p className="text-xs text-gray-500 mt-0.5 max-w-xs truncate">{s.description}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: "Duración",
+      accessor: (s) => (
+        <span className="whitespace-nowrap">{s.duration_minutes} min</span>
+      ),
+    },
+    {
+      header: "Precio",
+      accessor: (s) => (
+        <span className="whitespace-nowrap">{formatCurrency(s.price)}</span>
+      ),
+    },
+    {
+      header: "Seña",
+      accessor: (s) => (
+        <span className="whitespace-nowrap">{formatCurrency(s.deposit_amount)}</span>
+      ),
+    },
+    {
+      header: "Profesional",
+      accessor: (s) => s.professionals?.name ?? "—",
+    },
+    {
+      header: "Estado",
+      accessor: (s) => (
+        <span
+          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            s.is_active
+              ? "bg-green-100 text-green-800"
+              : "bg-gray-100 text-gray-600"
+          }`}
+        >
+          {s.is_active ? "Activo" : "Inactivo"}
+        </span>
+      ),
+    },
+    {
+      header: "Acciones",
+      accessor: (s) => {
+        const toggleAction = toggleServiceActive.bind(null, s.id, s.is_active);
+        return (
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/backoffice/servicios/${s.id}/editar`}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Editar
+            </Link>
+            <form action={toggleAction}>
+              <button
+                type="submit"
+                className="text-sm text-gray-500 hover:text-gray-800 hover:underline"
+              >
+                {s.is_active ? "Desactivar" : "Activar"}
+              </button>
+            </form>
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -41,86 +117,12 @@ export default async function ServiciosPage() {
         </Link>
       </div>
 
-      <div className="rounded-lg border bg-white shadow-sm overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              {["Nombre", "Duración", "Precio", "Seña", "Profesional", "Estado", "Acciones"].map((h) => (
-                <th
-                  key={h}
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
-            {servicios.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
-                  No hay servicios creados aún
-                </td>
-              </tr>
-            ) : (
-              servicios.map((s) => {
-                const toggleAction = toggleServiceActive.bind(null, s.id, s.is_active);
-                return (
-                  <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-gray-900">{s.name}</p>
-                      {s.description && (
-                        <p className="text-xs text-gray-500 mt-0.5 max-w-xs truncate">{s.description}</p>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
-                      {s.duration_minutes} min
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
-                      {formatCurrency(s.price)}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
-                      {formatCurrency(s.deposit_amount)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {s.professionals?.name ?? "—"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          s.is_active
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {s.is_active ? "Activo" : "Inactivo"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <Link
-                          href={`/backoffice/servicios/${s.id}/editar`}
-                          className="text-sm text-blue-600 hover:underline"
-                        >
-                          Editar
-                        </Link>
-                        <form action={toggleAction}>
-                          <button
-                            type="submit"
-                            className="text-sm text-gray-500 hover:text-gray-800 hover:underline"
-                          >
-                            {s.is_active ? "Desactivar" : "Activar"}
-                          </button>
-                        </form>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ResponsiveTable
+        columns={columns}
+        data={servicios}
+        keyExtractor={(s) => s.id}
+        emptyMessage="No hay servicios creados aún"
+      />
     </div>
   );
 }
