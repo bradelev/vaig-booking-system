@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import DailyActivityChart from "@/components/backoffice/metrics/daily-activity-chart";
+import FunnelChart from "@/components/backoffice/metrics/funnel-chart";
 
 const FUNNEL_STAGES = [
   { key: "started", label: "Conversaciones iniciadas" },
@@ -73,6 +75,23 @@ export default async function MetricasPage({
 
   const selectedPeriod = PERIODS.find((p) => p.days === days) ?? PERIODS[1];
 
+  // Transform dailyMap into chart data (ascending order, short date label)
+  const MONTH_LABELS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const dailyChartData = Object.entries(dailyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, count]) => {
+      const [, mm, dd] = day.split("-");
+      const label = `${parseInt(dd)} ${MONTH_LABELS[parseInt(mm) - 1]}`;
+      return { date: label, sesiones: count };
+    });
+
+  // Transform stageCounts into funnel chart data
+  const funnelChartData = FUNNEL_STAGES.map((stage) => {
+    const count = stageCounts[stage.key] ?? 0;
+    const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+    return { stage: stage.key, count, percentage };
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -137,6 +156,41 @@ export default async function MetricasPage({
             </div>
           );
         })}
+      </div>
+
+      {/* Charts row */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Daily activity chart */}
+        <div className="rounded-lg border bg-white shadow-sm">
+          <div className="border-b border-gray-200 px-6 py-4">
+            <h2 className="text-lg font-semibold text-gray-900">Actividad diaria</h2>
+          </div>
+          <div className="p-6">
+            {dailyChartData.length > 0 ? (
+              <DailyActivityChart data={dailyChartData} />
+            ) : (
+              <p className="py-8 text-center text-sm text-gray-500">
+                No hay datos en el período seleccionado
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Funnel chart */}
+        <div className="rounded-lg border bg-white shadow-sm">
+          <div className="border-b border-gray-200 px-6 py-4">
+            <h2 className="text-lg font-semibold text-gray-900">Embudo de conversión</h2>
+          </div>
+          <div className="p-6">
+            {total > 0 ? (
+              <FunnelChart data={funnelChartData} />
+            ) : (
+              <p className="py-8 text-center text-sm text-gray-500">
+                No hay datos en el período seleccionado
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Funnel summary table */}
