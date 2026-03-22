@@ -10,6 +10,7 @@ export interface ConversationSession {
   state: BotConversationState;
   context: BookingFlowContext;
   lastMessageAt: Date;
+  updatedAt: Date;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,7 +21,7 @@ export async function getSession(phone: string): Promise<ConversationSession | n
 
   const { data } = await client
     .from("conversation_sessions")
-    .select("id, phone, state, context_json, last_message_at")
+    .select("id, phone, state, context_json, last_message_at, updated_at")
     .eq("phone", phone)
     .order("last_message_at", { ascending: false })
     .limit(1)
@@ -34,6 +35,7 @@ export async function getSession(phone: string): Promise<ConversationSession | n
     state: (data.state as BotConversationState) ?? "idle",
     context: (data.context_json as BookingFlowContext) ?? {},
     lastMessageAt: new Date(data.last_message_at as string),
+    updatedAt: new Date((data.updated_at ?? data.last_message_at) as string),
   };
 }
 
