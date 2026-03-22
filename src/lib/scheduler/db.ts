@@ -103,6 +103,89 @@ async function getExistingBookings(
   );
 }
 
+// ── Time window types ─────────────────────────────────────────────────────────
+
+export interface TimeWindow {
+  label: string;     // e.g. "Mañana"
+  emoji: string;     // e.g. "☀️"
+  startHour: number; // e.g. 9
+  endHour: number;   // e.g. 12
+}
+
+export interface SlotsByDay {
+  dateLabel: string;  // e.g. "Lunes 23/03"
+  date: string;       // ISO date string "2026-03-23"
+  windows: Array<{
+    window: TimeWindow;
+    slots: SlotOption[];
+  }>;
+}
+
+/**
+ * Returns available slots grouped by day and time window.
+ * Looks up to 7 days ahead.
+ */
+export async function getSlotsByWindow(
+  professionalId: string,
+  durationMinutes: number,
+  bufferMinutes: number,
+  windows: TimeWindow[],
+  maxDays = 7
+): Promise<SlotsByDay[]> {
+  const workingHours = await getProfessionalWorkingHours(professionalId);
+  const result: SlotsByDay[] = [];
+
+  const now = new Date();
+  const startDate = new Date(now);
+  startDate.setDate(now.getDate() + 1);
+
+  for (let dayOffset = 0; dayOffset < maxDays; dayOffset++) {
+    const rawDate = new Date(startDate);
+    rawDate.setDate(startDate.getDate() + dayOffset);
+    const checkDate = artMidnight(rawDate);
+
+    const existingBookings = await getExistingBookings(professionalId, checkDate);
+    const { availableSlots } = calculateAvailableSlots({
+      date: checkDate,
+      durationMinutes,
+      workingHours,
+      existingBookings,
+      bufferMinutes,
+    });
+
+    if (availableSlots.length === 0) continue;
+
+    const dayWindows: SlotsByDay["windows"] = [];
+    for (const window of windows) {
+      const windowSlots = availableSlots
+        .filter((s) => {
+          const { hour } = getARTComponents(s.start);
+          return hour >= window.startHour && hour < window.endHour;
+        })
+        .map((s) => ({
+          start: s.start.toISOString(),
+          end: s.end.toISOString(),
+          label: formatSlotLabel(s.start),
+        }));
+
+      if (windowSlots.length > 0) {
+        dayWindows.push({ window, slots: windowSlots });
+      }
+    }
+
+    if (dayWindows.length > 0) {
+      const dateStr = checkDate.toLocaleDateString("sv-SE", { timeZone: TZ });
+      result.push({
+        dateLabel: formatSlotLabel(checkDate).split(" a las")[0], // "Lunes 23/03"
+        date: dateStr,
+        windows: dayWindows,
+      });
+    }
+  }
+
+  return result;
+}
+
 /**
  * Returns up to 3 available slot options for a service+professional combination
  * starting from today+1 day, looking up to 7 days ahead.
