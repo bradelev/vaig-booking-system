@@ -233,6 +233,75 @@ export async function getNextAvailableSlots(
 }
 
 /**
+ * Returns slots within ±rangeHours of the target time on the same day,
+ * then on the next N days at the same hour if not enough found.
+ */
+export async function getNearbySlots(
+  professionalId: string,
+  targetDate: Date,
+  durationMinutes: number,
+  bufferMinutes: number,
+  rangeHours = 2,
+  maxResults = 5
+): Promise<SlotOption[]> {
+  const workingHours = await getProfessionalWorkingHours(professionalId);
+  const { hour: targetHour } = getARTComponents(targetDate);
+  const nearby: SlotOption[] = [];
+
+  // Phase 1: same day, ±rangeHours
+  const existingBookings = await getExistingBookings(professionalId, targetDate);
+  const { availableSlots } = calculateAvailableSlots({
+    date: artMidnight(targetDate),
+    durationMinutes,
+    workingHours,
+    existingBookings,
+    bufferMinutes,
+  });
+
+  for (const slot of availableSlots) {
+    const { hour } = getARTComponents(slot.start);
+    if (Math.abs(hour - targetHour) <= rangeHours && nearby.length < maxResults) {
+      nearby.push({
+        start: slot.start.toISOString(),
+        end: slot.end.toISOString(),
+        label: formatSlotLabel(slot.start),
+      });
+    }
+  }
+
+  // Phase 2: ±rangeHours on next 3 days if still need more
+  if (nearby.length < maxResults) {
+    for (let daysAhead = 1; daysAhead <= 3 && nearby.length < maxResults; daysAhead++) {
+      const rawDate = new Date(targetDate);
+      rawDate.setDate(rawDate.getDate() + daysAhead);
+      const checkDate = artMidnight(rawDate);
+
+      const dayBookings = await getExistingBookings(professionalId, checkDate);
+      const { availableSlots: daySlots } = calculateAvailableSlots({
+        date: checkDate,
+        durationMinutes,
+        workingHours,
+        existingBookings: dayBookings,
+        bufferMinutes,
+      });
+
+      for (const slot of daySlots) {
+        const { hour } = getARTComponents(slot.start);
+        if (Math.abs(hour - targetHour) <= rangeHours && nearby.length < maxResults) {
+          nearby.push({
+            start: slot.start.toISOString(),
+            end: slot.end.toISOString(),
+            label: formatSlotLabel(slot.start),
+          });
+        }
+      }
+    }
+  }
+
+  return nearby;
+}
+
+/**
  * Checks if a specific datetime is available for a professional.
  */
 export async function checkSlotAvailability(
