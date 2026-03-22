@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { calculateAvailableSlots } from "./index";
 import type { TimeSlot, WorkingHours } from "./types";
 import type { SlotOption } from "@/lib/bot/types";
+import { artMidnight, artDateTime, getARTComponents } from "@/lib/timezone";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
@@ -121,9 +122,9 @@ export async function getNextAvailableSlots(
   startDate.setDate(now.getDate() + 1);
 
   for (let dayOffset = 0; dayOffset < 14 && slots.length < maxSlots; dayOffset++) {
-    const checkDate = new Date(startDate);
-    checkDate.setDate(startDate.getDate() + dayOffset);
-    checkDate.setHours(0, 0, 0, 0);
+    const rawDate = new Date(startDate);
+    rawDate.setDate(startDate.getDate() + dayOffset);
+    const checkDate = artMidnight(rawDate);
 
     const existingBookings = await getExistingBookings(professionalId, checkDate);
 
@@ -161,12 +162,11 @@ export async function checkSlotAvailability(
   const existingBookings = await getExistingBookings(professionalId, start);
   const end = new Date(start.getTime() + durationMinutes * 60_000);
 
+  const { dayOfWeek: artDayOfWeek } = getARTComponents(start);
   const slotFits = workingHours.some((wh) => {
-    if (wh.dayOfWeek !== start.getDay()) return false;
-    const whStart = new Date(start);
-    whStart.setHours(wh.startHour, wh.startMinute, 0, 0);
-    const whEnd = new Date(start);
-    whEnd.setHours(wh.endHour, wh.endMinute, 0, 0);
+    if (wh.dayOfWeek !== artDayOfWeek) return false;
+    const whStart = artDateTime(start, wh.startHour, wh.startMinute);
+    const whEnd = artDateTime(start, wh.endHour, wh.endMinute);
     return start >= whStart && end <= whEnd;
   });
 
