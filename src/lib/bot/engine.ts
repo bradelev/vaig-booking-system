@@ -5,7 +5,7 @@
 import { sendTextMessage, sendInteractiveButtons } from "@/lib/whatsapp";
 import { buildKnowledgeBase } from "./knowledge";
 import { getSession, upsertSession, clearSession, advanceFunnel } from "./session";
-import { getSlotsByWindow, getNextAvailableSlots, checkSlotAvailability } from "@/lib/scheduler/db";
+import { getSlotsByWindow, getNextAvailableSlots, checkSlotAvailability, getNearbySlots, formatSlotLabel } from "@/lib/scheduler/db";
 import type { TimeWindow, SlotsByDay } from "@/lib/scheduler/db";
 import { artDateTime, getARTComponents } from "@/lib/timezone";
 import { getConfigValue } from "@/lib/config";
@@ -808,7 +808,7 @@ async function handleSlotSelection(
         return;
       }
 
-      const { available, alternatives } = await checkSlotAvailability(
+      const { available } = await checkSlotAvailability(
         professionalId,
         parsedDate,
         service.durationMinutes,
@@ -822,14 +822,34 @@ async function handleSlotSelection(
           label: formatDateLabel(parsedDate),
         };
       } else {
-        let msg = `❌ El horario solicitado no está disponible.\n\nOtras opciones:\n`;
-        alternatives.slice(0, 3).forEach((alt, i) => {
-          msg += `*${i + 1}.* ${alt.label}\n`;
-        });
-        msg += `\nTambién podés respondé *espera* para anotarte en lista de espera para ese horario.`;
+        // Get nearby slots (±2h same day, then same hour next 3 days)
+        const nearbySlots = await getNearbySlots(
+          professionalId,
+          parsedDate,
+          service.durationMinutes,
+          bufferMinutes,
+          2,
+          5
+        );
+
+        let msg = `❌ ${formatSlotLabel(parsedDate)} no está disponible.\n\n`;
+
+        if (nearbySlots.length > 0) {
+          msg += `Alternativas cercanas:\n`;
+          nearbySlots.forEach((alt, i) => {
+            msg += `*${i + 1}.* ${alt.label}\n`;
+          });
+          msg += `\nRespondé con el número o escribí otro horario.`;
+          msg += `\nTambién podés escribir *espera* para anotarte en lista de espera.`;
+        } else {
+          msg += `No encontramos alternativas cercanas. Podés:\n`;
+          msg += `• Escribir otro horario\n`;
+          msg += `• Escribir *espera* para lista de espera`;
+        }
+
         const contextWithAlts = {
           ...context,
-          _slots: alternatives,
+          _slots: nearbySlots,
           _requestedSlot: parsedDate.toISOString(),
         } as BookingFlowContext & { _slots: SlotOption[]; _requestedSlot: string };
         await upsertSession(phone, "booking_slots", contextWithAlts);
