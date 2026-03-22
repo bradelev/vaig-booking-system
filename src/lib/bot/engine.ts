@@ -151,6 +151,8 @@ async function route(
       return handleMenuSelection(phone, text, context);
     case "info_flow":
       return handleInfoFlow(phone, text);
+    case "booking_category":
+      return handleCategorySelection(phone, text, context);
     case "booking_service":
       return handleServiceSelection(phone, text, context);
     case "booking_professional":
@@ -301,13 +303,64 @@ async function startBookingFlow(phone: string): Promise<void> {
     return;
   }
 
-  await upsertSession(phone, "booking_service", {});
+  const categories = [...new Set(kb.services.map((s) => s.category ?? "Otros"))].sort();
 
-  let msg = "¿Qué servicio te interesa?\n\n";
-  kb.services.forEach((s, i) => {
-    msg += `*${i + 1}.* ${s.name} — ${s.durationMinutes} min — $${s.price.toLocaleString("es-AR")}\n`;
+  await upsertSession(phone, "booking_category", { _categories: categories });
+
+  let msg = "¿Qué tipo de servicio te interesa?\n\n";
+  categories.forEach((cat, i) => {
+    msg += `*${i + 1}.* ${cat}\n`;
   });
-  msg += "\nResponde con el número o el nombre del servicio.";
+  msg += "\nRespondé con el número o escribí el nombre.";
+  await reply(phone, msg);
+}
+
+async function handleCategorySelection(
+  phone: string,
+  text: string,
+  context: BookingFlowContext
+): Promise<void> {
+  const kb = await buildKnowledgeBase();
+  const categories =
+    (context._categories as string[]) ??
+    [...new Set(kb.services.map((s) => s.category ?? "Otros"))].sort();
+
+  const t = normalize(text);
+  const idx = parseInt(t) - 1;
+
+  let selectedCategory: string | null = null;
+
+  if (!isNaN(idx) && idx >= 0 && idx < categories.length) {
+    selectedCategory = categories[idx];
+  } else {
+    selectedCategory = categories.find((cat) => normalize(cat).includes(t)) ?? null;
+  }
+
+  if (!selectedCategory) {
+    await reply(phone, "No reconocí esa opción. Respondé con el número de categoría.");
+    return;
+  }
+
+  const servicesInCategory = kb.services.filter(
+    (s) => (s.category ?? "Otros") === selectedCategory
+  );
+
+  if (servicesInCategory.length === 0) {
+    await reply(phone, "No hay servicios disponibles en esa categoría.");
+    return;
+  }
+
+  let msg = `*${selectedCategory}*\n\n¿Qué servicio te interesa?\n\n`;
+  servicesInCategory.forEach((s, i) => {
+    msg += `*${i + 1}.* ${s.name} — $${s.price.toLocaleString("es-AR")} (${s.durationMinutes} min)\n`;
+  });
+  msg += "\nRespondé con el número.";
+
+  await upsertSession(phone, "booking_service", {
+    ...context,
+    _selectedCategory: selectedCategory,
+    _servicesInCategory: servicesInCategory.map((s) => s.id),
+  } as BookingFlowContext);
   await reply(phone, msg);
 }
 
@@ -319,13 +372,19 @@ async function handleServiceSelection(
   const kb = await buildKnowledgeBase();
   const t = normalize(text);
 
+  // Filter to services in the selected category if set
+  const categoryServiceIds = context._servicesInCategory as string[] | undefined;
+  const servicePool: ServiceInfo[] = categoryServiceIds
+    ? kb.services.filter((s) => categoryServiceIds.includes(s.id))
+    : kb.services;
+
   let service: ServiceInfo | undefined;
 
   const num = parseInt(t);
-  if (!isNaN(num) && num >= 1 && num <= kb.services.length) {
-    service = kb.services[num - 1];
+  if (!isNaN(num) && num >= 1 && num <= servicePool.length) {
+    service = servicePool[num - 1];
   } else {
-    service = kb.services.find((s) => normalize(s.name).includes(t));
+    service = servicePool.find((s) => normalize(s.name).includes(t));
   }
 
   if (!service) {
