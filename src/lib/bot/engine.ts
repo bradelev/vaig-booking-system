@@ -832,15 +832,7 @@ async function handleSlotSelection(
           5
         );
 
-        const timeLabel = parsedDate.toLocaleTimeString("es-AR", {
-          timeZone: "America/Argentina/Buenos_Aires",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        });
-        const dateLabel = formatSlotLabel(parsedDate).split(" a las")[0];
-
-        let msg = `❌ ${dateLabel} a las ${timeLabel} no está disponible.\n\n`;
+        let msg = `❌ ${formatSlotLabel(parsedDate)} no está disponible.\n\n`;
 
         if (nearbySlots.length > 0) {
           msg += `Alternativas cercanas:\n`;
