@@ -8,6 +8,7 @@ export type BotConversationState =
   | "booking_service"
   | "booking_professional"
   | "booking_date"
+  | "booking_window"
   | "booking_slots"
   | "booking_client_name"
   | "booking_client_email"
