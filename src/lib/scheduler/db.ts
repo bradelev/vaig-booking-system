@@ -269,7 +269,7 @@ export async function getNearbySlots(
     }
   }
 
-  // Phase 2: same hour on next 3 days if still need more
+  // Phase 2: ±rangeHours on next 3 days if still need more
   if (nearby.length < maxResults) {
     for (let daysAhead = 1; daysAhead <= 3 && nearby.length < maxResults; daysAhead++) {
       const rawDate = new Date(targetDate);
