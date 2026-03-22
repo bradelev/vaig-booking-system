@@ -41,6 +41,39 @@ function decideRoute(text: string, state: BotConversationState): RouteDecision {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+describe("isMenuTrigger — exact vs partial matching", () => {
+  it("returns true for exact '0'", () => {
+    assert.equal(isMenuTrigger("0"), true);
+  });
+
+  it("returns false for time strings containing '0'", () => {
+    assert.equal(isMenuTrigger("19:00"), false);
+    assert.equal(isMenuTrigger("10:00"), false);
+    assert.equal(isMenuTrigger("20:30"), false);
+  });
+
+  it("returns true for exact 'hi'", () => {
+    assert.equal(isMenuTrigger("hi"), true);
+  });
+
+  it("returns false for words that contain 'hi' but are not 'hi'", () => {
+    assert.equal(isMenuTrigger("hifu"), false);
+    assert.equal(isMenuTrigger("hidratar"), false);
+  });
+
+  it("returns true for partial-match keywords", () => {
+    assert.equal(isMenuTrigger("hola"), true);
+    assert.equal(isMenuTrigger("menu"), true);
+    assert.equal(isMenuTrigger("volver"), true);
+    assert.equal(isMenuTrigger("inicio"), true);
+  });
+
+  it("returns true for phrases containing partial-match keywords", () => {
+    assert.equal(isMenuTrigger("volver al inicio"), true);
+    assert.equal(isMenuTrigger("ir al menu principal"), true);
+  });
+});
+
 describe("Bot engine route decisions — global triggers", () => {
   it("cancel trigger always routes to cancel reset regardless of state", () => {
     const states: BotConversationState[] = [
@@ -70,10 +103,17 @@ describe("Bot engine route decisions — global triggers", () => {
     }
   });
 
-  it("any text containing '0' triggers menu (known quirk of isMenuTrigger)", () => {
-    // isMenuTrigger checks t.includes("0") — any time "10:00", "20:30" etc. match
-    assert.equal(decideRoute("10:00", "booking_slots"), "handle_menu");
-    assert.equal(decideRoute("20:00", "booking_slots"), "handle_menu");
+  it("exact '0' triggers menu but time strings containing '0' do not", () => {
+    assert.equal(decideRoute("0", "booking_slots"), "handle_menu");
+    assert.equal(decideRoute("10:00", "booking_slots"), "handle_state");
+    assert.equal(decideRoute("19:00", "booking_slots"), "handle_state");
+    assert.equal(decideRoute("20:30", "booking_slots"), "handle_state");
+  });
+
+  it("exact 'hi' triggers menu but words containing 'hi' do not", () => {
+    assert.equal(decideRoute("hi", "booking_slots"), "handle_menu");
+    assert.equal(decideRoute("hifu", "booking_service"), "handle_state");
+    assert.equal(decideRoute("hidratar", "booking_service"), "handle_state");
   });
 
   it("cancel trigger has higher priority than mis_turnos (cancel in mis turnos text)", () => {
@@ -103,9 +143,8 @@ describe("Bot engine route decisions — state-based routing", () => {
     const cases: Array<[string, BotConversationState]> = [
       ["1", "booking_service"],
       ["masaje", "booking_service"],
-      // Note: any text containing "0" triggers menu (isMenuTrigger quirk)
-      // Use a slot description without "0" digit
       ["viernes 9:15", "booking_slots"],
+      ["19:00", "booking_slots"],
       ["Juan Pérez", "booking_client_name"],
       ["si", "booking_confirm"],
       ["no", "cancelling"],
