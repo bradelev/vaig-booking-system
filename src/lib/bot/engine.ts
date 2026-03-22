@@ -956,11 +956,12 @@ async function handleRescheduleConfirm(
     const service = kb.services.find((s) => s.id === booking.service_id);
     if (!service) { await handleMenu(phone); return; }
 
+    const bufferMinutes = parseInt(await getConfigValue("buffer_minutes", "0"));
     const slots = await getNextAvailableSlots(
       booking.professional_id ?? kb.professionals[0]?.id ?? "",
       service.durationMinutes,
-      5,
-      parseInt(await getConfigValue("buffer_minutes", "0"))
+      bufferMinutes,
+      5
     );
 
     if (slots.length === 0) {
