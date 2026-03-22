@@ -6,6 +6,7 @@ import { sendTextMessage, sendInteractiveButtons } from "@/lib/whatsapp";
 import { buildKnowledgeBase } from "./knowledge";
 import { getSession, upsertSession, clearSession, advanceFunnel } from "./session";
 import { getNextAvailableSlots, checkSlotAvailability } from "@/lib/scheduler/db";
+import { artDateTime, getARTComponents } from "@/lib/timezone";
 import { getConfigValue } from "@/lib/config";
 import { createMPPreference, createPackMPPreference } from "@/lib/payments/mp";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -1586,6 +1587,10 @@ function parseUserDateTime(text: string): Date | null {
   const minute = parseInt(timeMatch[2]);
 
   const now = new Date();
+  // Use ART day-of-week so "lunes" resolves correctly when server is UTC
+  const { dayOfWeek: currentArtDay } = getARTComponents(now);
+
+  // candidate tracks the target date (as a Date object used only for date arithmetic)
   const candidate = new Date(now);
 
   const t = normalize(text);
@@ -1602,8 +1607,7 @@ function parseUserDateTime(text: string): Date | null {
     };
     for (const [name, dayNum] of Object.entries(dayMap)) {
       if (t.includes(name)) {
-        const currentDay = now.getDay();
-        let daysAhead = (dayNum - currentDay + 7) % 7;
+        let daysAhead = (dayNum - currentArtDay + 7) % 7;
         if (daysAhead === 0) daysAhead = 7; // next week same day
         candidate.setDate(now.getDate() + daysAhead);
         break;
@@ -1620,6 +1624,6 @@ function parseUserDateTime(text: string): Date | null {
     }
   }
 
-  candidate.setHours(hour, minute, 0, 0);
-  return candidate;
+  // Build the final Date in ART so hour/minute are interpreted as Argentina time
+  return artDateTime(candidate, hour, minute);
 }
