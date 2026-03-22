@@ -31,7 +31,9 @@ function normalize(text: string): string {
 
 export function isMenuTrigger(text: string): boolean {
   const t = normalize(text);
-  return ["menu", "inicio", "hola", "hi", "0", "volver"].some((kw) => t.includes(kw));
+  const exactMatch = ["0", "hi"].includes(t);
+  const partialMatch = ["menu", "inicio", "hola", "volver"].some((kw) => t.includes(kw));
+  return exactMatch || partialMatch;
 }
 
 export function isCancelTrigger(text: string): boolean {
