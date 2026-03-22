@@ -113,13 +113,17 @@ export async function handleIncomingMessage(phone: string, messageText: string):
 
   // VBS-114: Session timeout — clear stale sessions after configurable inactivity
   if (session && state !== "idle") {
-    const timeoutMinutesStr = await getConfigValue("bot_session_timeout_minutes", "30");
-    const timeoutMinutes = parseInt(timeoutMinutesStr, 10) || 30;
-    const sessionAge = (Date.now() - session.updatedAt.getTime()) / 1000 / 60;
-    if (sessionAge > timeoutMinutes) {
-      await clearSession(phone);
-      state = "idle";
-      context = {};
+    try {
+      const timeoutMinutesStr = await getConfigValue("bot_session_timeout_minutes", "30");
+      const timeoutMinutes = parseInt(timeoutMinutesStr, 10) || 30;
+      const sessionAge = (Date.now() - session.updatedAt.getTime()) / 1000 / 60;
+      if (sessionAge > timeoutMinutes) {
+        await clearSession(phone);
+        state = "idle";
+        context = {};
+      }
+    } catch {
+      // config unavailable — skip timeout check, continue with existing session
     }
   }
 
