@@ -108,8 +108,24 @@ export async function handleIncomingMessage(phone: string, messageText: string):
 
   // VBS-87: RNPD consent gate
   const session = await getSession(phone);
-  const state: BotConversationState = session?.state ?? "idle";
-  const context: BookingFlowContext = session?.context ?? {};
+  let state: BotConversationState = session?.state ?? "idle";
+  let context: BookingFlowContext = session?.context ?? {};
+
+  // VBS-114: Session timeout — clear stale sessions after configurable inactivity
+  if (session && state !== "idle") {
+    try {
+      const timeoutMinutesStr = await getConfigValue("bot_session_timeout_minutes", "30");
+      const timeoutMinutes = parseInt(timeoutMinutesStr, 10) || 30;
+      const sessionAge = (Date.now() - session.updatedAt.getTime()) / 1000 / 60;
+      if (sessionAge > timeoutMinutes) {
+        await clearSession(phone);
+        state = "idle";
+        context = {};
+      }
+    } catch {
+      // config unavailable — skip timeout check, continue with existing session
+    }
+  }
 
   if (clientCheck && !clientCheck.consent_accepted_at) {
     if (state === "awaiting_consent") {
