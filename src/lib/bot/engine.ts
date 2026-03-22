@@ -161,6 +161,7 @@ export async function handleIncomingMessage(phone: string, messageText: string):
 const BOOKING_BACK_MAP: Partial<Record<BotConversationState, BotConversationState>> = {
   booking_confirm: "booking_slots",
   booking_slots: "booking_professional",
+  booking_window: "booking_professional",
   booking_professional: "booking_service",
   booking_service: "booking_category",
   booking_category: "menu",
@@ -298,6 +299,9 @@ async function handleBack(
   const strippedContext: BookingFlowContext = { ...context };
   const toDelete: string[] = [];
 
+  if (state === "booking_window" || state === "booking_slots" || state === "booking_confirm") {
+    toDelete.push("_slotsByDay", "_windows");
+  }
   if (state === "booking_confirm" || state === "booking_slots") {
     toDelete.push("_slots", "selectedSlot", "_requestedSlot");
   }
@@ -734,7 +738,7 @@ async function handleWindowSelection(
 
   let matchedWindow: TimeWindow | undefined;
   for (const w of windows) {
-    if (normalize(w.label) === t || t.includes(normalize(w.label)) || normalize(w.label).includes(t)) {
+    if (normalize(w.label) === t || t.includes(normalize(w.label))) {
       matchedWindow = w;
       break;
     }
