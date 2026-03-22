@@ -602,7 +602,7 @@ async function handleSlotSelection(
         return;
       }
 
-      const { available, alternatives } = await checkSlotAvailability(
+      const { available } = await checkSlotAvailability(
         professionalId,
         parsedDate,
         service.durationMinutes,
