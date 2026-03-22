@@ -1,18 +1,20 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { calculateAvailableSlots, isSlotAvailable, filterAvailableSlots } from "../index";
+import { artDateTime } from "../../timezone";
 import type { WorkingHours, TimeSlot } from "../types";
 
 const MON_WORKING_HOURS: WorkingHours[] = [
   { dayOfWeek: 1, startHour: 9, startMinute: 0, endHour: 12, endMinute: 0 },
 ];
 
-// Helper: create a Date on a specific Monday using local time
+// 2026-03-16 is a Monday (noon UTC = Monday ART since ART = UTC-3)
+const MON_DATE = new Date("2026-03-16T12:00:00.000Z");
+
+// Helper: create an ART-anchored Date on a specific Monday.
+// Uses artDateTime so booking fixtures are timezone-consistent with calculateAvailableSlots.
 function monday(h: number, m = 0): Date {
-  // 2026-03-16 is a Monday — use noon UTC to stay on Monday in any timezone
-  const d = new Date("2026-03-16T12:00:00.000Z");
-  d.setHours(h, m, 0, 0);
-  return d;
+  return artDateTime(MON_DATE, h, m);
 }
 
 describe("calculateAvailableSlots", () => {
@@ -176,7 +178,8 @@ describe("calculateAvailableSlots — edge cases", () => {
       bufferMinutes: 60,
     });
     assert.equal(result.availableSlots.length, 1);
-    assert.equal(result.availableSlots[0].start.getHours(), 11);
+    // Compare against known ART-anchored time to avoid UTC-vs-local getHours() discrepancy in CI
+    assert.deepEqual(result.availableSlots[0].start, artDateTime(MON_DATE, 11, 0));
   });
 });
 
