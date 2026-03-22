@@ -5,7 +5,8 @@
 import { sendTextMessage, sendInteractiveButtons } from "@/lib/whatsapp";
 import { buildKnowledgeBase } from "./knowledge";
 import { getSession, upsertSession, clearSession, advanceFunnel } from "./session";
-import { getNextAvailableSlots, checkSlotAvailability } from "@/lib/scheduler/db";
+import { getSlotsByWindow, getNextAvailableSlots, checkSlotAvailability } from "@/lib/scheduler/db";
+import type { TimeWindow, SlotsByDay } from "@/lib/scheduler/db";
 import { artDateTime, getARTComponents } from "@/lib/timezone";
 import { getConfigValue } from "@/lib/config";
 import { createMPPreference, createPackMPPreference } from "@/lib/payments/mp";
@@ -160,6 +161,7 @@ export async function handleIncomingMessage(phone: string, messageText: string):
 const BOOKING_BACK_MAP: Partial<Record<BotConversationState, BotConversationState>> = {
   booking_confirm: "booking_slots",
   booking_slots: "booking_professional",
+  booking_window: "booking_professional",
   booking_professional: "booking_service",
   booking_service: "booking_category",
   booking_category: "menu",
@@ -191,6 +193,8 @@ async function route(
       return handleServiceSelection(phone, text, context);
     case "booking_professional":
       return handleProfessionalSelection(phone, text, context);
+    case "booking_window":
+      return handleWindowSelection(phone, text, context);
     case "booking_slots":
       return handleSlotSelection(phone, text, context);
     case "booking_client_name":
@@ -295,6 +299,9 @@ async function handleBack(
   const strippedContext: BookingFlowContext = { ...context };
   const toDelete: string[] = [];
 
+  if (state === "booking_window" || state === "booking_slots" || state === "booking_confirm") {
+    toDelete.push("_slotsByDay", "_windows");
+  }
   if (state === "booking_confirm" || state === "booking_slots") {
     toDelete.push("_slots", "selectedSlot", "_requestedSlot");
   }
@@ -631,6 +638,13 @@ async function handleProfessionalSelection(
   await reply(phone, "No encontré esa profesional. Por favor respondé con el número de la lista.");
 }
 
+// Default time windows
+const DEFAULT_WINDOWS: TimeWindow[] = [
+  { label: "Mañana", emoji: "☀️", startHour: 9, endHour: 12 },
+  { label: "Tarde", emoji: "🌤", startHour: 12, endHour: 17 },
+  { label: "Noche", emoji: "🌙", startHour: 17, endHour: 21 },
+];
+
 async function proceedToSlotSelection(context: BookingFlowContext, phone: string): Promise<void> {
   const kb = await buildKnowledgeBase();
   const service = kb.services.find((s) => s.id === context.selectedServiceId);
@@ -644,7 +658,6 @@ async function proceedToSlotSelection(context: BookingFlowContext, phone: string
   // Use specific professional or first active one for availability check
   let professionalId = context.selectedProfessionalId;
   if (!professionalId) {
-    // Find any available professional
     if (kb.professionals.length > 0) {
       professionalId = kb.professionals[0].id;
     } else {
@@ -653,34 +666,102 @@ async function proceedToSlotSelection(context: BookingFlowContext, phone: string
     }
   }
 
-  const slots = await getNextAvailableSlots(professionalId, service.durationMinutes, bufferMinutes, 3);
+  const windows = DEFAULT_WINDOWS;
+  const slotsByDay = await getSlotsByWindow(professionalId, service.durationMinutes, bufferMinutes, windows);
 
-  if (slots.length === 0) {
+  if (slotsByDay.length === 0) {
     await reply(
       phone,
-      "No encontramos turnos disponibles en los próximos 14 días. Por favor contactanos directamente. 🙏"
+      "No encontramos turnos disponibles en los próximos 7 días. Por favor contactanos directamente. 🙏"
     );
     await clearSession(phone);
     return;
   }
 
-  const newContext: BookingFlowContext = { ...context };
-  await upsertSession(phone, "booking_slots", newContext);
-
-  let msg = `📅 *Turnos disponibles para ${service.name}*\n`;
+  let msg = `📅 *Turnos disponibles para ${service.name}*`;
   if (context.selectedProfessionalName && context.selectedProfessionalName !== "cualquier profesional") {
-    msg += `con ${context.selectedProfessionalName}\n`;
+    msg += ` con ${context.selectedProfessionalName}`;
   }
-  msg += "\n";
-  slots.forEach((slot, i) => {
-    msg += `*${i + 1}.* ${slot.label}\n`;
+  msg += "\n\n";
+
+  slotsByDay.forEach((day) => {
+    msg += `*${day.dateLabel}:*\n`;
+    day.windows.forEach((w) => {
+      const count = w.slots.length;
+      msg += `  ${w.window.emoji} ${w.window.label} (${count} turno${count > 1 ? "s" : ""})\n`;
+    });
+    msg += "\n";
   });
-  msg += "\nRespondé con el número del turno que preferís, o escribí el día y horario que buscás (ej: *viernes 10:00*).\n*0.* Volver";
+  msg += "Respondé con día y franja (ej: *lunes mañana*) o un horario exacto (ej: *lunes 10:00*).";
 
-  // Store slots in context for later retrieval
-  const contextWithSlots = { ...newContext, _slots: slots } as BookingFlowContext & { _slots: SlotOption[] };
-  await upsertSession(phone, "booking_slots", contextWithSlots);
+  const newContext = { ...context, _slotsByDay: slotsByDay, _windows: windows } as BookingFlowContext;
+  await upsertSession(phone, "booking_window", newContext);
+  await reply(phone, msg);
+}
 
+async function handleWindowSelection(
+  phone: string,
+  text: string,
+  context: BookingFlowContext
+): Promise<void> {
+  const t = normalize(text);
+  const slotsByDay = (context._slotsByDay as SlotsByDay[]) ?? [];
+  const windows = (context._windows as TimeWindow[]) ?? DEFAULT_WINDOWS;
+
+  // Try to parse as exact date/time — delegate to handleSlotSelection which re-parses
+  const parsedDate = parseUserDateTime(text);
+  if (parsedDate) {
+    return handleSlotSelection(phone, text, context as BookingFlowContext & { _slots?: SlotOption[] });
+  }
+
+  // Try to match day name
+  const dayNames: Record<string, number> = {
+    domingo: 0, lunes: 1, martes: 2, miercoles: 3, jueves: 4, viernes: 5, sabado: 6,
+  };
+
+  let matchedDay: SlotsByDay | undefined;
+  for (const [name, dow] of Object.entries(dayNames)) {
+    if (t.includes(name)) {
+      matchedDay = slotsByDay.find((d) => {
+        const date = new Date(d.date + "T12:00:00-03:00");
+        const { dayOfWeek } = getARTComponents(date);
+        return dayOfWeek === dow;
+      });
+      break;
+    }
+  }
+
+  // "mañana" keyword → next available day
+  if (!matchedDay && (t === "manana" || t.includes("manana") || t === "mañana" || t.includes("mañana"))) {
+    matchedDay = slotsByDay[0];
+  }
+
+  let matchedWindow: TimeWindow | undefined;
+  for (const w of windows) {
+    if (normalize(w.label) === t || t.includes(normalize(w.label))) {
+      matchedWindow = w;
+      break;
+    }
+  }
+
+  if (!matchedDay || !matchedWindow) {
+    await reply(phone, "No entendí. Respondé con día y franja (ej: *lunes tarde*) o un horario exacto (ej: *lunes 10:00*).");
+    return;
+  }
+
+  const dayWindow = matchedDay.windows.find((w) => w.window.label === matchedWindow!.label);
+  if (!dayWindow || dayWindow.slots.length === 0) {
+    await reply(phone, `No hay turnos de ${matchedWindow.label} el ${matchedDay.dateLabel}. Probá otra franja.`);
+    return;
+  }
+
+  const slots = dayWindow.slots.slice(0, 5);
+  let msg = `${matchedWindow.emoji} *${matchedWindow.label} — ${matchedDay.dateLabel}:*\n\n`;
+  slots.forEach((s, i) => { msg += `*${i + 1}.* ${s.label}\n`; });
+  msg += "\nRespondé con el número o escribí otro horario.";
+
+  const newContext = { ...context, _slots: slots } as BookingFlowContext;
+  await upsertSession(phone, "booking_slots", newContext);
   await reply(phone, msg);
 }
 
