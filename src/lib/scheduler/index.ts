@@ -1,15 +1,16 @@
 import type { SchedulerInput, SchedulerResult, TimeSlot, WorkingHours } from "./types";
+import { getARTComponents, artDateTime } from "@/lib/timezone";
 
 export type { SchedulerInput, SchedulerResult, TimeSlot, WorkingHours };
 
 /**
  * Returns available time slots for a given date, duration, working hours and existing bookings.
- * All logic is pure (no I/O). Dates must be in the same timezone as the consumer.
+ * All logic is pure (no I/O). Dates must represent ART (UTC-3) midnight for the target day.
  */
 export function calculateAvailableSlots(input: SchedulerInput): SchedulerResult {
   const { date, durationMinutes, workingHours, existingBookings, bufferMinutes = 0 } = input;
 
-  const dayOfWeek = date.getDay();
+  const { dayOfWeek } = getARTComponents(date);
   const dayHours = workingHours.filter((wh) => wh.dayOfWeek === dayOfWeek);
 
   if (dayHours.length === 0) {
@@ -19,11 +20,8 @@ export function calculateAvailableSlots(input: SchedulerInput): SchedulerResult 
   const slots: TimeSlot[] = [];
 
   for (const wh of dayHours) {
-    const periodStart = new Date(date);
-    periodStart.setHours(wh.startHour, wh.startMinute, 0, 0);
-
-    const periodEnd = new Date(date);
-    periodEnd.setHours(wh.endHour, wh.endMinute, 0, 0);
+    const periodStart = artDateTime(date, wh.startHour, wh.startMinute);
+    const periodEnd = artDateTime(date, wh.endHour, wh.endMinute);
 
     let cursor = new Date(periodStart);
 
