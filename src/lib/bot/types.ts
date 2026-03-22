@@ -4,6 +4,7 @@ export type BotConversationState =
   | "idle"
   | "menu"
   | "info_flow"
+  | "booking_category"
   | "booking_service"
   | "booking_professional"
   | "booking_date"
@@ -29,6 +30,7 @@ export interface ServiceInfo {
   price: number;
   depositAmount: number;
   defaultProfessionalId: string | null;
+  category: string | null;
 }
 
 export interface ProfessionalInfo {
