@@ -32,9 +32,13 @@ function normalize(text: string): string {
 
 export function isMenuTrigger(text: string): boolean {
   const t = normalize(text);
-  const exactMatch = ["0", "hi"].includes(t);
+  const exactMatch = ["hi"].includes(t);
   const partialMatch = ["menu", "inicio", "hola", "volver"].some((kw) => t.includes(kw));
   return exactMatch || partialMatch;
+}
+
+export function isBackTrigger(text: string): boolean {
+  return normalize(text) === "0";
 }
 
 export function isCancelTrigger(text: string): boolean {
@@ -153,12 +157,25 @@ export async function handleIncomingMessage(phone: string, messageText: string):
   }
 }
 
+const BOOKING_BACK_MAP: Partial<Record<BotConversationState, BotConversationState>> = {
+  booking_confirm: "booking_slots",
+  booking_slots: "booking_professional",
+  booking_professional: "booking_service",
+  booking_service: "booking_category",
+  booking_category: "menu",
+};
+
 async function route(
   phone: string,
   text: string,
   state: BotConversationState,
   context: BookingFlowContext
 ): Promise<void> {
+  // Intercept "0" as back navigation when inside the booking flow
+  if (isBackTrigger(text) && state in BOOKING_BACK_MAP) {
+    return handleBack(phone, state, context);
+  }
+
   if (state === "idle" || isMenuTrigger(text)) {
     return handleMenu(phone);
   }
@@ -199,6 +216,112 @@ async function route(
     case "awaiting_consent":
       return handleConsentResponse(phone, text);
     default:
+      return handleMenu(phone);
+  }
+}
+
+// ── Back navigation helpers ────────────────────────────────────────────────────
+
+async function showCategoryMenu(phone: string, context: BookingFlowContext): Promise<void> {
+  const kb = await buildKnowledgeBase();
+  const categories = [...new Set(kb.services.map((s) => s.category ?? "Otros"))].sort();
+  await upsertSession(phone, "booking_category", { ...context, _categories: categories });
+  let msg = "¿Qué tipo de servicio te interesa?\n\n";
+  categories.forEach((cat, i) => {
+    msg += `*${i + 1}.* ${cat}\n`;
+  });
+  msg += "\nRespondé con el número o escribí el nombre.\n*0.* Volver al menú";
+  await reply(phone, msg);
+}
+
+async function showServiceMenu(phone: string, context: BookingFlowContext): Promise<void> {
+  const kb = await buildKnowledgeBase();
+  const categoryServiceIds = context._servicesInCategory as string[] | undefined;
+  const selectedCategory = context._selectedCategory as string | undefined;
+  const servicePool: ServiceInfo[] = categoryServiceIds
+    ? kb.services.filter((s) => categoryServiceIds.includes(s.id))
+    : kb.services;
+
+  let msg = selectedCategory ? `*${selectedCategory}*\n\n` : "";
+  msg += "¿Qué servicio te interesa?\n\n";
+  servicePool.forEach((s, i) => {
+    msg += `*${i + 1}.* ${s.name} — $${s.price.toLocaleString("es-AR")} (${s.durationMinutes} min)\n`;
+  });
+  msg += "\nRespondé con el número.\n*0.* Volver";
+  await upsertSession(phone, "booking_service", context);
+  await reply(phone, msg);
+}
+
+async function showProfessionalMenu(phone: string, context: BookingFlowContext): Promise<void> {
+  const kb = await buildKnowledgeBase();
+  await upsertSession(phone, "booking_professional", context);
+
+  if (service_hasSingleProfessional(kb)) {
+    // Edge case: only one professional — skip back to slot selection
+    return proceedToSlotSelection(
+      { ...context, selectedProfessionalId: kb.professionals[0].id, selectedProfessionalName: kb.professionals[0].name },
+      phone
+    );
+  }
+
+  const service = kb.services.find((s) => s.id === context.selectedServiceId);
+  let msg = service ? `¡Perfecto! *${service.name}*\n\n` : "";
+  msg += "¿Con quién querés atenderte?\n\n";
+  kb.professionals.forEach((p, i) => {
+    msg += `*${i + 1}.* ${p.name}\n`;
+  });
+  msg += "\n*A.* Cualquier profesional disponible\n";
+  msg += "*0.* Volver";
+  await reply(phone, msg);
+}
+
+function service_hasSingleProfessional(kb: { professionals: Array<{ id: string; name: string }> }): boolean {
+  return kb.professionals.length === 1;
+}
+
+async function handleBack(
+  phone: string,
+  state: BotConversationState,
+  context: BookingFlowContext
+): Promise<void> {
+  const prevState = BOOKING_BACK_MAP[state];
+
+  if (!prevState || prevState === "menu") {
+    await clearSession(phone);
+    return handleMenu(phone);
+  }
+
+  // Strip context fields that belong to the step we are leaving
+  const strippedContext: BookingFlowContext = { ...context };
+  const toDelete: string[] = [];
+
+  if (state === "booking_confirm" || state === "booking_slots") {
+    toDelete.push("_slots", "selectedSlot", "_requestedSlot");
+  }
+  if (state === "booking_slots" || state === "booking_professional") {
+    toDelete.push("selectedProfessionalId", "selectedProfessionalName");
+  }
+  if (state === "booking_professional" || state === "booking_service") {
+    toDelete.push("selectedServiceId", "selectedServiceName", "_servicesInCategory");
+  }
+  if (state === "booking_service") {
+    toDelete.push("_selectedCategory", "_categories");
+  }
+  for (const key of toDelete) {
+    delete (strippedContext as Record<string, unknown>)[key];
+  }
+
+  switch (prevState) {
+    case "booking_slots":
+      return proceedToSlotSelection(strippedContext, phone);
+    case "booking_professional":
+      return showProfessionalMenu(phone, strippedContext);
+    case "booking_service":
+      return showServiceMenu(phone, strippedContext);
+    case "booking_category":
+      return showCategoryMenu(phone, strippedContext);
+    default:
+      await clearSession(phone);
       return handleMenu(phone);
   }
 }
@@ -328,7 +451,7 @@ async function startBookingFlow(phone: string): Promise<void> {
   categories.forEach((cat, i) => {
     msg += `*${i + 1}.* ${cat}\n`;
   });
-  msg += "\nRespondé con el número o escribí el nombre.";
+  msg += "\nRespondé con el número o escribí el nombre.\n*0.* Volver al menú";
   await reply(phone, msg);
 }
 
@@ -371,7 +494,7 @@ async function handleCategorySelection(
   servicesInCategory.forEach((s, i) => {
     msg += `*${i + 1}.* ${s.name} — $${s.price.toLocaleString("es-AR")} (${s.durationMinutes} min)\n`;
   });
-  msg += "\nRespondé con el número.";
+  msg += "\nRespondé con el número.\n*0.* Volver";
 
   await upsertSession(phone, "booking_service", {
     ...context,
@@ -451,7 +574,8 @@ async function handleServiceSelection(
   kb.professionals.forEach((p, i) => {
     msg += `*${i + 1}.* ${p.name}\n`;
   });
-  msg += "\n*0.* Cualquier profesional disponible\n";
+  msg += "\n*A.* Cualquier profesional disponible\n";
+  msg += "*0.* Volver\n";
   msg += "\nResponde con el número.";
   await reply(phone, msg);
 }
@@ -465,7 +589,8 @@ async function handleProfessionalSelection(
   const t = normalize(text);
 
   // Handle interactive button reply (id: prof_<uuid> or prof_any)
-  if (t.startsWith("prof_any") || t === "0" || t.includes("cualquier")) {
+  // Note: "0" is intercepted upstream as back navigation — not handled here
+  if (t.startsWith("prof_any") || t === "a" || t.includes("cualquier")) {
     return proceedToSlotSelection(
       { ...context, selectedProfessionalId: null, selectedProfessionalName: "cualquier profesional" },
       phone
@@ -550,7 +675,7 @@ async function proceedToSlotSelection(context: BookingFlowContext, phone: string
   slots.forEach((slot, i) => {
     msg += `*${i + 1}.* ${slot.label}\n`;
   });
-  msg += "\nRespondé con el número del turno que preferís, o escribí el día y horario que buscás (ej: *viernes 10:00*).";
+  msg += "\nRespondé con el número del turno que preferís, o escribí el día y horario que buscás (ej: *viernes 10:00*).\n*0.* Volver";
 
   // Store slots in context for later retrieval
   const contextWithSlots = { ...newContext, _slots: slots } as BookingFlowContext & { _slots: SlotOption[] };
@@ -712,7 +837,7 @@ async function showBookingConfirm(phone: string, context: BookingFlowContext): P
   msg += `📅 Turno: ${label}\n`;
   msg += `👤 Nombre: ${context.clientFirstName} ${context.clientLastName}\n`;
   if (context.clientEmail) msg += `📧 Email: ${context.clientEmail}\n`;
-  msg += `\n¿Confirmás la reserva? Respondé *sí* o *no*.`;
+  msg += `\n¿Confirmás la reserva? Respondé *sí* o *no*.\n*0.* Volver a elegir turno`;
 
   await reply(phone, msg);
 }
