@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { upsertProfessionalSchedule } from "@/actions/schedule";
+import { upsertProfessionalSchedule, deleteScheduleOverride } from "@/actions/schedule";
+import OverrideForm from "./OverrideForm";
 
 const DAYS = [
   { value: 1, label: "Lunes" },
@@ -20,6 +21,15 @@ interface ScheduleRow {
   is_working: boolean;
 }
 
+interface OverrideRow {
+  id: string;
+  override_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  is_working: boolean;
+  reason: string | null;
+}
+
 interface Professional {
   id: string;
   name: string;
@@ -35,12 +45,20 @@ export default async function HorarioProfesionalPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
 
-  const [{ data: profRaw }, { data: scheduleRaw }] = await Promise.all([
+  const today = new Date().toISOString().split("T")[0];
+
+  const [{ data: profRaw }, { data: scheduleRaw }, { data: overridesRaw }] = await Promise.all([
     client.from("professionals").select("id, name").eq("id", id).single(),
     client
       .from("professional_schedule")
       .select("day_of_week, start_time, end_time, is_working")
       .eq("professional_id", id),
+    client
+      .from("professional_schedule_overrides")
+      .select("id, override_date, start_time, end_time, is_working, reason")
+      .eq("professional_id", id)
+      .gte("override_date", today)
+      .order("override_date", { ascending: true }),
   ]);
 
   const prof = profRaw as Professional | null;
@@ -48,6 +66,7 @@ export default async function HorarioProfesionalPage({
 
   const schedule = (scheduleRaw ?? []) as ScheduleRow[];
   const scheduleMap = Object.fromEntries(schedule.map((s) => [s.day_of_week, s]));
+  const overrides = (overridesRaw ?? []) as OverrideRow[];
 
   const saveAction = upsertProfessionalSchedule.bind(null, id);
 
@@ -114,6 +133,56 @@ export default async function HorarioProfesionalPage({
           </button>
         </div>
       </form>
+
+      <div className="rounded-lg border bg-white p-6 shadow-sm space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900">Excepciones de horario</h2>
+        <p className="text-sm text-gray-500">
+          Agregá cambios puntuales para fechas específicas. La excepción reemplaza el horario semanal de ese día.
+        </p>
+
+        {overrides.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 text-left text-gray-500">
+                  <th className="pb-2 font-medium">Fecha</th>
+                  <th className="pb-2 font-medium">Horario</th>
+                  <th className="pb-2 font-medium">Motivo</th>
+                  <th className="pb-2 font-medium sr-only">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {overrides.map((ov) => {
+                  const deleteAction = deleteScheduleOverride.bind(null, id, ov.id);
+                  return (
+                    <tr key={ov.id}>
+                      <td className="py-2 text-gray-900">{ov.override_date}</td>
+                      <td className="py-2 text-gray-700">
+                        {ov.is_working
+                          ? `${ov.start_time?.slice(0, 5)} - ${ov.end_time?.slice(0, 5)}`
+                          : "No trabaja"}
+                      </td>
+                      <td className="py-2 text-gray-500">{ov.reason ?? "—"}</td>
+                      <td className="py-2">
+                        <form action={deleteAction}>
+                          <button
+                            type="submit"
+                            className="text-sm text-red-600 hover:text-red-800"
+                          >
+                            Eliminar
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <OverrideForm professionalId={id} />
+      </div>
     </div>
   );
 }
