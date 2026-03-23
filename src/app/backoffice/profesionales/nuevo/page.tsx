@@ -23,6 +23,17 @@ export default function NuevoProfesionalPage() {
         </div>
 
         <div>
+          <label className="block text-sm font-medium text-gray-700">Teléfono</label>
+          <input
+            name="phone"
+            type="tel"
+            placeholder="5491112345678"
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
+          />
+          <p className="mt-1 text-xs text-gray-500">Formato internacional sin + (para recordatorios WA)</p>
+        </div>
+
+        <div>
           <label className="block text-sm font-medium text-gray-700">Especialidades</label>
           <input
             name="specialties"

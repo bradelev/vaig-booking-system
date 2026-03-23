@@ -3,7 +3,8 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { calculateAvailableSlots } from "./index";
-import type { TimeSlot, WorkingHours } from "./types";
+import type { TimeSlot, WorkingHours, ScheduleOverride } from "./types";
+import { resolveWorkingHoursForDate } from "./types";
 import type { SlotOption } from "@/lib/bot/types";
 import { artMidnight, artDateTime, getARTComponents } from "@/lib/timezone";
 
@@ -103,6 +104,55 @@ async function getExistingBookings(
   );
 }
 
+/**
+ * Fetches schedule overrides for a professional within a date range.
+ * Returns a Map keyed by "YYYY-MM-DD" for O(1) lookup per day.
+ */
+async function getOverridesForRange(
+  professionalId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<Map<string, ScheduleOverride>> {
+  const client = createAdminClient() as AnyClient;
+  const startStr = startDate.toLocaleDateString("sv-SE", { timeZone: TZ });
+  const endStr = endDate.toLocaleDateString("sv-SE", { timeZone: TZ });
+
+  const { data } = await client
+    .from("professional_schedule_overrides")
+    .select("override_date, start_time, end_time, is_working")
+    .eq("professional_id", professionalId)
+    .gte("override_date", startStr)
+    .lte("override_date", endStr);
+
+  const map = new Map<string, ScheduleOverride>();
+  if (data) {
+    for (const row of data as ScheduleOverride[]) {
+      map.set(row.override_date, row);
+    }
+  }
+  return map;
+}
+
+/**
+ * Fetches a single schedule override for a professional on a specific date.
+ */
+async function getOverrideForDate(
+  professionalId: string,
+  date: Date
+): Promise<ScheduleOverride | null> {
+  const client = createAdminClient() as AnyClient;
+  const dateStr = date.toLocaleDateString("sv-SE", { timeZone: TZ });
+
+  const { data } = await client
+    .from("professional_schedule_overrides")
+    .select("override_date, start_time, end_time, is_working")
+    .eq("professional_id", professionalId)
+    .eq("override_date", dateStr)
+    .maybeSingle();
+
+  return (data as ScheduleOverride | null) ?? null;
+}
+
 // ── Time window types ─────────────────────────────────────────────────────────
 
 export interface TimeWindow {
@@ -132,17 +182,24 @@ export async function getSlotsByWindow(
   windows: TimeWindow[],
   maxDays = 7
 ): Promise<SlotsByDay[]> {
-  const workingHours = await getProfessionalWorkingHours(professionalId);
+  const weeklySchedule = await getProfessionalWorkingHours(professionalId);
   const result: SlotsByDay[] = [];
 
   const now = new Date();
   const startDate = new Date(now);
   startDate.setDate(now.getDate() + 1);
 
+  const rangeEnd = new Date(startDate);
+  rangeEnd.setDate(startDate.getDate() + maxDays);
+  const overrides = await getOverridesForRange(professionalId, startDate, rangeEnd);
+
   for (let dayOffset = 0; dayOffset < maxDays; dayOffset++) {
     const rawDate = new Date(startDate);
     rawDate.setDate(startDate.getDate() + dayOffset);
     const checkDate = artMidnight(rawDate);
+    const dateKey = checkDate.toLocaleDateString("sv-SE", { timeZone: TZ });
+    const { dayOfWeek } = getARTComponents(checkDate);
+    const workingHours = resolveWorkingHoursForDate(weeklySchedule, overrides.get(dateKey), dayOfWeek);
 
     const existingBookings = await getExistingBookings(professionalId, checkDate);
     const { availableSlots } = calculateAvailableSlots({
@@ -196,7 +253,7 @@ export async function getNextAvailableSlots(
   bufferMinutes = 0,
   maxSlots = 3
 ): Promise<SlotOption[]> {
-  const workingHours = await getProfessionalWorkingHours(professionalId);
+  const weeklySchedule = await getProfessionalWorkingHours(professionalId);
   const slots: SlotOption[] = [];
 
   const now = new Date();
@@ -204,10 +261,17 @@ export async function getNextAvailableSlots(
   const startDate = new Date(now);
   startDate.setDate(now.getDate() + 1);
 
+  const rangeEnd = new Date(startDate);
+  rangeEnd.setDate(startDate.getDate() + 14);
+  const overrides = await getOverridesForRange(professionalId, startDate, rangeEnd);
+
   for (let dayOffset = 0; dayOffset < 14 && slots.length < maxSlots; dayOffset++) {
     const rawDate = new Date(startDate);
     rawDate.setDate(startDate.getDate() + dayOffset);
     const checkDate = artMidnight(rawDate);
+    const dateKey = checkDate.toLocaleDateString("sv-SE", { timeZone: TZ });
+    const { dayOfWeek } = getARTComponents(checkDate);
+    const workingHours = resolveWorkingHoursForDate(weeklySchedule, overrides.get(dateKey), dayOfWeek);
 
     const existingBookings = await getExistingBookings(professionalId, checkDate);
 
@@ -244,14 +308,24 @@ export async function getNearbySlots(
   rangeHours = 2,
   maxResults = 5
 ): Promise<SlotOption[]> {
-  const workingHours = await getProfessionalWorkingHours(professionalId);
+  const weeklySchedule = await getProfessionalWorkingHours(professionalId);
   const { hour: targetHour } = getARTComponents(targetDate);
   const nearby: SlotOption[] = [];
 
+  // Batch-fetch overrides for today + 3 days ahead
+  const rangeEnd = new Date(targetDate);
+  rangeEnd.setDate(targetDate.getDate() + 4);
+  const overrides = await getOverridesForRange(professionalId, targetDate, rangeEnd);
+
   // Phase 1: same day, ±rangeHours
+  const targetMidnight = artMidnight(targetDate);
+  const dateKey0 = targetMidnight.toLocaleDateString("sv-SE", { timeZone: TZ });
+  const { dayOfWeek: dow0 } = getARTComponents(targetMidnight);
+  const workingHours = resolveWorkingHoursForDate(weeklySchedule, overrides.get(dateKey0), dow0);
+
   const existingBookings = await getExistingBookings(professionalId, targetDate);
   const { availableSlots } = calculateAvailableSlots({
-    date: artMidnight(targetDate),
+    date: targetMidnight,
     durationMinutes,
     workingHours,
     existingBookings,
@@ -275,12 +349,15 @@ export async function getNearbySlots(
       const rawDate = new Date(targetDate);
       rawDate.setDate(rawDate.getDate() + daysAhead);
       const checkDate = artMidnight(rawDate);
+      const dateKey = checkDate.toLocaleDateString("sv-SE", { timeZone: TZ });
+      const { dayOfWeek } = getARTComponents(checkDate);
+      const dayWorkingHours = resolveWorkingHoursForDate(weeklySchedule, overrides.get(dateKey), dayOfWeek);
 
       const dayBookings = await getExistingBookings(professionalId, checkDate);
       const { availableSlots: daySlots } = calculateAvailableSlots({
         date: checkDate,
         durationMinutes,
-        workingHours,
+        workingHours: dayWorkingHours,
         existingBookings: dayBookings,
         bufferMinutes,
       });
@@ -310,13 +387,14 @@ export async function checkSlotAvailability(
   durationMinutes: number,
   bufferMinutes = 0
 ): Promise<{ available: boolean; alternatives: SlotOption[] }> {
-  const workingHours = await getProfessionalWorkingHours(professionalId);
+  const weeklySchedule = await getProfessionalWorkingHours(professionalId);
+  const override = await getOverrideForDate(professionalId, start);
   const existingBookings = await getExistingBookings(professionalId, start);
   const end = new Date(start.getTime() + durationMinutes * 60_000);
 
   const { dayOfWeek: artDayOfWeek } = getARTComponents(start);
+  const workingHours = resolveWorkingHoursForDate(weeklySchedule, override, artDayOfWeek);
   const slotFits = workingHours.some((wh) => {
-    if (wh.dayOfWeek !== artDayOfWeek) return false;
     const whStart = artDateTime(start, wh.startHour, wh.startMinute);
     const whEnd = artDateTime(start, wh.endHour, wh.endMinute);
     return start >= whStart && end <= whEnd;
