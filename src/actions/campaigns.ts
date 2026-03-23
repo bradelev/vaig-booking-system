@@ -67,9 +67,13 @@ export async function createAndScheduleCampaign(formData: FormData) {
 
   const scheduledAt = new Date(`${scheduledAtRaw}:00-03:00`).toISOString();
 
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) throw new Error("CRON_SECRET is not set");
+
+  // Insert as draft first so we have an ID for the cron job title
   const { data: campaign, error } = await db
     .from("campaigns")
-    .insert({ name, body, image_url: imageUrl, status: "scheduled", scheduled_at: scheduledAt, target_all: targetAll })
+    .insert({ name, body, image_url: imageUrl, status: "draft", scheduled_at: scheduledAt, target_all: targetAll })
     .select("id")
     .single();
 
@@ -80,15 +84,14 @@ export async function createAndScheduleCampaign(formData: FormData) {
     await insertRecipients(db, campaign.id, selectedIds);
   }
 
-  // Register a one-time cron job at the scheduled time
-  const cronSecret = process.env.CRON_SECRET ?? "";
+  // Register the cron job before marking as scheduled to avoid orphaned state
   const jobId = await createCronJob({
     title: `Campaign ${campaign.id} — ${name}`,
     url: getCampaignsEndpointUrl(),
     scheduledAt: new Date(scheduledAt),
     authHeader: `Bearer ${cronSecret}`,
   });
-  await db.from("campaigns").update({ cronjob_id: jobId }).eq("id", campaign.id);
+  await db.from("campaigns").update({ status: "scheduled", cronjob_id: jobId }).eq("id", campaign.id);
 
   revalidatePath("/backoffice/automatizaciones");
   redirect(`/backoffice/automatizaciones/${campaign.id}`);
@@ -158,17 +161,17 @@ export async function scheduleCampaign(id: string) {
   if (campaign.status !== "draft") throw new Error("Solo se pueden programar campañas en estado borrador");
   if (!campaign.scheduled_at) throw new Error("Configurá una fecha/hora de envío antes de programar");
 
-  await db.from("campaigns").update({ status: "scheduled" }).eq("id", id);
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) throw new Error("CRON_SECRET is not set");
 
-  // Register a one-time cron job at the scheduled time
-  const cronSecret = process.env.CRON_SECRET ?? "";
+  // Register the cron job before marking as scheduled to avoid orphaned state
   const jobId = await createCronJob({
     title: `Campaign ${id}`,
     url: getCampaignsEndpointUrl(),
     scheduledAt: new Date(campaign.scheduled_at as string),
     authHeader: `Bearer ${cronSecret}`,
   });
-  await db.from("campaigns").update({ cronjob_id: jobId }).eq("id", id);
+  await db.from("campaigns").update({ status: "scheduled", cronjob_id: jobId }).eq("id", id);
 
   revalidatePath("/backoffice/automatizaciones");
   revalidatePath(`/backoffice/automatizaciones/${id}`);
