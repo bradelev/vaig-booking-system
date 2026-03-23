@@ -11,6 +11,7 @@ interface Client {
   first_name: string;
   last_name: string;
   phone: string;
+  consent_accepted_at: string | null;
 }
 
 export default async function EditarCampanaPage({
@@ -32,9 +33,8 @@ export default async function EditarCampanaPage({
       .select("client_id")
       .eq("campaign_id", id),
     db.from("clients")
-      .select("id, first_name, last_name, phone")
+      .select("id, first_name, last_name, phone, consent_accepted_at")
       .eq("is_blocked", false)
-      .not("consent_accepted_at", "is", null)
       .order("first_name"),
   ]);
 
