@@ -41,6 +41,49 @@ export async function upsertProfessionalSchedule(professionalId: string, formDat
   revalidatePath(`/backoffice/profesionales/${professionalId}/horario`);
 }
 
+export async function createScheduleOverride(professionalId: string, formData: FormData) {
+  const supabase = await createClient();
+  const client = supabase as AnyClient;
+
+  const isWorking = formData.get("is_working") === "on";
+  const overrideDate = formData.get("override_date") as string;
+  const startTime = (formData.get("start_time") as string) || null;
+  const endTime = (formData.get("end_time") as string) || null;
+  const reason = (formData.get("reason") as string) || null;
+
+  const { error } = await client
+    .from("professional_schedule_overrides")
+    .upsert(
+      {
+        professional_id: professionalId,
+        override_date: overrideDate,
+        start_time: isWorking ? startTime : null,
+        end_time: isWorking ? endTime : null,
+        is_working: isWorking,
+        reason,
+      },
+      { onConflict: "professional_id,override_date" }
+    );
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/backoffice/profesionales/${professionalId}/horario`);
+}
+
+export async function deleteScheduleOverride(professionalId: string, overrideId: string) {
+  const supabase = await createClient();
+  const client = supabase as AnyClient;
+
+  const { error } = await client
+    .from("professional_schedule_overrides")
+    .delete()
+    .eq("id", overrideId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/backoffice/profesionales/${professionalId}/horario`);
+}
+
 export async function saveSystemConfig(formData: FormData) {
   const supabase = await createClient();
   const client = supabase as AnyClient;
