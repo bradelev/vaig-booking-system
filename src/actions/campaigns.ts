@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { processDueCampaigns } from "@/lib/campaigns/processor";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getDb() {
@@ -12,11 +11,24 @@ async function getDb() {
   return supabase as any;
 }
 
+async function insertRecipients(db: unknown, campaignId: string, clientIds: string[]) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = db as any;
+  if (clientIds.length > 0) {
+    await client.from("campaign_recipients").insert(
+      clientIds.map((clientId) => ({ campaign_id: campaignId, client_id: clientId }))
+    );
+    await client.from("campaigns").update({ total_recipients: clientIds.length }).eq("id", campaignId);
+  }
+}
+
 export async function createCampaign(formData: FormData) {
   const db = await getDb();
 
   const targetAll = formData.get("target_all") === "true";
-  const name = formData.get("name") as string;
+  const name = (formData.get("name") as string)?.trim();
+  if (!name) throw new Error("El nombre de la campaña es requerido");
+
   const body = (formData.get("body") as string) || "";
   const imageUrl = (formData.get("image_url") as string) || null;
   const scheduledAtRaw = formData.get("scheduled_at") as string | null;
@@ -32,12 +44,39 @@ export async function createCampaign(formData: FormData) {
 
   if (!targetAll) {
     const selectedIds = formData.getAll("client_ids") as string[];
-    if (selectedIds.length > 0) {
-      await db.from("campaign_recipients").insert(
-        selectedIds.map((clientId) => ({ campaign_id: campaign.id, client_id: clientId }))
-      );
-      await db.from("campaigns").update({ total_recipients: selectedIds.length }).eq("id", campaign.id);
-    }
+    await insertRecipients(db, campaign.id, selectedIds);
+  }
+
+  revalidatePath("/backoffice/automatizaciones");
+  redirect(`/backoffice/automatizaciones/${campaign.id}`);
+}
+
+/** Creates a new campaign and immediately marks it as scheduled (for new campaign "Programar envío" button). */
+export async function createAndScheduleCampaign(formData: FormData) {
+  const db = await getDb();
+
+  const targetAll = formData.get("target_all") === "true";
+  const name = (formData.get("name") as string)?.trim();
+  if (!name) throw new Error("El nombre de la campaña es requerido");
+
+  const body = (formData.get("body") as string) || "";
+  const imageUrl = (formData.get("image_url") as string) || null;
+  const scheduledAtRaw = formData.get("scheduled_at") as string | null;
+  if (!scheduledAtRaw) throw new Error("Configurá una fecha/hora de envío antes de programar");
+
+  const scheduledAt = new Date(`${scheduledAtRaw}:00-03:00`).toISOString();
+
+  const { data: campaign, error } = await db
+    .from("campaigns")
+    .insert({ name, body, image_url: imageUrl, status: "scheduled", scheduled_at: scheduledAt, target_all: targetAll })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  if (!targetAll) {
+    const selectedIds = formData.getAll("client_ids") as string[];
+    await insertRecipients(db, campaign.id, selectedIds);
   }
 
   revalidatePath("/backoffice/automatizaciones");
@@ -57,7 +96,9 @@ export async function updateCampaign(id: string, formData: FormData) {
   if (existing.status !== "draft") throw new Error("Solo se pueden editar campañas en estado borrador");
 
   const targetAll = formData.get("target_all") === "true";
-  const name = formData.get("name") as string;
+  const name = (formData.get("name") as string)?.trim();
+  if (!name) throw new Error("El nombre de la campaña es requerido");
+
   const body = (formData.get("body") as string) || "";
   const imageUrl = (formData.get("image_url") as string) || null;
   const scheduledAtRaw = formData.get("scheduled_at") as string | null;
@@ -83,8 +124,9 @@ export async function updateCampaign(id: string, formData: FormData) {
       await db.from("campaigns").update({ total_recipients: 0 }).eq("id", id);
     }
   } else {
-    // Remove any manual recipients since we're targeting all
+    // Remove manual recipients and reset count
     await db.from("campaign_recipients").delete().eq("campaign_id", id);
+    await db.from("campaigns").update({ total_recipients: 0 }).eq("id", id);
   }
 
   revalidatePath("/backoffice/automatizaciones");
@@ -97,25 +139,16 @@ export async function scheduleCampaign(id: string) {
 
   const { data: campaign, error: fetchErr } = await db
     .from("campaigns")
-    .select("status, scheduled_at, target_all")
+    .select("status, scheduled_at")
     .eq("id", id)
     .single();
 
   if (fetchErr) throw new Error(fetchErr.message);
   if (campaign.status !== "draft") throw new Error("Solo se pueden programar campañas en estado borrador");
-
   if (!campaign.scheduled_at) throw new Error("Configurá una fecha/hora de envío antes de programar");
 
-  const scheduledAt = new Date(campaign.scheduled_at);
-  const now = new Date();
-
-  if (scheduledAt <= now) {
-    // Process immediately
-    await db.from("campaigns").update({ status: "scheduled" }).eq("id", id);
-    await processDueCampaigns();
-  } else {
-    await db.from("campaigns").update({ status: "scheduled" }).eq("id", id);
-  }
+  // Mark as scheduled — the external cron (cron-job.org, every 5 min) will pick it up
+  await db.from("campaigns").update({ status: "scheduled" }).eq("id", id);
 
   revalidatePath("/backoffice/automatizaciones");
   revalidatePath(`/backoffice/automatizaciones/${id}`);
