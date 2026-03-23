@@ -6,9 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createCronJob, deleteCronJob, getCampaignsEndpointUrl } from "@/lib/cronjob";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getDb() {
   const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return supabase as any;
 }
 
