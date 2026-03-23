@@ -24,7 +24,7 @@ export default async function EditarCampanaPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  const [{ data: campaignRaw }, { data: recipientsRaw }, { data: clientsRaw }] = await Promise.all([
+  const [{ data: campaignRaw }, { data: recipientsRaw }, { data: clientsWithConsent }] = await Promise.all([
     db.from("campaigns")
       .select("id, name, body, image_url, scheduled_at, target_all, status")
       .eq("id", id)
@@ -57,7 +57,21 @@ export default async function EditarCampanaPage({
   }
 
   const recipientIds = (recipientsRaw ?? []).map((r: { client_id: string }) => r.client_id);
-  const clients = (clientsRaw ?? []) as Client[];
+
+  let clients: Client[];
+  if (clientsWithConsent) {
+    clients = clientsWithConsent as Client[];
+  } else {
+    // Fallback: consent_accepted_at column may not exist in DB yet
+    const { data: withoutConsent } = await db
+      .from("clients")
+      .select("id, first_name, last_name, phone")
+      .eq("is_blocked", false)
+      .order("first_name");
+    clients = ((withoutConsent ?? []) as Array<Omit<Client, "consent_accepted_at">>).map(
+      (c) => ({ ...c, consent_accepted_at: null }),
+    );
+  }
 
   const campaign = {
     ...campaignRaw,
