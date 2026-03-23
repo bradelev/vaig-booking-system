@@ -77,7 +77,8 @@ export async function deleteScheduleOverride(professionalId: string, overrideId:
   const { error } = await client
     .from("professional_schedule_overrides")
     .delete()
-    .eq("id", overrideId);
+    .eq("id", overrideId)
+    .eq("professional_id", professionalId);
 
   if (error) throw new Error(error.message);
 
