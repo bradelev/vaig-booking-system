@@ -22,3 +22,30 @@ export interface SchedulerInput {
 export interface SchedulerResult {
   availableSlots: TimeSlot[];
 }
+
+export interface ScheduleOverride {
+  override_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  is_working: boolean;
+}
+
+/**
+ * Resolves working hours for a specific date, applying an override if present.
+ * Pure function — no DB calls.
+ */
+export function resolveWorkingHoursForDate(
+  weeklySchedule: WorkingHours[],
+  override: ScheduleOverride | null | undefined,
+  dayOfWeek: number
+): WorkingHours[] {
+  if (override) {
+    if (!override.is_working) return [];
+    if (override.start_time && override.end_time) {
+      const [startH, startM] = override.start_time.split(":").map(Number);
+      const [endH, endM] = override.end_time.split(":").map(Number);
+      return [{ dayOfWeek, startHour: startH, startMinute: startM, endHour: endH, endMinute: endM }];
+    }
+  }
+  return weeklySchedule.filter((wh) => wh.dayOfWeek === dayOfWeek);
+}
