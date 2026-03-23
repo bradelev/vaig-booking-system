@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { toast } from "sonner";
 import Modal from "@/components/backoffice/modal";
 import { confirmBookingAsSession } from "@/actions/sesiones";
@@ -33,6 +33,7 @@ interface ConfirmBookingModalProps {
 }
 
 export default function ConfirmBookingModal({ booking, onClose }: ConfirmBookingModalProps) {
+  const uid = useId();
   const [operadora, setOperadora] = useState("");
   const [montoCobrado, setMontoCobrado] = useState("");
   const [descuentoPct, setDescuentoPct] = useState("");
@@ -109,8 +110,9 @@ export default function ConfirmBookingModal({ booking, onClose }: ConfirmBooking
 
         {/* Operadora */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Operadora</label>
+          <label htmlFor={`${uid}-operadora`} className="block text-xs font-medium text-gray-700 mb-1">Operadora</label>
           <input
+            id={`${uid}-operadora`}
             type="text"
             value={operadora}
             onChange={(e) => setOperadora(e.target.value)}
