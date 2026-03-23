@@ -1,8 +1,8 @@
 const BASE_URL = "https://api.cron-job.org";
 
 function getApiKey(): string {
-  const key = process.env.CRONJOB_API_KEY;
-  if (!key) throw new Error("CRONJOB_API_KEY is not set");
+  const key = process.env.VAIG_CRON_KEY;
+  if (!key) throw new Error("VAIG_CRON_KEY is not set");
   return key;
 }
 
