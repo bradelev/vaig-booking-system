@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import ConfirmDeleteForm from "@/components/backoffice/confirm-delete-form";
 import { scheduleCampaign, cancelSchedule, deleteCampaign, cloneCampaign } from "@/actions/campaigns";
 
 export const metadata: Metadata = { title: "Campaña" };
@@ -123,12 +124,10 @@ export default async function CampanaDetallePage({
             </button>
           </form>
           {campaign.status === "draft" && (
-            <form
+            <ConfirmDeleteForm
               action={deleteCampaign.bind(null, id)}
               className="inline"
-              onSubmit={(e) => {
-                if (!confirm("¿Eliminar esta campaña?")) e.preventDefault();
-              }}
+              message="¿Eliminar esta campaña?"
             >
               <button
                 type="submit"
@@ -136,7 +135,7 @@ export default async function CampanaDetallePage({
               >
                 Eliminar
               </button>
-            </form>
+            </ConfirmDeleteForm>
           )}
         </div>
       </div>
