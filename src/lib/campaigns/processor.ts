@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTextMessage, sendImageMessage } from "@/lib/whatsapp";
 
 const DELAY_MS = 100;
+const STUCK_SENDING_MINUTES = 30;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -14,6 +15,14 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
 
   const errors: string[] = [];
   let processed = 0;
+
+  // Recover campaigns stuck in "sending" for too long (e.g. killed by timeout)
+  const staleThreshold = new Date(Date.now() - STUCK_SENDING_MINUTES * 60 * 1000).toISOString();
+  await db
+    .from("campaigns")
+    .update({ status: "failed" })
+    .eq("status", "sending")
+    .lt("updated_at", staleThreshold);
 
   // Fetch campaigns due for sending
   const { data: campaigns, error: fetchError } = await db
@@ -42,10 +51,13 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
           .not("consent_accepted_at", "is", null);
         recipients = data ?? [];
       } else {
+        // Join through campaign_recipients — also enforce consent
         const { data } = await db
           .from("campaign_recipients")
-          .select("clients(id, phone)")
-          .eq("campaign_id", campaign.id);
+          .select("clients!inner(id, phone, is_blocked, consent_accepted_at)")
+          .eq("campaign_id", campaign.id)
+          .eq("clients.is_blocked", false)
+          .not("clients.consent_accepted_at", "is", null);
         recipients = (data ?? [])
           .map((r: { clients: { id: string; phone: string } | null }) => r.clients)
           .filter(Boolean) as Array<{ id: string; phone: string }>;
