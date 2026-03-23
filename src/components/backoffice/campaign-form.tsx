@@ -27,12 +27,19 @@ interface CampaignFormProps {
 
 function toLocalDatetimeValue(isoString: string | null): string {
   if (!isoString) return "";
-  // Convert UTC ISO to ART (UTC-3) datetime-local format
   const date = new Date(isoString);
-  const artOffset = -3 * 60;
-  const local = new Date(date.getTime() + (artOffset - date.getTimezoneOffset()) * -60000);
-  // Format as YYYY-MM-DDTHH:MM
-  return local.toISOString().slice(0, 16);
+  // Format as YYYY-MM-DDTHH:MM in ART using Intl (timezone-safe, independent of browser locale)
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
 }
 
 function formatTimeART(isoString: string | null): string {
