@@ -252,6 +252,7 @@ export default function SessionForm({
             key={clientKey}
             value={clientId}
             selectedLabel={clientLabel}
+            aria-label="Buscar cliente"
             onChange={(id, label) => { setClientId(id); setClientLabel(label); }}
             onCreateNew={(query) => {
               const parts = query.split(" ");

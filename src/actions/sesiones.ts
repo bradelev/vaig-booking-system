@@ -64,6 +64,7 @@ export async function createSession(data: {
   if (error) return { success: false, error: error.message };
 
   revalidatePath("/backoffice/sesiones");
+  revalidatePath("/backoffice/sesiones/nueva");
   return { success: true };
 }
 

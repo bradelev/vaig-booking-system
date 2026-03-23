@@ -14,6 +14,7 @@ interface ClientSearchComboboxProps {
   onChange: (id: string, label: string) => void;
   onCreateNew?: (query: string) => void;
   placeholder?: string;
+  "aria-label"?: string;
 }
 
 export default function ClientSearchCombobox({
@@ -22,6 +23,7 @@ export default function ClientSearchCombobox({
   onChange,
   onCreateNew,
   placeholder = "Buscar cliente...",
+  "aria-label": ariaLabel,
 }: ClientSearchComboboxProps) {
   const uid = useId();
   const listboxId = `${uid}-listbox`;
@@ -119,6 +121,7 @@ export default function ClientSearchCombobox({
         aria-controls={listboxId}
         aria-activedescendant={activeOptionId}
         aria-autocomplete="list"
+        aria-label={ariaLabel}
         value={inputText}
         placeholder={placeholder}
         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
