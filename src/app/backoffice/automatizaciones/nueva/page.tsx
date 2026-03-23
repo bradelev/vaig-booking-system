@@ -18,13 +18,26 @@ export default async function NuevaCampanaPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  const { data: raw } = await db
+  const { data: withConsent } = await db
     .from("clients")
     .select("id, first_name, last_name, phone, consent_accepted_at")
     .eq("is_blocked", false)
     .order("first_name");
 
-  const clients = (raw ?? []) as Client[];
+  let clients: Client[];
+  if (withConsent) {
+    clients = withConsent as Client[];
+  } else {
+    // Fallback: consent_accepted_at column may not exist in DB yet
+    const { data: withoutConsent } = await db
+      .from("clients")
+      .select("id, first_name, last_name, phone")
+      .eq("is_blocked", false)
+      .order("first_name");
+    clients = ((withoutConsent ?? []) as Array<Omit<Client, "consent_accepted_at">>).map(
+      (c) => ({ ...c, consent_accepted_at: null }),
+    );
+  }
 
   return (
     <div className="max-w-5xl space-y-6">
