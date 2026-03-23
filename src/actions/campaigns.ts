@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createCronJob, deleteCronJob, getCampaignsEndpointUrl } from "@/lib/cronjob";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getDb() {
@@ -79,6 +80,16 @@ export async function createAndScheduleCampaign(formData: FormData) {
     await insertRecipients(db, campaign.id, selectedIds);
   }
 
+  // Register a one-time cron job at the scheduled time
+  const cronSecret = process.env.CRON_SECRET ?? "";
+  const jobId = await createCronJob({
+    title: `Campaign ${campaign.id} — ${name}`,
+    url: getCampaignsEndpointUrl(),
+    scheduledAt: new Date(scheduledAt),
+    authHeader: `Bearer ${cronSecret}`,
+  });
+  await db.from("campaigns").update({ cronjob_id: jobId }).eq("id", campaign.id);
+
   revalidatePath("/backoffice/automatizaciones");
   redirect(`/backoffice/automatizaciones/${campaign.id}`);
 }
@@ -147,8 +158,17 @@ export async function scheduleCampaign(id: string) {
   if (campaign.status !== "draft") throw new Error("Solo se pueden programar campañas en estado borrador");
   if (!campaign.scheduled_at) throw new Error("Configurá una fecha/hora de envío antes de programar");
 
-  // Mark as scheduled — the external cron (cron-job.org, every 5 min) will pick it up
   await db.from("campaigns").update({ status: "scheduled" }).eq("id", id);
+
+  // Register a one-time cron job at the scheduled time
+  const cronSecret = process.env.CRON_SECRET ?? "";
+  const jobId = await createCronJob({
+    title: `Campaign ${id}`,
+    url: getCampaignsEndpointUrl(),
+    scheduledAt: new Date(campaign.scheduled_at as string),
+    authHeader: `Bearer ${cronSecret}`,
+  });
+  await db.from("campaigns").update({ cronjob_id: jobId }).eq("id", id);
 
   revalidatePath("/backoffice/automatizaciones");
   revalidatePath(`/backoffice/automatizaciones/${id}`);
@@ -158,9 +178,22 @@ export async function scheduleCampaign(id: string) {
 export async function cancelSchedule(id: string) {
   const db = await getDb();
 
+  const { data: campaign, error: fetchErr } = await db
+    .from("campaigns")
+    .select("cronjob_id")
+    .eq("id", id)
+    .eq("status", "scheduled")
+    .single();
+
+  if (fetchErr) throw new Error(fetchErr.message);
+
+  if (campaign?.cronjob_id) {
+    await deleteCronJob(campaign.cronjob_id);
+  }
+
   const { error } = await db
     .from("campaigns")
-    .update({ status: "draft" })
+    .update({ status: "draft", cronjob_id: null })
     .eq("id", id)
     .eq("status", "scheduled");
 
