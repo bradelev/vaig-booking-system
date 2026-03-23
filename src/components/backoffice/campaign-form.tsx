@@ -111,7 +111,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
       setActiveIndex((i) => Math.min(i + 1, dropdownClients.length - 1));
       e.preventDefault();
     } else if (e.key === "ArrowUp") {
-      setActiveIndex((i) => Math.max(i - 1, 0));
+      setActiveIndex((i) => Math.max(i - 1, -1));
       e.preventDefault();
     } else if (e.key === "Enter" && activeIndex >= 0 && dropdownClients[activeIndex]) {
       selectClient(dropdownClients[activeIndex].id);
@@ -362,7 +362,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
                             key={c.id}
                             id={`${comboboxId}-option-${c.id}`}
                             role="option"
-                            aria-selected={false}
+                            aria-selected={idx === activeIndex}
                             onMouseDown={(e) => {
                               e.preventDefault();
                               selectClient(c.id);
