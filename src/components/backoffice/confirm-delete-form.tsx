@@ -1,14 +1,16 @@
 "use client";
 
-export default function ConfirmDeleteForm({
+import type { ReactNode } from "react";
+
+export function ConfirmDeleteForm({
   action,
   message,
   children,
   className,
 }: {
-  action: (formData: FormData) => void;
+  action: (formData: FormData) => void | Promise<void>;
   message: string;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (

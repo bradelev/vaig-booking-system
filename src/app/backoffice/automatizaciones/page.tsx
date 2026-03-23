@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
-import ConfirmDeleteForm from "@/components/backoffice/confirm-delete-form";
+import { ConfirmDeleteForm } from "@/components/backoffice/confirm-delete-form";
 import { deleteCampaign, cloneCampaign, cancelSchedule } from "@/actions/campaigns";
 
 export const metadata: Metadata = { title: "Automatizaciones" };
