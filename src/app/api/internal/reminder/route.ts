@@ -89,6 +89,66 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  console.log(`[Reminder] Sent: ${sent}, Failed: ${failed}`);
-  return NextResponse.json({ sent, failed });
+  console.log(`[Reminder] Client reminders — Sent: ${sent}, Failed: ${failed}`);
+
+  // ── Professional reminders ──────────────────────────────────────────────────
+  // Send each professional with a phone number a summary of their confirmed
+  // bookings in the reminder window.
+  let profSent = 0;
+  let profFailed = 0;
+
+  const { data: professionals } = await client
+    .from("professionals")
+    .select("id, name, phone")
+    .eq("is_active", true)
+    .not("phone", "is", null);
+
+  for (const prof of professionals ?? []) {
+    if (!prof.phone) continue;
+
+    const { data: profBookings } = await client
+      .from("bookings")
+      .select(
+        `scheduled_at,
+         clients(first_name),
+         services(name)`
+      )
+      .eq("professional_id", prof.id)
+      .eq("status", "confirmed")
+      .gte("scheduled_at", windowStart)
+      .lte("scheduled_at", windowEnd)
+      .order("scheduled_at", { ascending: true });
+
+    if (!profBookings || profBookings.length === 0) continue;
+
+    const lines = profBookings.map(
+      (b: { scheduled_at: string; clients: { first_name: string } | null; services: { name: string } | null }) => {
+        const time = new Date(b.scheduled_at).toLocaleTimeString("es-AR", {
+          timeZone: "America/Argentina/Buenos_Aires",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        });
+        const clientName = b.clients?.first_name ?? "Cliente";
+        const serviceName = b.services?.name ?? "Servicio";
+        return `• ${time} — ${serviceName} (${clientName})`;
+      }
+    );
+
+    const profMsg =
+      `📋 *Turnos de mañana — ${businessName}*\n\n` +
+      `Hola ${prof.name}! Estos son tus turnos confirmados:\n\n` +
+      lines.join("\n");
+
+    try {
+      await sendTextMessage({ to: prof.phone, body: profMsg });
+      profSent++;
+    } catch (err) {
+      console.error(`[Reminder] Professional ${prof.name} failed:`, err);
+      profFailed++;
+    }
+  }
+
+  console.log(`[Reminder] Professional reminders — Sent: ${profSent}, Failed: ${profFailed}`);
+  return NextResponse.json({ sent, failed, profSent, profFailed });
 }
