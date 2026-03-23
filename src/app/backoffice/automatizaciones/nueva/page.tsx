@@ -1,0 +1,45 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import CampaignForm from "@/components/backoffice/campaign-form";
+
+export const metadata: Metadata = { title: "Nueva campaña" };
+
+interface Client {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+}
+
+export default async function NuevaCampanaPage() {
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+
+  const { data: raw } = await db
+    .from("clients")
+    .select("id, first_name, last_name, phone")
+    .eq("is_blocked", false)
+    .not("consent_accepted_at", "is", null)
+    .order("first_name");
+
+  const clients = (raw ?? []) as Client[];
+
+  return (
+    <div className="max-w-5xl space-y-6">
+      <div className="flex items-center gap-3">
+        <Link
+          href="/backoffice/automatizaciones"
+          className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+        >
+          ← Automatizaciones
+        </Link>
+        <span className="text-gray-300">/</span>
+        <h1 className="text-xl font-bold text-gray-900">Nueva campaña</h1>
+      </div>
+
+      <CampaignForm clients={clients} />
+    </div>
+  );
+}
