@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
+import ConfirmDeleteForm from "@/components/backoffice/confirm-delete-form";
 import { deleteCampaign, cloneCampaign, cancelSchedule } from "@/actions/campaigns";
 
 export const metadata: Metadata = { title: "Automatizaciones" };
@@ -121,17 +122,15 @@ export default async function AutomatizacionesPage() {
             </form>
           )}
           {c.status === "draft" && (
-            <form
+            <ConfirmDeleteForm
               action={deleteCampaign.bind(null, c.id)}
               className="inline"
-              onSubmit={(e) => {
-                if (!confirm("¿Eliminar esta campaña?")) e.preventDefault();
-              }}
+              message="¿Eliminar esta campaña?"
             >
               <button type="submit" className="text-red-600 hover:underline">
                 Eliminar
               </button>
-            </form>
+            </ConfirmDeleteForm>
           )}
         </div>
       ),
