@@ -15,9 +15,12 @@ export async function createProfessional(formData: FormData) {
     .map((s) => s.trim())
     .filter(Boolean);
 
+  const phone = (formData.get("phone") as string) || null;
+
   const { error } = await client.from("professionals").insert({
     name: formData.get("name") as string,
     specialties,
+    phone,
     is_active: true,
   });
 
@@ -38,11 +41,14 @@ export async function updateProfessional(id: string, formData: FormData) {
     .map((s) => s.trim())
     .filter(Boolean);
 
+  const phone = (formData.get("phone") as string) || null;
+
   const { error } = await client
     .from("professionals")
     .update({
       name: formData.get("name") as string,
       specialties,
+      phone,
     })
     .eq("id", id);
 
