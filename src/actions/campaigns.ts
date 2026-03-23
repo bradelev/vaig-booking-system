@@ -84,13 +84,26 @@ export async function createAndScheduleCampaign(formData: FormData) {
     await insertRecipients(db, campaign.id, selectedIds);
   }
 
+  const scheduledDate = new Date(scheduledAt);
+  if (scheduledDate.getTime() < Date.now() - 60_000) {
+    await db.from("campaigns").delete().eq("id", campaign.id);
+    throw new Error("La fecha de envío ya pasó. Editá la campaña y configurá una nueva fecha.");
+  }
+
   // Register the cron job before marking as scheduled to avoid orphaned state
-  const jobId = await createCronJob({
-    title: `Campaign ${campaign.id} — ${name}`,
-    url: getCampaignsEndpointUrl(),
-    scheduledAt: new Date(scheduledAt),
-    authHeader: `Bearer ${cronSecret}`,
-  });
+  let jobId: number;
+  try {
+    jobId = await createCronJob({
+      title: `Campaign ${campaign.id} — ${name}`,
+      url: getCampaignsEndpointUrl(),
+      scheduledAt: scheduledDate,
+      authHeader: `Bearer ${cronSecret}`,
+    });
+  } catch (err) {
+    await db.from("campaigns").delete().eq("id", campaign.id);
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`No se pudo programar el envío: ${msg}`);
+  }
   await db.from("campaigns").update({ status: "scheduled", cronjob_id: jobId }).eq("id", campaign.id);
 
   revalidatePath("/backoffice/automatizaciones");
@@ -164,13 +177,24 @@ export async function scheduleCampaign(id: string) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) throw new Error("CRON_SECRET is not set");
 
+  const scheduledDate = new Date(campaign.scheduled_at as string);
+  if (scheduledDate.getTime() < Date.now() - 60_000) {
+    throw new Error("La fecha de envío ya pasó. Editá la campaña y configurá una nueva fecha.");
+  }
+
   // Register the cron job before marking as scheduled to avoid orphaned state
-  const jobId = await createCronJob({
-    title: `Campaign ${id}`,
-    url: getCampaignsEndpointUrl(),
-    scheduledAt: new Date(campaign.scheduled_at as string),
-    authHeader: `Bearer ${cronSecret}`,
-  });
+  let jobId: number;
+  try {
+    jobId = await createCronJob({
+      title: `Campaign ${id}`,
+      url: getCampaignsEndpointUrl(),
+      scheduledAt: scheduledDate,
+      authHeader: `Bearer ${cronSecret}`,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`No se pudo programar el envío: ${msg}`);
+  }
   await db.from("campaigns").update({ status: "scheduled", cronjob_id: jobId }).eq("id", id);
 
   revalidatePath("/backoffice/automatizaciones");
