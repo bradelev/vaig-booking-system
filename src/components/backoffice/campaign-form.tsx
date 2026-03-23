@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, useId, useCallback, useEffect } from "react";
 import { createCampaign, createAndScheduleCampaign, updateCampaign, uploadCampaignImage, scheduleCampaign } from "@/actions/campaigns";
 
 interface Client {
@@ -8,6 +8,7 @@ interface Client {
   first_name: string;
   last_name: string;
   phone: string;
+  consent_accepted_at: string | null;
 }
 
 interface CampaignFormProps {
@@ -55,7 +56,9 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     new Set(campaign?.recipient_ids ?? [])
   );
-  const [clientSearch, setClientSearch] = useState("");
+  const [comboboxQuery, setComboboxQuery] = useState("");
+  const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [scheduledAt, setScheduledAt] = useState(
     toLocalDatetimeValue(campaign?.scheduled_at ?? null)
   );
@@ -63,24 +66,75 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
   const [isPending, startTransition] = useTransition();
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const comboboxId = useId();
+  const listboxId = `${comboboxId}-listbox`;
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const filteredClients = clients.filter((c) => {
-    const q = clientSearch.toLowerCase();
+  const dropdownClients = clients.filter((c) => {
+    if (selectedIds.has(c.id)) return false;
+    const q = comboboxQuery.toLowerCase();
     return (
       c.first_name.toLowerCase().includes(q) ||
       c.last_name.toLowerCase().includes(q) ||
       c.phone.includes(q)
     );
-  });
+  }).slice(0, 8);
 
-  function toggleClient(id: string) {
+  const selectedClients = clients.filter((c) => selectedIds.has(c.id));
+
+  const selectClient = useCallback((id: string) => {
+    setSelectedIds((prev) => new Set([...prev, id]));
+    setComboboxQuery("");
+    setComboboxOpen(false);
+    setActiveIndex(-1);
+    inputRef.current?.focus();
+  }, []);
+
+  const removeClient = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      next.delete(id);
       return next;
     });
+  }, []);
+
+  function handleComboboxKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!comboboxOpen) {
+      if (e.key === "ArrowDown") {
+        setComboboxOpen(true);
+        setActiveIndex(0);
+        e.preventDefault();
+      }
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      setActiveIndex((i) => Math.min(i + 1, dropdownClients.length - 1));
+      e.preventDefault();
+    } else if (e.key === "ArrowUp") {
+      setActiveIndex((i) => Math.max(i - 1, -1));
+      e.preventDefault();
+    } else if (e.key === "Enter" && activeIndex >= 0 && dropdownClients[activeIndex]) {
+      selectClient(dropdownClients[activeIndex].id);
+      e.preventDefault();
+    } else if (e.key === "Escape") {
+      setComboboxOpen(false);
+      setActiveIndex(-1);
+    }
   }
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!comboboxOpen) return;
+    function handleClick(e: MouseEvent) {
+      const container = document.getElementById(comboboxId);
+      if (container && !container.contains(e.target as Node)) {
+        setComboboxOpen(false);
+        setActiveIndex(-1);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [comboboxOpen, comboboxId]);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -267,40 +321,107 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
             </div>
 
             {!targetAll && (
-              <div className="mt-3 rounded-md border border-gray-200 overflow-hidden">
-                <div className="p-2 border-b border-gray-200 bg-gray-50">
+              <div className="mt-3 space-y-2">
+                {/* Combobox input */}
+                <div id={comboboxId} className="relative">
                   <input
+                    ref={inputRef}
                     type="text"
-                    value={clientSearch}
-                    onChange={(e) => setClientSearch(e.target.value)}
+                    role="combobox"
+                    aria-expanded={comboboxOpen}
+                    aria-controls={listboxId}
+                    aria-activedescendant={
+                      activeIndex >= 0 && dropdownClients[activeIndex]
+                        ? `${comboboxId}-option-${dropdownClients[activeIndex].id}`
+                        : undefined
+                    }
+                    value={comboboxQuery}
+                    onChange={(e) => {
+                      setComboboxQuery(e.target.value);
+                      setComboboxOpen(true);
+                      setActiveIndex(-1);
+                    }}
+                    onFocus={() => setComboboxOpen(true)}
+                    onKeyDown={handleComboboxKeyDown}
                     placeholder="Buscar cliente..."
-                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+                    disabled={!isDraft}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 disabled:bg-gray-50 disabled:text-gray-500"
+                    autoComplete="off"
                   />
-                  <p className="mt-1 text-xs text-gray-500">{selectedIds.size} seleccionados</p>
-                </div>
-                <div className="max-h-48 overflow-y-auto divide-y divide-gray-100">
-                  {filteredClients.map((c) => (
-                    <label
-                      key={c.id}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                  {comboboxOpen && (
+                    <ul
+                      id={listboxId}
+                      role="listbox"
+                      className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-56 overflow-y-auto divide-y divide-gray-100"
                     >
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(c.id)}
-                        onChange={() => toggleClient(c.id)}
-                        disabled={!isDraft}
-                        className="h-4 w-4 rounded text-gray-900"
-                      />
-                      <span className="text-sm text-gray-700">
-                        {c.first_name} {c.last_name}
-                        <span className="ml-1 text-gray-400 text-xs">{c.phone}</span>
-                      </span>
-                    </label>
-                  ))}
-                  {filteredClients.length === 0 && (
-                    <p className="px-3 py-4 text-center text-sm text-gray-400">Sin resultados</p>
+                      {dropdownClients.length === 0 ? (
+                        <li className="px-3 py-3 text-sm text-gray-400 text-center">Sin resultados</li>
+                      ) : (
+                        dropdownClients.map((c, idx) => (
+                          <li
+                            key={c.id}
+                            id={`${comboboxId}-option-${c.id}`}
+                            role="option"
+                            aria-selected={idx === activeIndex}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectClient(c.id);
+                            }}
+                            onMouseEnter={() => setActiveIndex(idx)}
+                            className={`flex items-center justify-between px-3 py-2 cursor-pointer text-sm ${
+                              idx === activeIndex ? "bg-gray-100" : "hover:bg-gray-50"
+                            }`}
+                          >
+                            <span className="text-gray-800">
+                              {c.first_name} {c.last_name}
+                              <span className="ml-2 text-gray-400 text-xs">{c.phone}</span>
+                            </span>
+                            {!c.consent_accepted_at && (
+                              <span className="ml-2 shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
+                                Sin RNPD
+                              </span>
+                            )}
+                          </li>
+                        ))
+                      )}
+                    </ul>
                   )}
                 </div>
+
+                {/* Selected chips */}
+                {selectedClients.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedClients.map((c) => (
+                      <span
+                        key={c.id}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
+                          !c.consent_accepted_at
+                            ? "border border-orange-300 bg-orange-50 text-orange-800"
+                            : "border border-gray-200 bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {!c.consent_accepted_at && (
+                          <svg className="h-3 w-3 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-label="Sin RNPD">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                          </svg>
+                        )}
+                        {c.first_name} {c.last_name}
+                        {isDraft && (
+                          <button
+                            type="button"
+                            onClick={() => removeClient(c.id)}
+                            className="ml-0.5 rounded-full hover:bg-gray-300 hover:text-gray-900 leading-none"
+                            aria-label={`Quitar ${c.first_name} ${c.last_name}`}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-500">{selectedIds.size} seleccionado{selectedIds.size !== 1 ? "s" : ""}</p>
               </div>
             )}
           </div>
