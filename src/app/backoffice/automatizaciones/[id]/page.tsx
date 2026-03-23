@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import ConfirmDeleteForm from "@/components/backoffice/confirm-delete-form";
+import { ConfirmDeleteForm } from "@/components/backoffice/confirm-delete-form";
 import { scheduleCampaign, cancelSchedule, deleteCampaign, cloneCampaign } from "@/actions/campaigns";
 
 export const metadata: Metadata = { title: "Campaña" };
