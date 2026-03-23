@@ -7,6 +7,7 @@ import ValidatedForm from "@/components/backoffice/validated-form";
 interface Professional {
   id: string;
   name: string;
+  phone: string | null;
   specialties: string[] | null;
   is_active: boolean;
 }
@@ -23,7 +24,7 @@ export default async function EditarProfesionalPage({
 
   const { data: raw } = await client
     .from("professionals")
-    .select("id, name, specialties, is_active")
+    .select("id, name, phone, specialties, is_active")
     .eq("id", id)
     .single();
 
@@ -51,6 +52,18 @@ export default async function EditarProfesionalPage({
             defaultValue={profesional.name}
             className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Teléfono</label>
+          <input
+            name="phone"
+            type="tel"
+            defaultValue={profesional.phone ?? ""}
+            placeholder="5491112345678"
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
+          />
+          <p className="mt-1 text-xs text-gray-500">Formato internacional sin + (para recordatorios WA)</p>
         </div>
 
         <div>
