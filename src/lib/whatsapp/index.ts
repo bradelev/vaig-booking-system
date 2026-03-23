@@ -91,6 +91,22 @@ export async function sendInteractiveButtons({
   });
 }
 
+export interface SendImageMessageParams {
+  to: string;
+  imageUrl: string;
+  caption?: string;
+}
+
+export async function sendImageMessage({ to, imageUrl, caption }: SendImageMessageParams): Promise<string> {
+  return sendMessage({
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to,
+    type: "image",
+    image: { link: imageUrl, ...(caption ? { caption } : {}) },
+  });
+}
+
 export async function sendListMessage({
   to,
   body,
