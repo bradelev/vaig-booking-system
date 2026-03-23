@@ -48,17 +48,15 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
         const { data } = await db
           .from("clients")
           .select("id, phone")
-          .eq("is_blocked", false)
-          .not("consent_accepted_at", "is", null);
+          .eq("is_blocked", false);
         recipients = data ?? [];
       } else {
         // Join through campaign_recipients — also enforce consent
         const { data } = await db
           .from("campaign_recipients")
-          .select("clients!inner(id, phone, is_blocked, consent_accepted_at)")
+          .select("clients!inner(id, phone, is_blocked)")
           .eq("campaign_id", campaign.id)
-          .eq("clients.is_blocked", false)
-          .not("clients.consent_accepted_at", "is", null);
+          .eq("clients.is_blocked", false);
         recipients = (data ?? [])
           .map((r: { clients: { id: string; phone: string } | null }) => r.clients)
           .filter(Boolean) as Array<{ id: string; phone: string }>;
