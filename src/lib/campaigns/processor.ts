@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTextMessage, sendImageMessage } from "@/lib/whatsapp";
+import { deleteCronJob } from "@/lib/cronjob";
 
 const DELAY_MS = 100;
 const STUCK_SENDING_MINUTES = 30;
@@ -27,7 +28,7 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
   // Fetch campaigns due for sending
   const { data: campaigns, error: fetchError } = await db
     .from("campaigns")
-    .select("id, name, body, image_url, target_all, total_recipients")
+    .select("id, name, body, image_url, target_all, total_recipients, cronjob_id")
     .eq("status", "scheduled")
     .lte("scheduled_at", new Date().toISOString());
 
@@ -124,7 +125,13 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
         failed_count: failedCount,
         total_recipients: totalRecipients,
         completed_at: new Date().toISOString(),
+        cronjob_id: null,
       }).eq("id", campaign.id);
+
+      // Clean up the cron job if it still exists (e.g. processor ran before expiry)
+      if (campaign.cronjob_id) {
+        await deleteCronJob(campaign.cronjob_id).catch(() => {});
+      }
 
       processed++;
     } catch (err) {
