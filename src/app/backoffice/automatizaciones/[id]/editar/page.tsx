@@ -34,6 +34,7 @@ export default async function EditarCampanaPage({
     db.from("clients")
       .select("id, first_name, last_name, phone")
       .eq("is_blocked", false)
+      .not("consent_accepted_at", "is", null)
       .order("first_name"),
   ]);
 
