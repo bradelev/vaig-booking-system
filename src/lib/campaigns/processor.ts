@@ -51,7 +51,7 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
           .eq("is_blocked", false);
         recipients = data ?? [];
       } else {
-        // Join through campaign_recipients — also enforce consent
+        // Join through campaign_recipients to filter to manually selected clients
         const { data } = await db
           .from("campaign_recipients")
           .select("clients!inner(id, phone, is_blocked)")
