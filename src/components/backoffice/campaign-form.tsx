@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { createCampaign, updateCampaign, uploadCampaignImage, scheduleCampaign } from "@/actions/campaigns";
+import { createCampaign, createAndScheduleCampaign, updateCampaign, uploadCampaignImage, scheduleCampaign } from "@/actions/campaigns";
 
 interface Client {
   id: string;
@@ -137,20 +137,15 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
     });
   }
 
-  function handleSchedule() {
+  function handleScheduleNew() {
     if (!scheduledAt) {
       alert("Configurá una fecha y hora de envío antes de programar");
       return;
     }
     startTransition(async () => {
-      // First save, then schedule
+      // createAndScheduleCampaign inserts the campaign directly as "scheduled"
       const fd = buildFormData();
-      if (isEdit && campaign) {
-        // For edit, we need to save first then schedule
-        await updateCampaign(campaign.id, fd);
-      } else {
-        await createCampaign(fd);
-      }
+      await createAndScheduleCampaign(fd);
     });
   }
 
@@ -161,9 +156,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
     });
   }
 
-  const now = new Date();
-  const artNow = new Date(now.getTime() - 3 * 60 * 60 * 1000);
-  const minDatetime = artNow.toISOString().slice(0, 16);
+  const minDatetime = toLocalDatetimeValue(new Date().toISOString());
 
   return (
     <div className="space-y-6">
@@ -353,7 +346,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
               ) : (
                 <button
                   type="button"
-                  onClick={handleSchedule}
+                  onClick={handleScheduleNew}
                   disabled={isPending || !name.trim() || !scheduledAt}
                   className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors disabled:opacity-50"
                 >

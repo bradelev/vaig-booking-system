@@ -21,6 +21,7 @@ export default async function NuevaCampanaPage() {
     .from("clients")
     .select("id, first_name, last_name, phone")
     .eq("is_blocked", false)
+    .not("consent_accepted_at", "is", null)
     .order("first_name");
 
   const clients = (raw ?? []) as Client[];

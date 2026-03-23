@@ -123,7 +123,13 @@ export default async function CampanaDetallePage({
             </button>
           </form>
           {campaign.status === "draft" && (
-            <form action={deleteCampaign.bind(null, id)} className="inline">
+            <form
+              action={deleteCampaign.bind(null, id)}
+              className="inline"
+              onSubmit={(e) => {
+                if (!confirm("¿Eliminar esta campaña?")) e.preventDefault();
+              }}
+            >
               <button
                 type="submit"
                 className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
