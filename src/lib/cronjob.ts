@@ -7,7 +7,9 @@ function getApiKey(): string {
 }
 
 function getAppUrl(): string {
-  const vercelUrl = process.env.VERCEL_URL;
+  // VERCEL_PROJECT_PRODUCTION_URL is the stable production hostname (no preview suffix).
+  // Fall back to VERCEL_URL which is set on every deployment.
+  const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
   if (!vercelUrl) throw new Error("VERCEL_URL is not set");
   return `https://${vercelUrl}`;
 }
@@ -33,7 +35,8 @@ export async function createCronJob(params: {
   const apiKey = getApiKey();
   const { title, url, scheduledAt, authHeader } = params;
 
-  // Convert UTC time to ART (UTC-3) for schedule fields
+  // Both this offset and schedule.timezone below must agree.
+  // ART = UTC-3, no DST. Update both if the app ever serves a different timezone.
   const artOffset = -3 * 60; // minutes
   const artDate = new Date(scheduledAt.getTime() + artOffset * 60 * 1000);
   const hour = artDate.getUTCHours();
