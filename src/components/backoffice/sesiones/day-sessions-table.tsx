@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { toast } from "sonner";
 import ConfirmBookingModal, { BookingToConfirm } from "./confirm-booking-modal";
 import { updateSession } from "@/actions/sesiones";
@@ -168,9 +168,9 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
             {sessions.map((row) => {
               const editing = isEditing(row);
               return editing ? (
-                <>
+                <Fragment key={row.id}>
                   {/* Main edit row */}
-                  <tr key={`${row.id}-edit`} className="bg-blue-50">
+                  <tr className="bg-blue-50">
                     <td className="py-2 pr-4 text-gray-500 whitespace-nowrap">{row.time ?? "—"}</td>
                     <td className="py-2 pr-4 font-medium text-gray-900">{row.clientName}</td>
                     <td className="py-2 pr-3">
@@ -250,7 +250,7 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
                     </td>
                   </tr>
                   {/* Sub-row for extra fields */}
-                  <tr key={`${row.id}-edit-sub`} className="bg-blue-50 border-t-0">
+                  <tr className="bg-blue-50 border-t-0">
                     <td colSpan={8} className="pb-3 pt-0 px-0">
                       <div className="flex flex-wrap gap-3 px-2 text-xs items-end">
                         <label className="flex flex-col gap-0.5">
@@ -322,7 +322,7 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
                       </div>
                     </td>
                   </tr>
-                </>
+                </Fragment>
               ) : (
                 <tr key={row.id} className={row.isPendingBooking ? "bg-amber-50" : ""}>
                   <td className="py-2 pr-4 text-gray-500 whitespace-nowrap">{row.time ?? "—"}</td>
