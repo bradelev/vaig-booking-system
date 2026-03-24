@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createCronJob, deleteCronJob, getCampaignsEndpointUrl } from "@/lib/cronjob";
 
 async function getDb() {
   const supabase = await createClient();
@@ -67,10 +66,7 @@ export async function createAndScheduleCampaign(formData: FormData) {
 
   const scheduledAt = new Date(`${scheduledAtRaw}:00-03:00`).toISOString();
 
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) throw new Error("CRON_SECRET is not set");
-
-  // Insert as draft first so we have an ID for the cron job title
+  // Insert as draft first so we have an ID
   const { data: campaign, error } = await db
     .from("campaigns")
     .insert({ name, body, image_url: imageUrl, status: "draft", scheduled_at: scheduledAt, target_all: targetAll })
@@ -90,21 +86,8 @@ export async function createAndScheduleCampaign(formData: FormData) {
     throw new Error("La fecha de envío ya pasó. Editá la campaña y configurá una nueva fecha.");
   }
 
-  // Register the cron job before marking as scheduled to avoid orphaned state
-  let jobId: number;
-  try {
-    jobId = await createCronJob({
-      title: `Campaign ${campaign.id} — ${name}`,
-      url: getCampaignsEndpointUrl(),
-      scheduledAt: scheduledDate,
-      authHeader: `Bearer ${cronSecret}`,
-    });
-  } catch (err) {
-    await db.from("campaigns").delete().eq("id", campaign.id);
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`No se pudo programar el envío: ${msg}`);
-  }
-  await db.from("campaigns").update({ status: "scheduled", cronjob_id: jobId }).eq("id", campaign.id);
+  // pg_cron polls /api/internal/campaigns every minute — just mark as scheduled
+  await db.from("campaigns").update({ status: "scheduled" }).eq("id", campaign.id);
 
   revalidatePath("/backoffice/automatizaciones");
   redirect(`/backoffice/automatizaciones/${campaign.id}`);
@@ -174,28 +157,13 @@ export async function scheduleCampaign(id: string) {
   if (campaign.status !== "draft") throw new Error("Solo se pueden programar campañas en estado borrador");
   if (!campaign.scheduled_at) throw new Error("Configurá una fecha/hora de envío antes de programar");
 
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) throw new Error("CRON_SECRET is not set");
-
   const scheduledDate = new Date(campaign.scheduled_at as string);
   if (scheduledDate.getTime() < Date.now() - 60_000) {
     throw new Error("La fecha de envío ya pasó. Editá la campaña y configurá una nueva fecha.");
   }
 
-  // Register the cron job before marking as scheduled to avoid orphaned state
-  let jobId: number;
-  try {
-    jobId = await createCronJob({
-      title: `Campaign ${id}`,
-      url: getCampaignsEndpointUrl(),
-      scheduledAt: scheduledDate,
-      authHeader: `Bearer ${cronSecret}`,
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`No se pudo programar el envío: ${msg}`);
-  }
-  await db.from("campaigns").update({ status: "scheduled", cronjob_id: jobId }).eq("id", id);
+  // pg_cron polls /api/internal/campaigns every minute — just mark as scheduled
+  await db.from("campaigns").update({ status: "scheduled" }).eq("id", id);
 
   revalidatePath("/backoffice/automatizaciones");
   revalidatePath(`/backoffice/automatizaciones/${id}`);
@@ -205,22 +173,9 @@ export async function scheduleCampaign(id: string) {
 export async function cancelSchedule(id: string) {
   const db = await getDb();
 
-  const { data: campaign, error: fetchErr } = await db
-    .from("campaigns")
-    .select("cronjob_id")
-    .eq("id", id)
-    .eq("status", "scheduled")
-    .single();
-
-  if (fetchErr) throw new Error(fetchErr.message);
-
-  if (campaign?.cronjob_id) {
-    await deleteCronJob(campaign.cronjob_id);
-  }
-
   const { error } = await db
     .from("campaigns")
-    .update({ status: "draft", cronjob_id: null })
+    .update({ status: "draft" })
     .eq("id", id)
     .eq("status", "scheduled");
 
