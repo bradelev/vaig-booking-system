@@ -11,9 +11,9 @@ CREATE OR REPLACE FUNCTION call_internal_api(endpoint text)
 RETURNS void AS $$
 BEGIN
   PERFORM net.http_post(
-    url     := current_setting('app.vercel_url') || endpoint,
+    url     := current_setting('app.vercel_url', true) || endpoint,
     headers := jsonb_build_object(
-      'Authorization', 'Bearer ' || current_setting('app.cron_secret'),
+      'Authorization', 'Bearer ' || current_setting('app.cron_secret', true),
       'Content-Type',  'application/json'
     ),
     body    := '{}'::jsonb
