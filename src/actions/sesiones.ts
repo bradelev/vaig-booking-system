@@ -91,7 +91,7 @@ export async function confirmBookingAsSession(
     .select(
       `id, scheduled_at, client_id, professional_id, client_package_id,
        clients(first_name, last_name),
-       services(name, category),
+       services(name, category, price),
        professionals(name)`
     )
     .eq("id", bookingId)
@@ -104,6 +104,21 @@ export async function confirmBookingAsSession(
   const fecha = new Date(booking.scheduled_at).toISOString().split("T")[0];
   const tipoServicio = booking.services?.category ?? booking.services?.name ?? "Servicio";
 
+  // Auto-populate sesion_n/sesion_total from client_packages if package present and overrides not provided
+  let sesionN = overrides.sesion_n ?? null;
+  let sesionTotal = overrides.sesion_total_cuponera ?? null;
+  if (booking.client_package_id && sesionN == null) {
+    const { data: cp } = await client
+      .from("client_packages")
+      .select("sessions_used, packages(sessions_count)")
+      .eq("id", booking.client_package_id)
+      .single();
+    if (cp) {
+      sesionN = (cp.sessions_used ?? 0) + 1;
+      sesionTotal = cp.packages?.sessions_count ?? null;
+    }
+  }
+
   // Insert sesion_historica linked to this booking
   const { error: insertError } = await client.from("sesiones_historicas").insert({
     client_id: booking.client_id,
@@ -113,12 +128,14 @@ export async function confirmBookingAsSession(
     operadora: overrides.operadora ?? booking.professionals?.name ?? null,
     professional_id: overrides.professional_id ?? booking.professional_id ?? null,
     booking_id: bookingId,
+    monto_lista: booking.services?.price ?? null,
+    client_package_id: booking.client_package_id ?? null,
     monto_cobrado: overrides.monto_cobrado ?? null,
     descuento_pct: overrides.descuento_pct ?? null,
     metodo_pago: overrides.metodo_pago ?? null,
     banco: overrides.banco ?? null,
-    sesion_n: overrides.sesion_n ?? null,
-    sesion_total_cuponera: overrides.sesion_total_cuponera ?? null,
+    sesion_n: sesionN,
+    sesion_total_cuponera: sesionTotal,
     notas: overrides.notas ?? null,
     fuente: "backoffice",
   });
@@ -151,6 +168,38 @@ export async function confirmBookingAsSession(
 
   revalidatePath("/backoffice/sesiones");
   revalidatePath("/backoffice/citas");
+  return { success: true };
+}
+
+export async function updateSession(
+  sessionId: string,
+  data: {
+    tipo_servicio?: string;
+    descripcion?: string | null;
+    operadora?: string | null;
+    professional_id?: string | null;
+    monto_lista?: number | null;
+    descuento_pct?: number | null;
+    monto_cobrado?: number | null;
+    metodo_pago?: string | null;
+    banco?: string | null;
+    sesion_n?: number | null;
+    sesion_total_cuponera?: number | null;
+    notas?: string | null;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const client = supabase as SupabaseClient;
+
+  const { error } = await client
+    .from("sesiones_historicas")
+    .update(data)
+    .eq("id", sessionId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/backoffice/sesiones");
+  revalidatePath("/backoffice/sesiones/nueva");
   return { success: true };
 }
 
