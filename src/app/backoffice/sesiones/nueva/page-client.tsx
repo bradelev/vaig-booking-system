@@ -26,6 +26,13 @@ interface SesionItem {
   montoCobrado?: number;
   metodoPago?: string;
   fuente: string;
+  montoLista?: number;
+  descuentoPct?: number;
+  banco?: string;
+  sesionN?: number;
+  sesionTotal?: number;
+  notas?: string;
+  professionalId?: string;
   clientName: string;
   clientSource?: string;
 }
@@ -107,6 +114,7 @@ export default function SessionsPageClient({
     // Manual sessions from backoffice
     ...sesiones.map((s) => ({
       id: `session-${s.id}`,
+      sessionId: s.id,
       source: (s.fuente === "backoffice" ? "backoffice" : "system") as "backoffice" | "system",
       clientName: s.clientName,
       tipoServicio: s.tipoServicio,
@@ -114,6 +122,13 @@ export default function SessionsPageClient({
       operadora: s.operadora,
       montoCobrado: s.montoCobrado,
       metodoPago: s.metodoPago,
+      montoLista: s.montoLista,
+      descuentoPct: s.descuentoPct,
+      banco: s.banco,
+      sesionN: s.sesionN,
+      sesionTotal: s.sesionTotal,
+      notas: s.notas,
+      professionalId: s.professionalId,
       clientSource: s.clientSource,
       time: undefined,
       isPendingBooking: false,
@@ -161,7 +176,7 @@ export default function SessionsPageClient({
             No hay sesiones para este día
           </p>
         ) : (
-          <DaySessionsTable sessions={tableRows} />
+          <DaySessionsTable sessions={tableRows} serviceCategories={serviceCategories} />
         )}
       </div>
     </div>
