@@ -107,15 +107,15 @@ export async function confirmBookingAsSession(
   // Auto-populate sesion_n/sesion_total from client_packages if package present and overrides not provided
   let sesionN = overrides.sesion_n ?? null;
   let sesionTotal = overrides.sesion_total_cuponera ?? null;
-  if (booking.client_package_id && sesionN == null) {
+  if (booking.client_package_id && (sesionN == null || sesionTotal == null)) {
     const { data: cp } = await client
       .from("client_packages")
       .select("sessions_used, packages(sessions_count)")
       .eq("id", booking.client_package_id)
       .single();
     if (cp) {
-      sesionN = (cp.sessions_used ?? 0) + 1;
-      sesionTotal = cp.packages?.sessions_count ?? null;
+      if (sesionN == null) sesionN = (cp.sessions_used ?? 0) + 1;
+      if (sesionTotal == null) sesionTotal = cp.packages?.sessions_count ?? null;
     }
   }
 
