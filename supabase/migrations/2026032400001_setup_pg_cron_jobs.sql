@@ -24,13 +24,11 @@ BEGIN
   SELECT value INTO v_url    FROM system_config WHERE key = 'vercel_url';
   SELECT value INTO v_secret FROM system_config WHERE key = 'cron_secret';
 
-  PERFORM net.http_post(
+  PERFORM net.http_get(
     url     := v_url || endpoint,
     headers := jsonb_build_object(
-      'Authorization', 'Bearer ' || v_secret,
-      'Content-Type',  'application/json'
-    ),
-    body    := '{}'::jsonb
+      'Authorization', 'Bearer ' || v_secret
+    )
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
