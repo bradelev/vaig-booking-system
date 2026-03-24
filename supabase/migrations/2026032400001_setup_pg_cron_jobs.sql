@@ -2,18 +2,32 @@
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
--- Helper function: call an internal API endpoint via pg_net
--- Reads app.vercel_url and app.cron_secret from database GUC params.
--- Configure them once with:
---   ALTER DATABASE postgres SET app.vercel_url = 'https://vaig-booking-system.vercel.app';
---   ALTER DATABASE postgres SET app.cron_secret = '<CRON_SECRET>';
+-- Seed system_config with the two values needed by pg_cron.
+-- Update them via Supabase Dashboard → Table Editor → system_config,
+-- or with SQL:
+--   UPDATE system_config SET value = 'https://vaig-booking-system.vercel.app' WHERE key = 'vercel_url';
+--   UPDATE system_config SET value = '<CRON_SECRET>'                          WHERE key = 'cron_secret';
+INSERT INTO system_config (key, value)
+VALUES
+  ('vercel_url',   'https://vaig-booking-system.vercel.app'),
+  ('cron_secret',  '')
+ON CONFLICT (key) DO NOTHING;
+
+-- Helper function: call an internal API endpoint via pg_net.
+-- Reads vercel_url and cron_secret from the system_config table.
 CREATE OR REPLACE FUNCTION call_internal_api(endpoint text)
 RETURNS void AS $$
+DECLARE
+  v_url    text;
+  v_secret text;
 BEGIN
+  SELECT value INTO v_url    FROM system_config WHERE key = 'vercel_url';
+  SELECT value INTO v_secret FROM system_config WHERE key = 'cron_secret';
+
   PERFORM net.http_post(
-    url     := current_setting('app.vercel_url', true) || endpoint,
+    url     := v_url || endpoint,
     headers := jsonb_build_object(
-      'Authorization', 'Bearer ' || current_setting('app.cron_secret', true),
+      'Authorization', 'Bearer ' || v_secret,
       'Content-Type',  'application/json'
     ),
     body    := '{}'::jsonb
