@@ -27,6 +27,18 @@ export default async function SesionesNuevaPage({ searchParams }: PageProps) {
     .eq("is_active", true)
     .order("name");
 
+  const FALLBACK_CATEGORIES = [
+    "Masajes",
+    "Facial",
+    "Cejas y Pestañas",
+    "Manos y Pies",
+    "Depilación Láser",
+    "Day Spa",
+    "Aparatología / HIFU",
+    "Combos",
+    "Otros",
+  ];
+
   // Load service categories
   const { data: servicesData } = await client
     .from("services")
@@ -34,9 +46,11 @@ export default async function SesionesNuevaPage({ searchParams }: PageProps) {
     .not("category", "is", null)
     .order("category");
 
-  const categories: string[] = Array.from(
+  const dbCategories: string[] = Array.from(
     new Set((servicesData ?? []).map((s: { category: string }) => s.category).filter(Boolean))
   );
+
+  const categories = dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES;
 
   // Load bookings for the day (confirmed, deposit_paid, realized)
   const { data: bookings } = await client
@@ -57,6 +71,7 @@ export default async function SesionesNuevaPage({ searchParams }: PageProps) {
     .from("sesiones_historicas")
     .select(
       `id, fecha, tipo_servicio, descripcion, operadora, monto_cobrado, metodo_pago, fuente,
+       monto_lista, descuento_pct, banco, sesion_n, sesion_total_cuponera, notas, professional_id,
        clients(id, first_name, last_name, source),
        booking_id`
     )
@@ -102,6 +117,13 @@ export default async function SesionesNuevaPage({ searchParams }: PageProps) {
         monto_cobrado: number | null;
         metodo_pago: string | null;
         fuente: string;
+        monto_lista: number | null;
+        descuento_pct: number | null;
+        banco: string | null;
+        sesion_n: number | null;
+        sesion_total_cuponera: number | null;
+        notas: string | null;
+        professional_id: string | null;
         clients: { id: string; first_name: string; last_name: string; source: string | null } | null;
       }) => ({
         id: s.id,
@@ -111,6 +133,13 @@ export default async function SesionesNuevaPage({ searchParams }: PageProps) {
         montoCobrado: s.monto_cobrado ?? undefined,
         metodoPago: s.metodo_pago ?? undefined,
         fuente: s.fuente,
+        montoLista: s.monto_lista ?? undefined,
+        descuentoPct: s.descuento_pct ?? undefined,
+        banco: s.banco ?? undefined,
+        sesionN: s.sesion_n ?? undefined,
+        sesionTotal: s.sesion_total_cuponera ?? undefined,
+        notas: s.notas ?? undefined,
+        professionalId: s.professional_id ?? undefined,
         clientName: s.clients ? `${s.clients.first_name} ${s.clients.last_name}` : "—",
         clientSource: s.clients?.source ?? undefined,
       }))}
