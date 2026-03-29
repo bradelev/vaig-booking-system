@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendTextMessage, sendImageMessage } from "@/lib/whatsapp";
+import { sendTemplateMessage } from "@/lib/whatsapp";
 
 const DELAY_MS = 100;
 const STUCK_SENDING_MINUTES = 30;
@@ -41,24 +41,24 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
 
     try {
       // Resolve recipients
-      let recipients: Array<{ id: string; phone: string }> = [];
+      let recipients: Array<{ id: string; phone: string; first_name: string }> = [];
 
       if (campaign.target_all) {
         const { data } = await db
           .from("clients")
-          .select("id, phone")
+          .select("id, phone, first_name")
           .eq("is_blocked", false);
         recipients = data ?? [];
       } else {
         // Join through campaign_recipients to filter to manually selected clients
         const { data } = await db
           .from("campaign_recipients")
-          .select("clients!inner(id, phone, is_blocked)")
+          .select("clients!inner(id, phone, first_name, is_blocked)")
           .eq("campaign_id", campaign.id)
           .eq("clients.is_blocked", false);
         recipients = (data ?? [])
-          .map((r: { clients: { id: string; phone: string } | null }) => r.clients)
-          .filter(Boolean) as Array<{ id: string; phone: string }>;
+          .map((r: { clients: { id: string; phone: string; first_name: string } | null }) => r.clients)
+          .filter(Boolean) as Array<{ id: string; phone: string; first_name: string }>;
       }
 
       const totalRecipients = recipients.length;
@@ -85,15 +85,28 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
         }
 
         try {
+          const components: Array<Record<string, unknown>> = [];
+
           if (campaign.image_url) {
-            await sendImageMessage({
-              to: recipient.phone,
-              imageUrl: campaign.image_url,
-              caption: campaign.body || undefined,
+            components.push({
+              type: "header",
+              parameters: [{ type: "image", image: { link: campaign.image_url } }],
             });
-          } else {
-            await sendTextMessage({ to: recipient.phone, body: campaign.body });
           }
+
+          components.push({
+            type: "body",
+            parameters: [
+              { type: "text", text: recipient.first_name || "cliente" },
+              { type: "text", text: campaign.body },
+            ],
+          });
+
+          await sendTemplateMessage({
+            to: recipient.phone,
+            templateName: "campana_general",
+            components,
+          });
 
           sentCount++;
           await db.from("campaign_recipients").upsert({
