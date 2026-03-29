@@ -105,6 +105,7 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
           await sendTemplateMessage({
             to: recipient.phone,
             templateName: "campana_general",
+            languageCode: "es_UY",
             components,
           });
 
