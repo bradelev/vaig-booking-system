@@ -97,6 +97,32 @@ export interface SendImageMessageParams {
   caption?: string;
 }
 
+export interface SendTemplateMessageParams {
+  to: string;
+  templateName: string;
+  languageCode?: string;
+  components?: Array<Record<string, unknown>>;
+}
+
+export async function sendTemplateMessage({
+  to,
+  templateName,
+  languageCode = "es_AR",
+  components = [],
+}: SendTemplateMessageParams): Promise<string> {
+  return sendMessage({
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to,
+    type: "template",
+    template: {
+      name: templateName,
+      language: { code: languageCode },
+      ...(components.length > 0 ? { components } : {}),
+    },
+  });
+}
+
 export async function sendImageMessage({ to, imageUrl, caption }: SendImageMessageParams): Promise<string> {
   return sendMessage({
     messaging_product: "whatsapp",
