@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { calculateAvailableSlots } from "./index";
 import type { TimeSlot, WorkingHours, ScheduleOverride } from "./types";
 import { resolveWorkingHoursForDate } from "./types";
-import type { SlotOption } from "@/lib/bot/types";
+import type { SlotOption, MultiProfSlot } from "@/lib/bot/types";
 import { artMidnight, artDateTime, getARTComponents } from "@/lib/timezone";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -235,6 +235,109 @@ export async function getSlotsByWindow(
       result.push({
         dateLabel: formatSlotLabel(checkDate).split(" a las")[0], // "Lunes 23/03"
         date: dateStr,
+        windows: dayWindows,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Returns slots for next maxDays days, merging availability across ALL given professionals.
+ * Each slot is annotated with which professional IDs are available at that time.
+ */
+export async function getSlotsByWindowAllProfessionals(
+  professionalIds: string[],
+  durationMinutes: number,
+  bufferMinutes: number,
+  windows: TimeWindow[],
+  maxDays = 7
+): Promise<SlotsByDay[]> {
+  const now = new Date();
+  const startDate = new Date(now);
+  startDate.setDate(now.getDate() + 1);
+  const rangeEnd = new Date(startDate);
+  rangeEnd.setDate(startDate.getDate() + maxDays);
+
+  // Fetch weekly schedules and overrides for all professionals in parallel
+  const [schedules, overrideMaps] = await Promise.all([
+    Promise.all(professionalIds.map((id) => getProfessionalWorkingHours(id))),
+    Promise.all(professionalIds.map((id) => getOverridesForRange(id, startDate, rangeEnd))),
+  ]);
+
+  const result: SlotsByDay[] = [];
+
+  for (let dayOffset = 0; dayOffset < maxDays; dayOffset++) {
+    const rawDate = new Date(startDate);
+    rawDate.setDate(startDate.getDate() + dayOffset);
+    const checkDate = artMidnight(rawDate);
+    const dateKey = checkDate.toLocaleDateString("sv-SE", { timeZone: TZ });
+    const { dayOfWeek } = getARTComponents(checkDate);
+
+    // For each professional, compute their available slots for this day
+    const slotsByProfessional: { profId: string; slots: import("./types").TimeSlot[] }[] = [];
+
+    await Promise.all(
+      professionalIds.map(async (profId, idx) => {
+        const workingHours = resolveWorkingHoursForDate(schedules[idx], overrideMaps[idx].get(dateKey), dayOfWeek);
+        const existingBookings = await getExistingBookings(profId, checkDate);
+        const { availableSlots } = calculateAvailableSlots({
+          date: checkDate,
+          durationMinutes,
+          workingHours,
+          existingBookings,
+          bufferMinutes,
+        });
+        if (availableSlots.length > 0) {
+          slotsByProfessional.push({ profId, slots: availableSlots });
+        }
+      })
+    );
+
+    if (slotsByProfessional.length === 0) continue;
+
+    // Merge: group by start time ISO string, union professional IDs
+    const mergedMap = new Map<string, { slot: import("./types").TimeSlot; profIds: string[] }>();
+    for (const { profId, slots } of slotsByProfessional) {
+      for (const slot of slots) {
+        const key = slot.start.toISOString();
+        if (mergedMap.has(key)) {
+          mergedMap.get(key)!.profIds.push(profId);
+        } else {
+          mergedMap.set(key, { slot, profIds: [profId] });
+        }
+      }
+    }
+
+    // Sort by start time and group into windows
+    const allMergedSlots = [...mergedMap.values()].sort(
+      (a, b) => a.slot.start.getTime() - b.slot.start.getTime()
+    );
+
+    const dayWindows: SlotsByDay["windows"] = [];
+    for (const window of windows) {
+      const windowSlots: MultiProfSlot[] = allMergedSlots
+        .filter(({ slot }) => {
+          const { hour } = getARTComponents(slot.start);
+          return hour >= window.startHour && hour < window.endHour;
+        })
+        .map(({ slot, profIds }) => ({
+          start: slot.start.toISOString(),
+          end: slot.end.toISOString(),
+          label: formatSlotLabel(slot.start),
+          availableProfessionalIds: profIds,
+        }));
+
+      if (windowSlots.length > 0) {
+        dayWindows.push({ window, slots: windowSlots });
+      }
+    }
+
+    if (dayWindows.length > 0) {
+      result.push({
+        dateLabel: formatSlotLabel(checkDate).split(" a las")[0],
+        date: checkDate.toLocaleDateString("sv-SE", { timeZone: TZ }),
         windows: dayWindows,
       });
     }
