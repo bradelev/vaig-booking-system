@@ -59,7 +59,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
   const [body, setBody] = useState(campaign?.body ?? "");
   const [imageUrl, setImageUrl] = useState(campaign?.image_url ?? "");
   const [imagePreview, setImagePreview] = useState(campaign?.image_url ?? "");
-  const [targetAll, setTargetAll] = useState(campaign?.target_all ?? true);
+  const [targetAll, setTargetAll] = useState(campaign?.target_all ?? false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     new Set(campaign?.recipient_ids ?? [])
   );
