@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import SessionForm, { type Professional } from "@/components/backoffice/sesiones/session-form";
 import DaySessionsTable from "@/components/backoffice/sesiones/day-sessions-table";
+import Modal from "@/components/backoffice/modal";
 import { type BookingToConfirm } from "@/components/backoffice/sesiones/confirm-booking-modal";
 
 interface BookingItem {
@@ -40,10 +42,12 @@ interface SesionItem {
 interface SessionsPageClientProps {
   professionals: Professional[];
   serviceCategories: string[];
-  initialDate: string;
-  bookings: BookingItem[];
-  sesiones: SesionItem[];
+  weekDates: string[]; // 7 items, Mon..Sun, YYYY-MM-DD
+  bookingsByDate: Record<string, BookingItem[]>;
+  sesionesByDate: Record<string, SesionItem[]>;
 }
+
+const DAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 function formatTime(isoString: string): string {
   return new Date(isoString).toLocaleTimeString("es-AR", {
@@ -53,20 +57,70 @@ function formatTime(isoString: string): string {
   });
 }
 
+/** Returns YYYY-MM-DD for today in Argentina TZ */
+function todayAR(): string {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" });
+}
+
+/** Add N days to a YYYY-MM-DD string */
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split("T")[0];
+}
+
+/** Format a date as DD/MM */
+function formatDDMM(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}`;
+}
+
 export default function SessionsPageClient({
   professionals,
   serviceCategories,
-  initialDate,
-  bookings,
-  sesiones,
+  weekDates,
+  bookingsByDate,
+  sesionesByDate,
 }: SessionsPageClientProps) {
   const router = useRouter();
+  const today = todayAR();
 
-  function handleDateChange(date: string) {
-    router.push(`/backoffice/sesiones/nueva?fecha=${date}`);
+  // Determine the default active tab: today if in week, else Monday
+  const todayIdx = weekDates.indexOf(today);
+  const [activeTab, setActiveTab] = useState<number>(todayIdx >= 0 ? todayIdx : 0);
+
+  // Export modal state
+  const [showExport, setShowExport] = useState(false);
+  const currentYear = new Date().getFullYear();
+  const [exportFrom, setExportFrom] = useState(`${currentYear}-01-01`);
+  const [exportTo, setExportTo] = useState(`${currentYear}-12-31`);
+
+  const weekMonday = weekDates[0];
+  const weekSunday = weekDates[6];
+
+  function goToPrevWeek() {
+    router.push(`/backoffice/sesiones/nueva?semana=${addDays(weekMonday, -7)}`);
   }
 
-  // Build unified table rows
+  function goToNextWeek() {
+    router.push(`/backoffice/sesiones/nueva?semana=${addDays(weekMonday, 7)}`);
+  }
+
+  function goToCurrentWeek() {
+    router.push(`/backoffice/sesiones/nueva`);
+  }
+
+  function handleExport() {
+    window.location.href = `/api/sesiones/export?from=${exportFrom}&to=${exportTo}`;
+  }
+
+  // Build session rows for the active date
+  const activeDate = weekDates[activeTab];
+  const bookings = bookingsByDate[activeDate] ?? [];
+  const sesiones = sesionesByDate[activeDate] ?? [];
+
   const tableRows = [
     // Pending bookings (not yet confirmed as session)
     ...bookings
@@ -136,20 +190,91 @@ export default function SessionsPageClient({
     })),
   ];
 
-  const dateFormatted = new Date(initialDate + "T12:00:00").toLocaleDateString("es-AR", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
   return (
     <div className="max-w-5xl mx-auto space-y-6 p-4 sm:p-6">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900">Registrar sesión</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Registrá sesiones manuales y confirmá citas del sistema
-        </p>
+      {/* Page header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Registrar sesión</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Registrá sesiones manuales y confirmá citas del sistema
+          </p>
+        </div>
+        <button
+          onClick={() => setShowExport(true)}
+          className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          Exportar XLSX
+        </button>
+      </div>
+
+      {/* Week navigator */}
+      <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3">
+        <button
+          onClick={goToPrevWeek}
+          className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 transition-colors"
+          aria-label="Semana anterior"
+        >
+          ← Anterior
+        </button>
+
+        <div className="text-center">
+          <span className="text-sm font-medium text-gray-800">
+            Semana del {formatDDMM(weekMonday)} al {formatDDMM(weekSunday)}
+          </span>
+          {weekDates.includes(today) ? null : (
+            <button
+              onClick={goToCurrentWeek}
+              className="ml-3 text-xs text-gray-400 hover:text-gray-600 underline"
+            >
+              Ir a hoy
+            </button>
+          )}
+        </div>
+
+        <button
+          onClick={goToNextWeek}
+          className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 transition-colors"
+          aria-label="Semana siguiente"
+        >
+          Siguiente →
+        </button>
+      </div>
+
+      {/* Day tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="flex gap-0 overflow-x-auto" aria-label="Días de la semana">
+          {weekDates.map((date, idx) => {
+            const isActive = idx === activeTab;
+            const isToday = date === today;
+            const dayCount =
+              (bookingsByDate[date]?.length ?? 0) + (sesionesByDate[date]?.length ?? 0);
+            return (
+              <button
+                key={date}
+                onClick={() => setActiveTab(idx)}
+                className={`flex flex-col items-center px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  isActive
+                    ? "border-gray-900 text-gray-900"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <span className={isToday ? "font-bold text-blue-600" : ""}>
+                  {DAY_LABELS[idx]} {formatDDMM(date)}
+                </span>
+                {dayCount > 0 && (
+                  <span
+                    className={`mt-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                      isActive ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {dayCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
       {/* Form card */}
@@ -158,18 +283,29 @@ export default function SessionsPageClient({
         <SessionForm
           professionals={professionals}
           serviceCategories={serviceCategories}
-          initialDate={initialDate}
-          onDateChange={handleDateChange}
+          initialDate={activeDate}
+          onDateChange={(date) => {
+            // When date changes in form, switch to closest tab or navigate to that week
+            const idx = weekDates.indexOf(date);
+            if (idx >= 0) {
+              setActiveTab(idx);
+            } else {
+              router.push(`/backoffice/sesiones/nueva?semana=${date}`);
+            }
+          }}
         />
       </div>
 
       {/* Day sessions card */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-700">
-            Sesiones del día
-          </h2>
-          <span className="text-xs text-gray-400 capitalize">{dateFormatted}</span>
+          <h2 className="text-sm font-semibold text-gray-700">Sesiones del día</h2>
+          <span className="text-xs text-gray-400">
+            {DAY_LABELS[activeTab]} {formatDDMM(activeDate)}
+            {activeDate === today && (
+              <span className="ml-1 text-blue-500 font-medium">(hoy)</span>
+            )}
+          </span>
         </div>
         {tableRows.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-6">
@@ -179,6 +315,48 @@ export default function SessionsPageClient({
           <DaySessionsTable sessions={tableRows} serviceCategories={serviceCategories} />
         )}
       </div>
+
+      {/* Export Modal */}
+      <Modal open={showExport} onClose={() => setShowExport(false)} title="Exportar sesiones XLSX">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Desde</label>
+              <input
+                type="date"
+                value={exportFrom}
+                onChange={(e) => setExportFrom(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Hasta</label>
+              <input
+                type="date"
+                value={exportTo}
+                onChange={(e) => setExportTo(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setShowExport(false)}
+              className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleExport}
+              className="flex-1 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
+            >
+              Exportar
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
