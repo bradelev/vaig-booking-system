@@ -51,6 +51,32 @@ export async function updateService(id: string, formData: FormData) {
   redirect("/backoffice/servicios");
 }
 
+export async function updateServiceInline(
+  id: string,
+  data: { name: string; price: number }
+): Promise<{ success: boolean; error?: string }> {
+  if (!data.name || data.name.trim() === "") {
+    return { success: false, error: "El nombre no puede estar vacío" };
+  }
+  if (!Number.isFinite(data.price) || data.price <= 0) {
+    return { success: false, error: "El precio debe ser un número positivo" };
+  }
+
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+
+  const { error } = await client
+    .from("services")
+    .update({ name: data.name.trim(), price: data.price })
+    .eq("id", id);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/backoffice/servicios");
+  return { success: true };
+}
+
 export async function toggleServiceActive(id: string, isActive: boolean) {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
