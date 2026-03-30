@@ -46,7 +46,7 @@ export default async function NuevaCampanaPage() {
           href="/backoffice/automatizaciones"
           className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
         >
-          ← Automatizaciones
+          ← Campañas
         </Link>
         <span className="text-gray-300">/</span>
         <h1 className="text-xl font-bold text-gray-900">Nueva campaña</h1>

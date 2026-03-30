@@ -5,7 +5,7 @@ import ResponsiveTable, { type TableColumn } from "@/components/backoffice/respo
 import { ConfirmDeleteForm } from "@/components/backoffice/confirm-delete-form";
 import { deleteCampaign, cloneCampaign, cancelSchedule } from "@/actions/campaigns";
 
-export const metadata: Metadata = { title: "Automatizaciones" };
+export const metadata: Metadata = { title: "Campañas" };
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   draft:     { label: "Borrador",    cls: "bg-gray-100 text-gray-700" },
