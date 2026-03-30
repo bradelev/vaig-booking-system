@@ -5,7 +5,7 @@
 import { sendTextMessage, sendInteractiveButtons } from "@/lib/whatsapp";
 import { buildKnowledgeBase } from "./knowledge";
 import { getSession, upsertSession, clearSession, advanceFunnel } from "./session";
-import { getSlotsByWindow, getNextAvailableSlots, checkSlotAvailability, getNearbySlots, formatSlotLabel } from "@/lib/scheduler/db";
+import { getSlotsByWindow, getSlotsByWindowAllProfessionals, getNextAvailableSlots, checkSlotAvailability, getNearbySlots, formatSlotLabel } from "@/lib/scheduler/db";
 import type { TimeWindow, SlotsByDay } from "@/lib/scheduler/db";
 import { artDateTime, getARTComponents } from "@/lib/timezone";
 import { getConfigValue } from "@/lib/config";
@@ -14,7 +14,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "./rate-limit";
 import { answerWithLLM } from "./llm";
 import { notifyAdminNewBooking } from "./notifications";
-import type { BotConversationState, BookingFlowContext, ServiceInfo, SlotOption } from "./types";
+import type { BotConversationState, BookingFlowContext, ServiceInfo, SlotOption, MultiProfSlot } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
@@ -160,8 +160,9 @@ export async function handleIncomingMessage(phone: string, messageText: string):
 
 const BOOKING_BACK_MAP: Partial<Record<BotConversationState, BotConversationState>> = {
   booking_confirm: "booking_slots",
-  booking_slots: "booking_professional",
-  booking_window: "booking_professional",
+  booking_slots: "booking_window",
+  booking_window: "booking_service",
+  booking_professional_after_slot: "booking_slots",
   booking_professional: "booking_service",
   booking_service: "booking_category",
   booking_category: "menu",
@@ -193,6 +194,8 @@ async function route(
       return handleServiceSelection(phone, text, context);
     case "booking_professional":
       return handleProfessionalSelection(phone, text, context);
+    case "booking_professional_after_slot":
+      return handleProfessionalAfterSlotSelection(phone, text, context);
     case "booking_window":
       return handleWindowSelection(phone, text, context);
     case "booking_slots":
@@ -299,13 +302,19 @@ async function handleBack(
   const strippedContext: BookingFlowContext = { ...context };
   const toDelete: string[] = [];
 
+  if (state === "booking_professional_after_slot") {
+    toDelete.push("_availProfIds", "selectedProfessionalId", "selectedProfessionalName", "selectedSlot");
+  }
   if (state === "booking_window" || state === "booking_slots" || state === "booking_confirm") {
     toDelete.push("_slotsByDay", "_windows");
   }
   if (state === "booking_confirm" || state === "booking_slots") {
     toDelete.push("_slots", "selectedSlot", "_requestedSlot");
   }
-  if (state === "booking_slots" || state === "booking_professional") {
+  if (state === "booking_slots") {
+    toDelete.push("selectedProfessionalId", "selectedProfessionalName");
+  }
+  if (state === "booking_professional") {
     toDelete.push("selectedProfessionalId", "selectedProfessionalName");
   }
   if (state === "booking_professional" || state === "booking_service") {
@@ -320,6 +329,8 @@ async function handleBack(
 
   switch (prevState) {
     case "booking_slots":
+      return proceedToSlotSelection(strippedContext, phone);
+    case "booking_window":
       return proceedToSlotSelection(strippedContext, phone);
     case "booking_professional":
       return showProfessionalMenu(phone, strippedContext);
@@ -545,46 +556,11 @@ async function handleServiceSelection(
     selectedServiceName: service.name,
   };
 
-  // If service has a default professional, offer it or "any"
-  if (service.defaultProfessionalId) {
-    const prof = kb.professionals.find((p) => p.id === service.defaultProfessionalId);
-    if (prof) {
-      await upsertSession(phone, "booking_professional", newContext);
-      await replyButtons(
-        phone,
-        `¡Perfecto! *${service.name}* — ${service.durationMinutes} min.\n\n¿Con quién preferís atenderte?`,
-        [
-          { id: `prof_${prof.id}`, title: prof.name.slice(0, 20) },
-          { id: "prof_any", title: "Cualquier disp." },
-        ]
-      );
-      return;
-    }
-  }
-
-  if (kb.professionals.length === 0) {
-    // No professionals — skip to date selection with null professional
-    return proceedToSlotSelection({ ...newContext, selectedProfessionalId: null, selectedProfessionalName: "cualquier profesional" }, phone);
-  }
-
-  if (kb.professionals.length === 1) {
-    const prof = kb.professionals[0];
-    return proceedToSlotSelection(
-      { ...newContext, selectedProfessionalId: prof.id, selectedProfessionalName: prof.name },
-      phone
-    );
-  }
-
-  // Multiple professionals — show list
-  await upsertSession(phone, "booking_professional", newContext);
-  let msg = `¡Perfecto! *${service.name}*\n\n¿Con quién querés atenderte?\n\n`;
-  kb.professionals.forEach((p, i) => {
-    msg += `*${i + 1}.* ${p.name}\n`;
-  });
-  msg += "\n*A.* Cualquier profesional disponible\n";
-  msg += "*0.* Volver\n";
-  msg += "\nResponde con el número.";
-  await reply(phone, msg);
+  // Always go to time selection first — professionals are resolved after slot pick
+  return proceedToSlotSelection(
+    { ...newContext, selectedProfessionalId: null, selectedProfessionalName: undefined },
+    phone
+  );
 }
 
 async function handleProfessionalSelection(
@@ -654,20 +630,22 @@ async function proceedToSlotSelection(context: BookingFlowContext, phone: string
   }
 
   const bufferMinutes = parseInt(await getConfigValue("buffer_minutes", "0"));
+  const windows = DEFAULT_WINDOWS;
 
-  // Use specific professional or first active one for availability check
-  let professionalId = context.selectedProfessionalId;
-  if (!professionalId) {
-    if (kb.professionals.length > 0) {
-      professionalId = kb.professionals[0].id;
-    } else {
+  let slotsByDay: SlotsByDay[];
+
+  if (context.selectedProfessionalId) {
+    // Specific professional already selected (e.g. coming from back nav after prof selection)
+    slotsByDay = await getSlotsByWindow(context.selectedProfessionalId, service.durationMinutes, bufferMinutes, windows);
+  } else {
+    // Time-first: merge slots across all active professionals
+    const profIds = kb.professionals.map((p) => p.id);
+    if (profIds.length === 0) {
       await reply(phone, "Lo sentimos, no hay profesionales disponibles en este momento.");
       return;
     }
+    slotsByDay = await getSlotsByWindowAllProfessionals(profIds, service.durationMinutes, bufferMinutes, windows);
   }
-
-  const windows = DEFAULT_WINDOWS;
-  const slotsByDay = await getSlotsByWindow(professionalId, service.durationMinutes, bufferMinutes, windows);
 
   if (slotsByDay.length === 0) {
     await reply(
@@ -678,11 +656,7 @@ async function proceedToSlotSelection(context: BookingFlowContext, phone: string
     return;
   }
 
-  let msg = `📅 *Turnos disponibles para ${service.name}*`;
-  if (context.selectedProfessionalName && context.selectedProfessionalName !== "cualquier profesional") {
-    msg += ` con ${context.selectedProfessionalName}`;
-  }
-  msg += "\n\n";
+  let msg = `📅 *Turnos disponibles para ${service.name}*\n\n`;
 
   slotsByDay.forEach((day) => {
     msg += `*${day.dateLabel}:*\n`;
@@ -799,32 +773,43 @@ async function handleSlotSelection(
     const parsedDate = parseUserDateTime(text);
     if (parsedDate) {
       const bufferMinutes = parseInt(await getConfigValue("buffer_minutes", "0"));
-      let professionalId = context.selectedProfessionalId;
-      if (!professionalId && kb.professionals.length > 0) {
-        professionalId = kb.professionals[0].id;
-      }
-      if (!professionalId) {
-        await reply(phone, "No hay profesionales disponibles.");
-        return;
+
+      // In time-first flow, check availability across all professionals
+      const availProfIds: string[] = [];
+      if (context.selectedProfessionalId) {
+        const { available } = await checkSlotAvailability(
+          context.selectedProfessionalId,
+          parsedDate,
+          service.durationMinutes,
+          bufferMinutes
+        );
+        if (available) availProfIds.push(context.selectedProfessionalId);
+      } else {
+        await Promise.all(
+          kb.professionals.map(async (prof) => {
+            const { available } = await checkSlotAvailability(prof.id, parsedDate, service.durationMinutes, bufferMinutes);
+            if (available) availProfIds.push(prof.id);
+          })
+        );
       }
 
-      const { available } = await checkSlotAvailability(
-        professionalId,
-        parsedDate,
-        service.durationMinutes,
-        bufferMinutes
-      );
-
-      if (available) {
+      if (availProfIds.length > 0) {
         selectedSlot = {
           start: parsedDate.toISOString(),
           end: new Date(parsedDate.getTime() + service.durationMinutes * 60_000).toISOString(),
           label: formatDateLabel(parsedDate),
-        };
+          availableProfessionalIds: availProfIds,
+        } as MultiProfSlot;
       } else {
+        // Use first professional for nearby slot suggestions
+        const fallbackProfId = context.selectedProfessionalId ?? kb.professionals[0]?.id;
+        if (!fallbackProfId) {
+          await reply(phone, "No hay profesionales disponibles.");
+          return;
+        }
         // Get nearby slots (±2h same day, then same hour next 3 days)
         const nearbySlots = await getNearbySlots(
-          professionalId,
+          fallbackProfId,
           parsedDate,
           service.durationMinutes,
           bufferMinutes,
@@ -862,8 +847,44 @@ async function handleSlotSelection(
     }
   }
 
-  const newContext: BookingFlowContext = { ...context, selectedSlot };
-  delete (newContext as BookingFlowContext & { _slots?: unknown })._slots;
+  const baseContext: BookingFlowContext = { ...context, selectedSlot };
+  delete (baseContext as BookingFlowContext & { _slots?: unknown })._slots;
+
+  // Resolve professional from slot's availableProfessionalIds if not yet selected
+  const resolvedContext: BookingFlowContext = { ...baseContext };
+  if (!resolvedContext.selectedProfessionalId) {
+    const multiSlot = selectedSlot as MultiProfSlot;
+    const availProfIds = multiSlot.availableProfessionalIds ?? [];
+
+    if (availProfIds.length === 0) {
+      // Race condition — no professional available anymore
+      await reply(phone, "Lo sentimos, ese horario ya no está disponible. Por favor elegí otro.");
+      await upsertSession(phone, "booking_slots", context);
+      return;
+    } else if (availProfIds.length === 1) {
+      // Auto-assign the only available professional
+      const kb = await buildKnowledgeBase();
+      const prof = kb.professionals.find((p) => p.id === availProfIds[0]);
+      resolvedContext.selectedProfessionalId = availProfIds[0];
+      resolvedContext.selectedProfessionalName = prof?.name ?? "profesional";
+    } else {
+      // Multiple professionals available — ask client to pick
+      const kb = await buildKnowledgeBase();
+      const availProfs = kb.professionals.filter((p) => availProfIds.includes(p.id));
+      await upsertSession(phone, "booking_professional_after_slot", {
+        ...resolvedContext,
+        selectedSlot,
+        _availProfIds: availProfIds,
+      });
+      let msg = `¿Con qué profesional preferís?\n\n`;
+      availProfs.forEach((p, i) => {
+        msg += `*${i + 1}.* ${p.name}\n`;
+      });
+      msg += `\n*0.* Volver`;
+      await reply(phone, msg);
+      return;
+    }
+  }
 
   // Check if client already exists by phone
   const client = createAdminClient() as AnyClient;
@@ -875,6 +896,63 @@ async function handleSlotSelection(
 
   if (existingClient?.id) {
     // Already know the client — go to confirm
+    resolvedContext.clientId = existingClient.id;
+    resolvedContext.clientFirstName = existingClient.first_name;
+    resolvedContext.clientLastName = existingClient.last_name;
+    resolvedContext.clientEmail = existingClient.email;
+    await upsertSession(phone, "booking_confirm", resolvedContext);
+    await showBookingConfirm(phone, resolvedContext);
+  } else {
+    await upsertSession(phone, "booking_client_name", resolvedContext);
+    await reply(phone, "¡Excelente! Para continuar necesito tus datos.\n\n¿Cuál es tu nombre y apellido?");
+  }
+}
+
+async function handleProfessionalAfterSlotSelection(
+  phone: string,
+  text: string,
+  context: BookingFlowContext
+): Promise<void> {
+  const kb = await buildKnowledgeBase();
+  const t = normalize(text);
+  const availProfIds = (context._availProfIds as string[]) ?? [];
+  const availProfs = kb.professionals.filter((p) => availProfIds.includes(p.id));
+
+  const num = parseInt(t);
+  let selectedProf: typeof availProfs[0] | undefined;
+
+  if (!isNaN(num) && num >= 1 && num <= availProfs.length) {
+    selectedProf = availProfs[num - 1];
+  } else {
+    selectedProf = availProfs.find((p) => normalize(p.name).includes(t));
+  }
+
+  if (!selectedProf) {
+    let msg = "No entendí. ¿Con cuál profesional?\n\n";
+    availProfs.forEach((p, i) => {
+      msg += `*${i + 1}.* ${p.name}\n`;
+    });
+    msg += "\n*0.* Volver";
+    await reply(phone, msg);
+    return;
+  }
+
+  const newContext: BookingFlowContext = {
+    ...context,
+    selectedProfessionalId: selectedProf.id,
+    selectedProfessionalName: selectedProf.name,
+  };
+  delete (newContext as Record<string, unknown>)._availProfIds;
+
+  // Continue to client lookup (same logic as end of handleSlotSelection)
+  const client = createAdminClient() as AnyClient;
+  const { data: existingClient } = await client
+    .from("clients")
+    .select("id, first_name, last_name, email")
+    .eq("phone", phone)
+    .maybeSingle();
+
+  if (existingClient?.id) {
     newContext.clientId = existingClient.id;
     newContext.clientFirstName = existingClient.first_name;
     newContext.clientLastName = existingClient.last_name;
