@@ -59,7 +59,7 @@ export default async function CampanaDetallePage({
         <div>
           <div className="flex items-center gap-3 mb-1">
             <Link href="/backoffice/automatizaciones" className="text-sm text-gray-500 hover:text-gray-700">
-              ← Automatizaciones
+              ← Campañas
             </Link>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">{campaign.name}</h1>
