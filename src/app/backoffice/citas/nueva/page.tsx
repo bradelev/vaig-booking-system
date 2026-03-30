@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { createBooking } from "@/actions/citas";
-import ValidatedForm from "@/components/backoffice/validated-form";
+import NuevaCitaForm from "./nueva-cita-form";
 
 interface Cliente {
   id: string;
@@ -49,89 +48,12 @@ export default async function NuevaCitaPage() {
         <h1 className="text-2xl font-bold text-gray-900">Nueva cita</h1>
       </div>
 
-      <ValidatedForm action={createBooking} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Cliente *</label>
-          <select
-            name="client_id"
-            required
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
-          >
-            <option value="">Seleccionar cliente</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.first_name} {c.last_name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Servicio *</label>
-          <select
-            name="service_id"
-            required
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
-          >
-            <option value="">Seleccionar servicio</option>
-            {servicios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Profesional</label>
-          <select
-            name="professional_id"
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
-          >
-            <option value="">Sin asignar</option>
-            {profesionales.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Fecha y hora *</label>
-          <input
-            name="scheduled_at"
-            type="datetime-local"
-            required
-            defaultValue={defaultDatetime}
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Notas</label>
-          <textarea
-            name="notes"
-            rows={3}
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
-          />
-        </div>
-
-        <div className="flex justify-end gap-3 pt-2">
-          <Link
-            href="/backoffice/citas"
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Cancelar
-          </Link>
-          <button
-            type="submit"
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
-          >
-            Crear cita
-          </button>
-        </div>
-      </ValidatedForm>
+      <NuevaCitaForm
+        clientes={clientes}
+        servicios={servicios}
+        profesionales={profesionales}
+        defaultDatetime={defaultDatetime}
+      />
     </div>
   );
 }
