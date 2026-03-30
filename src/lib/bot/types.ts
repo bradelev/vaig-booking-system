@@ -7,6 +7,7 @@ export type BotConversationState =
   | "booking_category"
   | "booking_service"
   | "booking_professional"
+  | "booking_professional_after_slot"
   | "booking_date"
   | "booking_window"
   | "booking_slots"
@@ -44,6 +45,10 @@ export interface SlotOption {
   start: string; // ISO string
   end: string;
   label: string; // e.g. "Lunes 17/03 a las 10:00"
+}
+
+export interface MultiProfSlot extends SlotOption {
+  availableProfessionalIds: string[];
 }
 
 export interface BookingFlowContext {
