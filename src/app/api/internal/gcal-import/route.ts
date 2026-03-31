@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { importGCalEvents } from "@/lib/gcal/import-engine";
 
 /**
@@ -7,10 +8,20 @@ import { importGCalEvents } from "@/lib/gcal/import-engine";
  * Imports Google Calendar events as bookings (status: deposit_paid).
  * Events already linked to a booking (via gcal_event_id) are skipped.
  *
+ * Requires an authenticated backoffice session (Supabase session cookie).
+ *
  * Default range: last 30 days + next 30 days.
  * Accepts optional body: { timeMin?: string; timeMax?: string }
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  // Validate authenticated session
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: { user } } = await (supabase as any).auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     let timeMin: string | undefined;
     let timeMax: string | undefined;
