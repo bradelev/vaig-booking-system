@@ -348,7 +348,7 @@ export async function updateBookingInline(
     void deleteBookingCalendarEvent(id).then(() => createBookingCalendarEvent(id));
   }
 
-  if (newStatus === "realized" && current.client_package_id) {
+  if (newStatus === "realized" && oldStatus !== "realized" && current.client_package_id) {
     const { data: cp } = await client
       .from("client_packages")
       .select("sessions_used")
