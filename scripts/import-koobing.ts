@@ -21,7 +21,6 @@ async function main() {
   const fromArg = args.find((a, i) => args[i - 1] === "--from");
   const toArg = args.find((a, i) => args[i - 1] === "--to");
 
-  const today = new Date().toISOString().split("T")[0];
   const ninetyDaysLater = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
     .toISOString()
     .split("T")[0];
@@ -54,7 +53,6 @@ async function main() {
     }
   }
 
-  console.log(`\nToday: ${today}`);
   process.exit(result.errors.length > 0 ? 1 : 0);
 }
 
