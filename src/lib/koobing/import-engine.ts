@@ -20,6 +20,7 @@ import {
 export interface ImportResult {
   imported: number;
   skipped: number;
+  unmatched_service: number; // appointments where service could not be resolved
   errors: string[];
   created: Array<{ name: string; phone: string; service: string; date: string }>;
 }
@@ -104,10 +105,11 @@ export async function importKoobingAppointments({
   to: string;   // YYYY-MM-DD
   dryRun?: boolean;
 }): Promise<ImportResult> {
+  // Cast to any: koobing_appointment_id not yet in generated DB types (regenerate after migration)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = createAdminClient() as any;
 
-  const result: ImportResult = { imported: 0, skipped: 0, errors: [], created: [] };
+  const result: ImportResult = { imported: 0, skipped: 0, unmatched_service: 0, errors: [], created: [] };
 
   // Load Koobing data
   const [koobApts, koobServices] = await Promise.all([
@@ -158,6 +160,7 @@ export async function importKoobingAppointments({
       // Resolve service
       const koobSvcObj = koobServices.find((s) => s.id === apt.service_id);
       const serviceId = koobSvcObj ? koobSvcToVaig.get(apt.service_id) : null;
+      if (!serviceId) result.unmatched_service++;
 
       // Build scheduled_at
       const scheduledAt = buildScheduledAt(apt.date, apt.start_time);
@@ -177,19 +180,21 @@ export async function importKoobingAppointments({
         if (byPhone) clientId = byPhone.id;
       }
 
-      // 2. Fallback: by name
+      // 2. Fallback: by name (only when last name is known to avoid false positives)
       if (!clientId && apt.name.trim()) {
         const nameParts = apt.name.trim().split(/\s+/);
         const firstName = nameParts[0];
         const lastName = nameParts.slice(1).join(" ") || null;
-        const { data: byName } = await db
-          .from("clients")
-          .select("id")
-          .ilike("first_name", firstName)
-          .ilike("last_name", lastName ?? "%")
-          .limit(1)
-          .maybeSingle();
-        if (byName) clientId = byName.id;
+        if (lastName) {
+          const { data: byName } = await db
+            .from("clients")
+            .select("id")
+            .ilike("first_name", firstName)
+            .ilike("last_name", lastName)
+            .limit(1)
+            .maybeSingle();
+          if (byName) clientId = byName.id;
+        }
       }
 
       // 3. Create client if not found

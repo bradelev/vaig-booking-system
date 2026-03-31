@@ -31,6 +31,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       // No body — use defaults
     }
 
+    const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+    if (from && !DATE_RE.test(from)) {
+      return NextResponse.json({ error: "Invalid from date (expected YYYY-MM-DD)" }, { status: 400 });
+    }
+    if (to && !DATE_RE.test(to)) {
+      return NextResponse.json({ error: "Invalid to date (expected YYYY-MM-DD)" }, { status: 400 });
+    }
+
     const ninetyDaysLater = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0];

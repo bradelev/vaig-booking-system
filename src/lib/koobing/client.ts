@@ -64,6 +64,7 @@ export async function fetchKoobingServices(): Promise<KoobingService[]> {
   return data.services ?? [];
 }
 
+// Reserved for future use (e.g. syncing worker list from Koobing to VAIG professionals)
 export async function fetchKoobingWorkers(): Promise<KoobingWorker[]> {
   const data = await koobingFetch("/worker") as { workers?: KoobingWorker[] };
   return data.workers ?? [];
