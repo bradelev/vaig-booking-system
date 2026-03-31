@@ -193,15 +193,14 @@ export async function importGCalEvents(options: {
       // h. Find or create client
       let clientId: string;
 
+      // Search by first_name + last_name (normalized)
+      const { first: searchFirst, last: searchLast } = splitName(parsed.clientName);
       const { data: existingClients, error: clientLookupErr } = await supabase
         .from("clients")
-        .select("id")
-        .filter(
-          "lower(first_name || ' ' || last_name)",
-          "eq",
-          parsed.clientName.toLowerCase(),
-        )
-        .limit(1);
+        .select("id, first_name, last_name")
+        .ilike("first_name", searchFirst)
+        .ilike("last_name", searchLast || "%")
+        .limit(5);
 
       if (clientLookupErr) {
         throw new Error(`Client lookup failed: ${clientLookupErr.message}`);
