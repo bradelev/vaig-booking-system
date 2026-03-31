@@ -195,12 +195,18 @@ export async function importGCalEvents(options: {
 
       // Search by first_name + last_name (normalized)
       const { first: searchFirst, last: searchLast } = splitName(parsed.clientName);
-      const { data: existingClients, error: clientLookupErr } = await supabase
+      let clientQuery = supabase
         .from("clients")
         .select("id, first_name, last_name")
-        .ilike("first_name", searchFirst)
-        .ilike("last_name", searchLast || "%")
-        .limit(5);
+        .ilike("first_name", searchFirst);
+      // When there is no last name (single-word client), require last_name = '' to avoid
+      // matching all clients with that first name across different last names
+      if (searchLast) {
+        clientQuery = clientQuery.ilike("last_name", searchLast);
+      } else {
+        clientQuery = clientQuery.or("last_name.is.null,last_name.eq.");
+      }
+      const { data: existingClients, error: clientLookupErr } = await clientQuery.limit(5);
 
       if (clientLookupErr) {
         throw new Error(`Client lookup failed: ${clientLookupErr.message}`);
