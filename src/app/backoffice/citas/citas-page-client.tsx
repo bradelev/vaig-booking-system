@@ -72,13 +72,13 @@ export default function CitasPageClient({
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch("/api/internal/gcal-import", { method: "POST" });
+      const res = await fetch("/api/internal/koobing-import", { method: "POST" });
       const data = await res.json();
       setSyncResult({
         imported: data.imported ?? 0,
         skipped: data.skipped ?? 0,
         errors: data.errors?.length ?? 0,
-        unmatched: data.unmatched?.length ?? 0,
+        unmatched: data.unmatched_service ?? 0,
       });
       if ((data.imported ?? 0) > 0) {
         router.refresh();
@@ -106,7 +106,7 @@ export default function CitasPageClient({
             onClick={() => { setShowSync(true); setSyncResult(null); }}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            Sincronizar GCal
+            Sincronizar Koobing
           </button>
           <Link
             href="/backoffice/citas/nueva"
@@ -210,18 +210,18 @@ export default function CitasPageClient({
         )}
       </div>
 
-      {/* GCal Sync Modal */}
+      {/* Koobing Sync Modal */}
       <Modal
         open={showSync}
         onClose={() => { if (!syncing) setShowSync(false); }}
-        title="Sincronizar Google Calendar"
+        title="Sincronizar Koobing"
       >
         <div className="space-y-4">
           {!syncResult ? (
             <>
               <p className="text-sm text-gray-600">
-                Se importarán eventos del calendario de los últimos 30 días y los próximos 30 días
-                como citas con estado <strong>Seña pagada</strong>. Los eventos ya vinculados se saltean.
+                Se importarán todas las citas de Koobing desde julio 2024 hasta 90 días en el futuro.
+                Las citas ya importadas se saltean. El cliente se crea automáticamente si no existe.
               </p>
               <div className="flex gap-2 pt-1">
                 <button
