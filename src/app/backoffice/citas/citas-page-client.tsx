@@ -78,7 +78,7 @@ export default function CitasPageClient({
         imported: data.imported ?? 0,
         skipped: data.skipped ?? 0,
         errors: data.errors?.length ?? 0,
-        unmatched: 0,
+        unmatched: data.unmatched_service ?? 0,
       });
       if ((data.imported ?? 0) > 0) {
         router.refresh();
