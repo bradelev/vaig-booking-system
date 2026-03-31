@@ -298,3 +298,70 @@ export async function updateBooking(id: string, formData: FormData) {
   revalidatePath("/backoffice");
   redirect("/backoffice/citas");
 }
+
+export async function updateBookingInline(
+  id: string,
+  data: {
+    client_id?: string;
+    service_id?: string;
+    professional_id?: string | null;
+    scheduled_at?: string;
+    status?: string;
+    notes?: string | null;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+
+  const { data: current, error: fetchError } = await client
+    .from("bookings")
+    .select("status, gcal_event_id, scheduled_at, client_package_id")
+    .eq("id", id)
+    .single();
+
+  if (fetchError || !current) return { success: false, error: fetchError?.message ?? "Not found" };
+
+  const updatePayload: Record<string, unknown> = {};
+  if (data.client_id) updatePayload.client_id = data.client_id;
+  if (data.service_id) updatePayload.service_id = data.service_id;
+  if ("professional_id" in data) updatePayload.professional_id = data.professional_id;
+  if (data.scheduled_at) updatePayload.scheduled_at = data.scheduled_at;
+  if (data.status) updatePayload.status = data.status;
+  if ("notes" in data) updatePayload.notes = data.notes;
+
+  const { error } = await client.from("bookings").update(updatePayload).eq("id", id);
+  if (error) return { success: false, error: error.message };
+
+  const newStatus = data.status;
+  const oldStatus = current.status;
+
+  if (newStatus && newStatus !== oldStatus) {
+    if (newStatus === "confirmed") {
+      void createBookingCalendarEvent(id);
+    } else if (newStatus === "cancelled" || newStatus === "no_show") {
+      void deleteBookingCalendarEvent(id);
+    }
+  }
+
+  if (data.scheduled_at && data.scheduled_at !== current.scheduled_at && current.gcal_event_id) {
+    void deleteBookingCalendarEvent(id).then(() => createBookingCalendarEvent(id));
+  }
+
+  if (newStatus === "realized" && current.client_package_id) {
+    const { data: cp } = await client
+      .from("client_packages")
+      .select("sessions_used")
+      .eq("id", current.client_package_id)
+      .single();
+    if (cp) {
+      await client
+        .from("client_packages")
+        .update({ sessions_used: cp.sessions_used + 1 })
+        .eq("id", current.client_package_id);
+    }
+  }
+
+  revalidatePath("/backoffice/citas");
+  return { success: true };
+}
