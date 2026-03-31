@@ -11,13 +11,15 @@
 import { config } from "dotenv";
 import * as path from "node:path";
 
-// Load env before importing engine (engine reads process.env at call time)
+// Load env BEFORE importing the engine (which reads process.env at module load time).
+// Use dynamic import to guarantee evaluation order is correct in ESM and CJS.
 config({ path: path.resolve(process.cwd(), ".env.local") });
 config({ path: path.resolve(process.cwd(), ".env") });
 
-import { importGCalEvents } from "../src/lib/gcal/import-engine";
-
 async function main(): Promise<void> {
+  // Dynamic import ensures env vars are loaded before the module initializes
+  const { importGCalEvents } = await import("../src/lib/gcal/import-engine");
+
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
 
@@ -40,10 +42,10 @@ async function main(): Promise<void> {
   const result = await importGCalEvents({ timeMin, timeMax, dryRun });
 
   console.log(`\nResults:`);
-  console.log(`  Imported: ${result.imported}`);
+  console.log(`  Imported bookings: ${result.imported}`);
   console.log(`  Skipped (already linked): ${result.skipped}`);
   console.log(`  Errors: ${result.errors.length}`);
-  console.log(`  Unmatched services: ${result.unmatched.length}`);
+  console.log(`  Unmatched events (no service found): ${result.unmatched.length}`);
 
   if (result.created.length > 0) {
     console.log(`\nCreated bookings:`);
