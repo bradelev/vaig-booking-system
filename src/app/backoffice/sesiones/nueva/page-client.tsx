@@ -10,6 +10,7 @@ interface BookingItem {
   id: string;
   scheduledAt: string;
   status: string;
+  clientId?: string;
   clientName: string;
   serviceName: string;
   serviceCategory: string;
@@ -148,7 +149,7 @@ export default function SessionsPageClient({
         bookingData: {
           id: b.id,
           clientName: b.clientName,
-          clientId: undefined as string | undefined,
+          clientId: b.clientId,
           serviceName: b.serviceName,
           serviceCategory: b.serviceCategory,
           scheduledAt: b.scheduledAt,

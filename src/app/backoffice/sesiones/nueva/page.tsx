@@ -174,6 +174,7 @@ export default async function SesionesNuevaPage({ searchParams }: PageProps) {
       id: string;
       scheduledAt: string;
       status: string;
+      clientId?: string;
       clientName: string;
       serviceName: string;
       serviceCategory: string;
@@ -193,6 +194,7 @@ export default async function SesionesNuevaPage({ searchParams }: PageProps) {
       id: b.id,
       scheduledAt: b.scheduled_at,
       status: b.status,
+      clientId: b.clients?.id,
       clientName: b.clients ? `${b.clients.first_name} ${b.clients.last_name}` : "—",
       serviceName: b.services?.name ?? "—",
       serviceCategory: b.services?.category ?? b.services?.name ?? "Servicio",
