@@ -146,6 +146,7 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
             {/* Category header */}
             <button
               onClick={() => toggleCollapse(category)}
+              aria-expanded={!isCollapsed}
               className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
             >
               <div className="flex items-center gap-2">
