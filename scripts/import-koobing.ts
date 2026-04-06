@@ -25,35 +25,51 @@ async function main() {
     .toISOString()
     .split("T")[0];
 
-  const from = fromArg ?? "2024-07-01";
-  const to = toArg ?? ninetyDaysLater;
+  const globalFrom = fromArg ?? "2024-07-01";
+  const globalTo = toArg ?? ninetyDaysLater;
+
+  // Split into 3-month chunks to avoid Koobing API timeout on large ranges
+  const chunks: Array<{ from: string; to: string }> = [];
+  const cursor = new Date(globalFrom + "T12:00:00");
+  const end = new Date(globalTo + "T12:00:00");
+  while (cursor < end) {
+    const chunkFrom = cursor.toISOString().split("T")[0];
+    cursor.setMonth(cursor.getMonth() + 3);
+    const chunkTo = cursor > end ? end.toISOString().split("T")[0] : cursor.toISOString().split("T")[0];
+    chunks.push({ from: chunkFrom, to: chunkTo });
+  }
 
   console.log(`\n🔄 Koobing Import${dryRun ? " (DRY RUN)" : ""}`);
-  console.log(`   Range: ${from} → ${to}`);
-  console.log("   Running...\n");
+  console.log(`   Range: ${globalFrom} → ${globalTo} (${chunks.length} chunks of ~3 months)`);
+  console.log("");
 
-  const result = await importKoobingAppointments({ from, to, dryRun });
+  let totalImported = 0;
+  let totalSkipped = 0;
+  let totalUnmatched = 0;
+  const allErrors: string[] = [];
 
-  console.log(`✅ Imported: ${result.imported}`);
-  console.log(`⏭️  Skipped (already exists): ${result.skipped}`);
-  console.log(`❌ Errors: ${result.errors.length}`);
+  for (const chunk of chunks) {
+    process.stdout.write(`   ${chunk.from} → ${chunk.to} ... `);
+    const result = await importKoobingAppointments({ from: chunk.from, to: chunk.to, dryRun });
+    totalImported += result.imported;
+    totalSkipped += result.skipped;
+    totalUnmatched += result.unmatched_service;
+    allErrors.push(...result.errors);
+    console.log(`imported=${result.imported} skipped=${result.skipped} unmatched=${result.unmatched_service} errors=${result.errors.length}`);
+  }
 
-  if (result.errors.length > 0) {
+  console.log(`\n✅ Total imported: ${totalImported}`);
+  console.log(`⏭️  Total skipped (already exists): ${totalSkipped}`);
+  console.log(`⚠️  Sin servicio matcheado: ${totalUnmatched}`);
+  console.log(`❌ Total errors: ${allErrors.length}`);
+
+  if (allErrors.length > 0) {
     console.log("\nErrors:");
-    result.errors.forEach((e) => console.log(`  - ${e}`));
+    allErrors.slice(0, 20).forEach((e) => console.log(`  - ${e}`));
+    if (allErrors.length > 20) console.log(`  ... and ${allErrors.length - 20} more`);
   }
 
-  if (result.created.length > 0 && dryRun) {
-    console.log("\nWould create:");
-    result.created.slice(0, 20).forEach((c) =>
-      console.log(`  [${c.date}] ${c.name} — ${c.service}`)
-    );
-    if (result.created.length > 20) {
-      console.log(`  ... and ${result.created.length - 20} more`);
-    }
-  }
-
-  process.exit(result.errors.length > 0 ? 1 : 0);
+  process.exit(allErrors.length > 0 ? 1 : 0);
 }
 
 main().catch((err) => {
