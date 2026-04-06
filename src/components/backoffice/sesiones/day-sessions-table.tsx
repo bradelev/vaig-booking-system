@@ -115,7 +115,7 @@ function parseDateART(isoString: string): string {
 function rowToEditData(row: SessionRow): EditData {
   const fecha = row.bookingData?.scheduledAt
     ? parseDateART(row.bookingData.scheduledAt)
-    : row.bookingData?.scheduledAt ?? "";
+    : "";
   const hora = row.bookingData?.scheduledAt
     ? parseTimeART(row.bookingData.scheduledAt)
     : "";
@@ -331,38 +331,17 @@ export default function DaySessionsTable({
     if (!editData) return null;
     return (
       <>
-        {/* Cliente */}
-        <label className="flex flex-col gap-0.5 text-xs flex-1 min-w-40">
-          <span className="text-gray-500">Cliente</span>
-          <ClientCombobox
-            value={editData.client_name}
-            clientId={editData.client_id}
-            onChange={(id, name) => setEditData((prev) => prev ? { ...prev, client_id: id, client_name: name } : prev)}
-            className="rounded border border-gray-300 px-2 py-1 w-full"
-          />
-        </label>
-        {/* Fecha + hora (only for pending bookings) */}
+        {/* Fecha (only for pending bookings — hora is in the main row Hora cell) */}
         {row.isPendingBooking && (
-          <>
-            <label className="flex flex-col gap-0.5 text-xs">
-              <span className="text-gray-500">Fecha</span>
-              <input
-                type="date"
-                value={editData.fecha}
-                onChange={(e) => updateField("fecha", e.target.value)}
-                className="rounded border border-gray-300 px-2 py-1 w-32"
-              />
-            </label>
-            <label className="flex flex-col gap-0.5 text-xs">
-              <span className="text-gray-500">Hora</span>
-              <input
-                type="time"
-                value={editData.hora}
-                onChange={(e) => updateField("hora", e.target.value)}
-                className="rounded border border-gray-300 px-2 py-1 w-24"
-              />
-            </label>
-          </>
+          <label className="flex flex-col gap-0.5 text-xs">
+            <span className="text-gray-500">Fecha</span>
+            <input
+              type="date"
+              value={editData.fecha}
+              onChange={(e) => updateField("fecha", e.target.value)}
+              className="rounded border border-gray-300 px-2 py-1 w-32"
+            />
+          </label>
         )}
         {/* Monto lista */}
         <label className="flex flex-col gap-0.5 text-xs">
