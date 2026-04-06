@@ -1489,6 +1489,10 @@ export async function notifyWaitlistForSlot(
   const phone = entry.clients?.phone;
   if (!phone) return;
 
+  const { shouldSendMessage } = await import("@/lib/messaging-toggle");
+  const { send: shouldSend, phone: targetPhone } = await shouldSendMessage("messaging_waitlist", phone);
+  if (!shouldSend) return;
+
   const firstName = entry.clients?.first_name ?? "Cliente";
   const dateLabel = slotDate.toLocaleDateString("es-AR", {
     timeZone: TZ,
@@ -1508,7 +1512,7 @@ export async function notifyWaitlistForSlot(
 
   try {
     const { sendTextMessage: send } = await import("@/lib/whatsapp");
-    await send({ to: phone, body: msg });
+    await send({ to: targetPhone, body: msg });
     await dbClient
       .from("waitlist")
       .update({ notified_at: new Date().toISOString() })
