@@ -10,10 +10,10 @@ interface Cliente {
   first_name: string;
   last_name: string;
   phone: string;
-  email: string | null;
   total_sesiones: number;
   dias_inactivo: number | null;
   segmento: string | null;
+  servicios_usados: string[] | null;
 }
 
 const SEGMENTO_BADGE: Record<string, { label: string; cls: string }> = {
@@ -41,6 +41,8 @@ const ORDEN_OPTIONS = [
   { label: "Menos sesiones", value: "sesiones_asc" },
   { label: "Visita más reciente", value: "visita_asc" },
   { label: "Visita más antigua", value: "visita_desc" },
+  { label: "Segmento (mayor)", value: "segmento_desc" },
+  { label: "Segmento (menor)", value: "segmento_asc" },
 ];
 
 const PAGE_SIZE = 30;
@@ -59,6 +61,18 @@ function buildSearchParams(
     if (v) params.set(k, v);
   }
   return params.toString();
+}
+
+// Short labels for service pills
+const SERVICE_SHORT: Record<string, string> = {
+  "Depilación Láser": "Láser",
+  "Aparatología / HIFU": "HIFU",
+  "Cejas y Pestañas": "Cejas/Pest.",
+  "Manos y Pies": "Manos/Pies",
+};
+
+function shortServiceName(name: string): string {
+  return SERVICE_SHORT[name] ?? name;
 }
 
 export default async function ClientesPage({
@@ -86,7 +100,7 @@ export default async function ClientesPage({
 
   let query = client
     .from("clientes_metricas")
-    .select("id, first_name, last_name, phone, email, total_sesiones, dias_inactivo, segmento", { count: "exact" });
+    .select("id, first_name, last_name, phone, total_sesiones, dias_inactivo, segmento, servicios_usados", { count: "exact" });
 
   if (busqueda) {
     query = query.or(`first_name.ilike.%${busqueda}%,last_name.ilike.%${busqueda}%,phone.ilike.%${busqueda}%`);
@@ -102,8 +116,10 @@ export default async function ClientesPage({
     case "nombre_desc": query = query.order("first_name", { ascending: false }); break;
     case "sesiones_desc": query = query.order("total_sesiones", { ascending: false }); break;
     case "sesiones_asc": query = query.order("total_sesiones", { ascending: true }); break;
-    case "visita_asc": query = query.order("dias_inactivo", { ascending: true }); break;
+    case "visita_asc": query = query.order("dias_inactivo", { ascending: true, nullsFirst: false }); break;
     case "visita_desc": query = query.order("dias_inactivo", { ascending: false }); break;
+    case "segmento_desc": query = query.order("segmento", { ascending: false, nullsFirst: false }); break;
+    case "segmento_asc": query = query.order("segmento", { ascending: true, nullsFirst: false }); break;
     default: query = query.order("first_name", { ascending: true }); break;
   }
 
@@ -135,9 +151,25 @@ export default async function ClientesPage({
       ),
     },
     {
-      header: "Email",
+      header: "Servicios",
       hideOnMobile: true,
-      accessor: (c) => c.email ?? "—",
+      accessor: (c) => {
+        const svcs = c.servicios_usados ?? [];
+        if (svcs.length === 0) return <span className="text-gray-400 text-sm">—</span>;
+        return (
+          <div className="flex flex-wrap gap-1 max-w-xs">
+            {svcs.map((s) => (
+              <span
+                key={s}
+                className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700"
+                title={s}
+              >
+                {shortServiceName(s)}
+              </span>
+            ))}
+          </div>
+        );
+      },
     },
     {
       header: "Sesiones",
