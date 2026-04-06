@@ -12,6 +12,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
 import { sendTextMessage } from "@/lib/whatsapp";
 import { upsertSession } from "@/lib/bot/session";
+import { shouldSendMessage } from "@/lib/messaging-toggle";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const authHeader = request.headers.get("authorization");
@@ -56,6 +57,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const phone = booking.clients?.phone;
     if (!phone) continue;
 
+    const { send, phone: targetPhone } = await shouldSendMessage("messaging_survey", phone);
+    if (!send) continue;
+
     const firstName = booking.clients?.first_name ?? "Cliente";
     const serviceName = booking.services?.name ?? "tu sesión";
 
@@ -72,14 +76,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .replace(/\{surveyUrl\}/g, surveyUrl);
 
     try {
-      await sendTextMessage({ to: phone, body: msg });
+      await sendTextMessage({ to: targetPhone, body: msg });
       await client
         .from("bookings")
         .update({ survey_sent_at: new Date().toISOString() })
         .eq("id", booking.id);
 
       // Set bot state so the next message from this client is treated as their score
-      await upsertSession(phone, "awaiting_survey_response", { pendingBookingId: booking.id });
+      await upsertSession(targetPhone, "awaiting_survey_response", { pendingBookingId: booking.id });
 
       sent++;
     } catch (err) {

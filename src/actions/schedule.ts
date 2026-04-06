@@ -86,10 +86,14 @@ export async function deleteScheduleOverride(professionalId: string, overrideId:
 }
 
 export async function saveSystemConfig(formData: FormData) {
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const client = createAdminClient() as AnyClient;
 
-  const keys = ["cbu", "cbu_alias", "mp_enabled", "auto_cancel_hours", "buffer_minutes", "business_name", "admin_phone"];
+  const keys = [
+    "cbu", "cbu_alias", "mp_enabled", "auto_cancel_hours", "buffer_minutes", "business_name", "admin_phone",
+    "messaging_reminder", "messaging_survey", "messaging_payment_reminder", "messaging_next_session",
+    "messaging_cancel_notification", "messaging_pack_notification", "messaging_waitlist",
+  ];
 
   for (const key of keys) {
     const value = (formData.get(key) as string) ?? "";
