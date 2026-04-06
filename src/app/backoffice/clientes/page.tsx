@@ -117,7 +117,7 @@ export default async function ClientesPage({
     case "sesiones_desc": query = query.order("total_sesiones", { ascending: false }); break;
     case "sesiones_asc": query = query.order("total_sesiones", { ascending: true }); break;
     case "visita_asc": query = query.order("dias_inactivo", { ascending: true, nullsFirst: false }); break;
-    case "visita_desc": query = query.order("dias_inactivo", { ascending: false }); break;
+    case "visita_desc": query = query.order("dias_inactivo", { ascending: false, nullsFirst: false }); break;
     case "segmento_desc": query = query.order("segmento", { ascending: false, nullsFirst: false }); break;
     case "segmento_asc": query = query.order("segmento", { ascending: true, nullsFirst: false }); break;
     default: query = query.order("first_name", { ascending: true }); break;
