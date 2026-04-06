@@ -85,7 +85,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         .update({ confirmation_sent_at: new Date().toISOString() })
         .eq("id", booking.id);
       // Set bot session so client reply is handled by handleReminderConfirm
-      await upsertSession(phone, "awaiting_reminder_confirm", { pendingBookingId: booking.id });
+      await upsertSession(targetPhone, "awaiting_reminder_confirm", { pendingBookingId: booking.id });
       sent++;
     } catch (err) {
       console.error(`[Reminder] Failed for booking ${booking.id}:`, err);
