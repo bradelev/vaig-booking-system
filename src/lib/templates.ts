@@ -8,6 +8,8 @@ export const TEMPLATE_KEYS = [
   "template_next_session",
   "template_cancel_client",
   "template_pack_purchased",
+  "template_admin_new_booking",
+  "template_admin_payment_confirmed",
 ] as const;
 
 export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
@@ -20,6 +22,8 @@ export const TEMPLATE_LABELS: Record<TemplateKey, string> = {
   template_next_session: "Sugerencia próxima sesión",
   template_cancel_client: "Cancelación de turno (cliente)",
   template_pack_purchased: "Confirmación compra de pack",
+  template_admin_new_booking: "Admin — Nueva reserva",
+  template_admin_payment_confirmed: "Admin — Pago confirmado",
 };
 
 export const TEMPLATE_PLACEHOLDERS: Record<TemplateKey, string[]> = {
@@ -30,4 +34,6 @@ export const TEMPLATE_PLACEHOLDERS: Record<TemplateKey, string[]> = {
   template_next_session: ["{firstName}", "{serviceName}", "{businessName}", "{dateLabel}", "{intervalDays}"],
   template_cancel_client: ["{firstName}", "{serviceName}", "{dateLabel}", "{reasonText}"],
   template_pack_purchased: ["{firstName}", "{packName}", "{serviceName}", "{sessionsTotal}"],
+  template_admin_new_booking: ["{clientName}", "{clientPhone}", "{serviceName}", "{professionalName}", "{dateLabel}", "{depositAmount}", "{bookingId}"],
+  template_admin_payment_confirmed: ["{clientName}", "{clientPhone}", "{serviceName}", "{dateLabel}", "{amount}", "{methodLabel}", "{bookingId}"],
 };
