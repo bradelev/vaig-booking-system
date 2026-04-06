@@ -9,6 +9,7 @@
  */
 import { sendTextMessage } from "@/lib/whatsapp";
 import { getConfigValue } from "@/lib/config";
+import { shouldSendMessage } from "@/lib/messaging-toggle";
 
 function applyTemplate(template: string, vars: Record<string, string>): string {
   return Object.entries(vars).reduce(
@@ -79,6 +80,9 @@ export interface PackPurchasedNotificationParams {
 export async function notifyClientPackPurchased(
   params: PackPurchasedNotificationParams
 ): Promise<void> {
+  const { send, phone: targetPhone } = await shouldSendMessage("messaging_pack_notification", params.clientPhone);
+  if (!send) return;
+
   const template = await getConfigValue(
     "template_pack_purchased",
     "🎉 *¡Pack adquirido!*\n\nHola {firstName}! Confirmamos la compra de tu pack:\n\n📦 *{packName}*\n📋 Servicio: {serviceName}\n✅ {sessionsTotal} sesiones disponibles\n\nPodés agendar tus turnos cuando quieras escribiéndonos. ¡Gracias! 😊"
@@ -91,7 +95,7 @@ export async function notifyClientPackPurchased(
   });
 
   try {
-    await sendTextMessage({ to: params.clientPhone, body: msg });
+    await sendTextMessage({ to: targetPhone, body: msg });
   } catch (err) {
     console.error("[Notifications] Failed to send pack purchased notification:", err);
   }
@@ -115,6 +119,9 @@ const REASON_LABELS: Record<string, string> = {
 export async function notifyClientCancellation(
   params: ClientCancellationNotificationParams
 ): Promise<void> {
+  const { send, phone: targetPhone } = await shouldSendMessage("messaging_cancel_notification", params.clientPhone);
+  if (!send) return;
+
   const date = new Date(params.scheduledAt);
   const dateLabel = date.toLocaleDateString("es-AR", {
     timeZone: "America/Argentina/Buenos_Aires",
@@ -140,7 +147,7 @@ export async function notifyClientCancellation(
   });
 
   try {
-    await sendTextMessage({ to: params.clientPhone, body: msg });
+    await sendTextMessage({ to: targetPhone, body: msg });
   } catch (err) {
     console.error("[Notifications] Failed to send cancellation notification to client:", err);
   }

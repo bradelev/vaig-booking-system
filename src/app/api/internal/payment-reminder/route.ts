@@ -14,6 +14,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
 import { sendTextMessage } from "@/lib/whatsapp";
 import { createMPPreference } from "@/lib/payments/mp";
+import { shouldSendMessage } from "@/lib/messaging-toggle";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const authHeader = request.headers.get("authorization");
@@ -67,6 +68,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const phone = booking.clients?.phone;
     if (!phone) continue;
 
+    const { send, phone: targetPhone } = await shouldSendMessage("messaging_payment_reminder", phone);
+    if (!send) continue;
+
     const firstName = booking.clients?.first_name ?? "Cliente";
     const serviceName = booking.services?.name ?? "tu servicio";
     const depositAmount: number = booking.services?.deposit_amount ?? 0;
@@ -104,7 +108,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .replace(/\{hoursRemaining\}/g, String(hoursRemaining));
 
     try {
-      await sendTextMessage({ to: phone, body: msg });
+      await sendTextMessage({ to: targetPhone, body: msg });
       await client
         .from("bookings")
         .update({ payment_reminder_sent_at: new Date().toISOString() })
