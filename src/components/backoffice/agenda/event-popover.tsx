@@ -45,7 +45,9 @@ export default function EventPopover({ event, anchor, onClose }: EventPopoverPro
 
   // Position: keep within viewport
   const POPOVER_W = 340;
-  const POPOVER_H = 420;
+  // Header (~72px) + scrollable body (capped at 60vh) + footer (~52px).
+  // Use a conservative estimate so the popover stays within the viewport on short screens.
+  const POPOVER_H = 520;
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
   const left = Math.min(anchor.x + 8, vw - POPOVER_W - 12);
