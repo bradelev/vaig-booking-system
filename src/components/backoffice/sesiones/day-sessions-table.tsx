@@ -1,13 +1,31 @@
 "use client";
 
-import { useState, useEffect, useCallback, Fragment } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { toast } from "sonner";
-import ConfirmBookingModal, { BookingToConfirm } from "./confirm-booking-modal";
-import { updateSession } from "@/actions/sesiones";
+import { updateSession, confirmBookingAsSession, searchClients } from "@/actions/sesiones";
+import type { Professional } from "@/components/backoffice/sesiones/session-form";
+
+export interface PendingBookingData {
+  id: string;
+  clientName: string;
+  clientId?: string;
+  serviceName: string;
+  serviceCategory: string;
+  scheduledAt: string;
+  professionalName?: string;
+  professionalId?: string;
+}
+
+interface ServiceOption {
+  id: string;
+  name: string;
+  category: string | null;
+  price: number;
+}
 
 interface SessionRow {
   id: string;
-  sessionId?: string; // real UUID for editing
+  sessionId?: string;
   source: "backoffice" | "system";
   clientName: string;
   tipoServicio: string;
@@ -25,12 +43,40 @@ interface SessionRow {
   clientSource?: string;
   time?: string;
   isPendingBooking?: boolean;
-  bookingData?: BookingToConfirm;
+  bookingData?: PendingBookingData;
+}
+
+interface EditData {
+  // Client
+  client_id: string;
+  client_name: string;
+  // Date/time
+  fecha: string;
+  hora: string;
+  // Service
+  tipo_servicio: string;
+  descripcion: string;
+  // Professional
+  operadora: string;
+  professional_id: string;
+  // Payment
+  monto_lista: string;
+  descuento_pct: string;
+  monto_cobrado: string;
+  metodo_pago: string;
+  banco: string;
+  // Package
+  sesion_n: string;
+  sesion_total_cuponera: string;
+  // Notes
+  notas: string;
 }
 
 interface DaySessionsTableProps {
   sessions: SessionRow[];
   serviceCategories: string[];
+  services: ServiceOption[];
+  professionals: Professional[];
 }
 
 const METODOS_PAGO = [
@@ -44,25 +90,45 @@ const METODOS_PAGO = [
 
 const METODOS_CON_BANCO = ["transferencia", "debito", "credito"];
 
-interface EditData {
-  tipo_servicio: string;
-  descripcion: string;
-  operadora: string;
-  monto_lista: string;
-  descuento_pct: string;
-  monto_cobrado: string;
-  metodo_pago: string;
-  banco: string;
-  sesion_n: string;
-  sesion_total_cuponera: string;
-  notas: string;
+function formatCurrency(n?: number): string {
+  if (n == null) return "—";
+  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(n);
+}
+
+/** Parse HH:MM from an ISO string in ART timezone */
+function parseTimeART(isoString: string): string {
+  return new Date(isoString).toLocaleTimeString("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Argentina/Buenos_Aires",
+    hour12: false,
+  });
+}
+
+/** Parse YYYY-MM-DD from an ISO string in ART timezone */
+function parseDateART(isoString: string): string {
+  return new Date(isoString).toLocaleDateString("sv-SE", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  });
 }
 
 function rowToEditData(row: SessionRow): EditData {
+  const fecha = row.bookingData?.scheduledAt
+    ? parseDateART(row.bookingData.scheduledAt)
+    : row.bookingData?.scheduledAt ?? "";
+  const hora = row.bookingData?.scheduledAt
+    ? parseTimeART(row.bookingData.scheduledAt)
+    : "";
+
   return {
+    client_id: row.bookingData?.clientId ?? "",
+    client_name: row.clientName,
+    fecha,
+    hora,
     tipo_servicio: row.tipoServicio ?? "",
     descripcion: row.descripcion ?? "",
     operadora: row.operadora ?? "",
+    professional_id: row.professionalId ?? "",
     monto_lista: row.montoLista != null ? String(row.montoLista) : "",
     descuento_pct: row.descuentoPct != null ? String(row.descuentoPct) : "",
     monto_cobrado: row.montoCobrado != null ? String(row.montoCobrado) : "",
@@ -74,13 +140,97 @@ function rowToEditData(row: SessionRow): EditData {
   };
 }
 
-function formatCurrency(n?: number): string {
-  if (n == null) return "—";
-  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(n);
+// ─── Client search combobox (inline) ────────────────────────────────────────
+
+interface ClientResult {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
 }
 
-export default function DaySessionsTable({ sessions, serviceCategories }: DaySessionsTableProps) {
-  const [confirmBooking, setConfirmBooking] = useState<BookingToConfirm | null>(null);
+interface ClientComboboxProps {
+  value: string;       // display name
+  clientId: string;
+  onChange: (id: string, name: string) => void;
+  className?: string;
+}
+
+function ClientCombobox({ value, onChange, className }: ClientComboboxProps) {
+  const [query, setQuery] = useState(value);
+  const [results, setResults] = useState<ClientResult[]>([]);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  function handleInput(q: string) {
+    setQuery(q);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (q.length < 2) { setResults([]); setOpen(false); return; }
+    debounceRef.current = setTimeout(async () => {
+      const res = await searchClients(q);
+      setResults(res);
+      setOpen(res.length > 0);
+    }, 300);
+  }
+
+  function select(c: ClientResult) {
+    const name = `${c.first_name} ${c.last_name}`;
+    setQuery(name);
+    setOpen(false);
+    onChange(c.id, name);
+  }
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => handleInput(e.target.value)}
+        className={className}
+        placeholder="Buscar cliente..."
+        autoComplete="off"
+      />
+      {open && (
+        <ul className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg text-xs">
+          {results.map((c) => (
+            <li
+              key={c.id}
+              onMouseDown={() => select(c)}
+              className="cursor-pointer px-3 py-2 hover:bg-gray-50"
+            >
+              <span className="font-medium">{c.first_name} {c.last_name}</span>
+              {c.phone && <span className="ml-2 text-gray-400">{c.phone}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ─── Main component ──────────────────────────────────────────────────────────
+
+export default function DaySessionsTable({
+  sessions,
+  serviceCategories,
+  services,
+  professionals,
+}: DaySessionsTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<EditData | null>(null);
   const [saving, setSaving] = useState(false);
@@ -108,27 +258,56 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
   }
 
   async function saveEdit(row: SessionRow) {
-    if (!editData || !row.sessionId) return;
+    if (!editData) return;
     setSaving(true);
     try {
-      const result = await updateSession(row.sessionId, {
-        tipo_servicio: editData.tipo_servicio || undefined,
-        descripcion: editData.descripcion || null,
-        operadora: editData.operadora || null,
-        monto_lista: editData.monto_lista !== "" ? Number(editData.monto_lista) : null,
-        descuento_pct: editData.descuento_pct !== "" ? Number(editData.descuento_pct) : null,
-        monto_cobrado: editData.monto_cobrado !== "" ? Number(editData.monto_cobrado) : null,
-        metodo_pago: editData.metodo_pago || null,
-        banco: editData.banco || null,
-        sesion_n: editData.sesion_n !== "" ? Number(editData.sesion_n) : null,
-        sesion_total_cuponera: editData.sesion_total_cuponera !== "" ? Number(editData.sesion_total_cuponera) : null,
-        notas: editData.notas || null,
-      });
-      if (result.success) {
-        toast.success("Sesión actualizada");
-        cancelEdit();
-      } else {
-        toast.error(result.error ?? "Error al guardar");
+      if (row.isPendingBooking && row.bookingData) {
+        const result = await confirmBookingAsSession(row.bookingData.id, {
+          client_id: editData.client_id || undefined,
+          fecha: editData.fecha || undefined,
+          hora: editData.hora || undefined,
+          tipo_servicio: editData.tipo_servicio || undefined,
+          descripcion: editData.descripcion || undefined,
+          operadora: editData.operadora || undefined,
+          professional_id: editData.professional_id || undefined,
+          monto_lista: editData.monto_lista !== "" ? Number(editData.monto_lista) : undefined,
+          descuento_pct: editData.descuento_pct !== "" ? Number(editData.descuento_pct) : undefined,
+          monto_cobrado: editData.monto_cobrado !== "" ? Number(editData.monto_cobrado) : undefined,
+          metodo_pago: editData.metodo_pago || undefined,
+          banco: editData.banco || undefined,
+          sesion_n: editData.sesion_n !== "" ? Number(editData.sesion_n) : undefined,
+          sesion_total_cuponera: editData.sesion_total_cuponera !== "" ? Number(editData.sesion_total_cuponera) : undefined,
+          notas: editData.notas || undefined,
+        });
+        if (result.success) {
+          toast.success("Sesión confirmada");
+          cancelEdit();
+        } else {
+          toast.error(result.error ?? "Error al confirmar");
+        }
+      } else if (row.sessionId) {
+        const result = await updateSession(row.sessionId, {
+          client_id: editData.client_id || null,
+          fecha: editData.fecha || null,
+          tipo_servicio: editData.tipo_servicio || undefined,
+          descripcion: editData.descripcion || null,
+          operadora: editData.operadora || null,
+          professional_id: editData.professional_id || null,
+          monto_lista: editData.monto_lista !== "" ? Number(editData.monto_lista) : null,
+          descuento_pct: editData.descuento_pct !== "" ? Number(editData.descuento_pct) : null,
+          monto_cobrado: editData.monto_cobrado !== "" ? Number(editData.monto_cobrado) : null,
+          metodo_pago: editData.metodo_pago || null,
+          banco: editData.banco || null,
+          sesion_n: editData.sesion_n !== "" ? Number(editData.sesion_n) : null,
+          sesion_total_cuponera: editData.sesion_total_cuponera !== "" ? Number(editData.sesion_total_cuponera) : null,
+          notas: editData.notas || null,
+        });
+        if (result.success) {
+          toast.success("Sesión actualizada");
+          cancelEdit();
+        } else {
+          toast.error(result.error ?? "Error al guardar");
+        }
       }
     } finally {
       setSaving(false);
@@ -144,8 +323,121 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
   }
 
   const isEditing = (row: SessionRow) => editingId === row.id && editData != null;
-  const canEdit = (row: SessionRow) => !!row.sessionId && !row.isPendingBooking;
+  const canEdit = (row: SessionRow) => !!row.isPendingBooking || !!row.sessionId;
   const showBanco = editData ? METODOS_CON_BANCO.includes(editData.metodo_pago) : false;
+
+  // Inline edit form — shared between desktop sub-row and mobile card
+  function renderEditFields(row: SessionRow) {
+    if (!editData) return null;
+    return (
+      <>
+        {/* Cliente */}
+        <label className="flex flex-col gap-0.5 text-xs flex-1 min-w-40">
+          <span className="text-gray-500">Cliente</span>
+          <ClientCombobox
+            value={editData.client_name}
+            clientId={editData.client_id}
+            onChange={(id, name) => setEditData((prev) => prev ? { ...prev, client_id: id, client_name: name } : prev)}
+            className="rounded border border-gray-300 px-2 py-1 w-full"
+          />
+        </label>
+        {/* Fecha + hora (only for pending bookings) */}
+        {row.isPendingBooking && (
+          <>
+            <label className="flex flex-col gap-0.5 text-xs">
+              <span className="text-gray-500">Fecha</span>
+              <input
+                type="date"
+                value={editData.fecha}
+                onChange={(e) => updateField("fecha", e.target.value)}
+                className="rounded border border-gray-300 px-2 py-1 w-32"
+              />
+            </label>
+            <label className="flex flex-col gap-0.5 text-xs">
+              <span className="text-gray-500">Hora</span>
+              <input
+                type="time"
+                value={editData.hora}
+                onChange={(e) => updateField("hora", e.target.value)}
+                className="rounded border border-gray-300 px-2 py-1 w-24"
+              />
+            </label>
+          </>
+        )}
+        {/* Monto lista */}
+        <label className="flex flex-col gap-0.5 text-xs">
+          <span className="text-gray-500">Monto lista</span>
+          <input
+            type="number"
+            value={editData.monto_lista}
+            onChange={(e) => updateField("monto_lista", e.target.value)}
+            placeholder="—"
+            className="w-24 rounded border border-gray-300 px-2 py-1"
+            min="0" step="0.01"
+          />
+        </label>
+        {/* Desc % */}
+        <label className="flex flex-col gap-0.5 text-xs">
+          <span className="text-gray-500">Desc. %</span>
+          <input
+            type="number"
+            value={editData.descuento_pct}
+            onChange={(e) => updateField("descuento_pct", e.target.value)}
+            placeholder="—"
+            className="w-16 rounded border border-gray-300 px-2 py-1"
+            min="0" max="100" step="1"
+          />
+        </label>
+        {/* Banco (conditional) */}
+        {showBanco && (
+          <label className="flex flex-col gap-0.5 text-xs">
+            <span className="text-gray-500">Banco</span>
+            <input
+              type="text"
+              value={editData.banco}
+              onChange={(e) => updateField("banco", e.target.value)}
+              placeholder="Banco"
+              className="w-28 rounded border border-gray-300 px-2 py-1"
+            />
+          </label>
+        )}
+        {/* Sesión N° / De */}
+        <label className="flex flex-col gap-0.5 text-xs">
+          <span className="text-gray-500">Sesión N°</span>
+          <input
+            type="number"
+            value={editData.sesion_n}
+            onChange={(e) => updateField("sesion_n", e.target.value)}
+            placeholder="—"
+            className="w-14 rounded border border-gray-300 px-2 py-1"
+            min="1"
+          />
+        </label>
+        <label className="flex flex-col gap-0.5 text-xs">
+          <span className="text-gray-500">De</span>
+          <input
+            type="number"
+            value={editData.sesion_total_cuponera}
+            onChange={(e) => updateField("sesion_total_cuponera", e.target.value)}
+            placeholder="—"
+            className="w-14 rounded border border-gray-300 px-2 py-1"
+            min="1"
+          />
+        </label>
+        {/* Notas */}
+        <label className="flex flex-col gap-0.5 text-xs flex-1 min-w-40">
+          <span className="text-gray-500">Notas</span>
+          <input
+            type="text"
+            value={editData.notas}
+            onChange={(e) => updateField("notas", e.target.value)}
+            placeholder="Notas"
+            className="rounded border border-gray-300 px-2 py-1 w-full"
+          />
+        </label>
+      </>
+    );
+  }
 
   return (
     <>
@@ -171,27 +463,79 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
                 <Fragment key={row.id}>
                   {/* Main edit row */}
                   <tr className="bg-blue-50">
-                    <td className="py-2 pr-4 text-gray-500 whitespace-nowrap">{row.time ?? "—"}</td>
-                    <td className="py-2 pr-4 font-medium text-gray-900">{row.clientName}</td>
-                    <td className="py-2 pr-3">
+                    {/* Hora */}
+                    <td className="py-2 pr-4 text-gray-500 whitespace-nowrap align-top pt-3">
+                      {row.isPendingBooking && editData ? (
+                        <input
+                          type="time"
+                          value={editData.hora}
+                          onChange={(e) => updateField("hora", e.target.value)}
+                          className="w-20 rounded border border-gray-300 px-1 py-0.5 text-xs"
+                        />
+                      ) : (
+                        row.time ?? "—"
+                      )}
+                    </td>
+                    {/* Cliente */}
+                    <td className="py-2 pr-4 align-top pt-3">
+                      <ClientCombobox
+                        value={editData!.client_name}
+                        clientId={editData!.client_id}
+                        onChange={(id, name) => setEditData((prev) => prev ? { ...prev, client_id: id, client_name: name } : prev)}
+                        className="w-36 rounded border border-gray-300 px-2 py-1 text-xs"
+                      />
+                    </td>
+                    {/* Servicio */}
+                    <td className="py-2 pr-3 align-top pt-3">
                       <select
                         value={editData!.tipo_servicio}
-                        onChange={(e) => updateField("tipo_servicio", e.target.value)}
+                        onChange={(e) => {
+                          updateField("tipo_servicio", e.target.value);
+                        }}
                         className="w-full rounded border border-gray-300 px-2 py-1 text-xs mb-1"
                       >
                         {serviceCategories.map((c) => (
                           <option key={c} value={c}>{c}</option>
                         ))}
                       </select>
-                      <input
-                        type="text"
+                      <select
                         value={editData!.descripcion}
-                        onChange={(e) => updateField("descripcion", e.target.value)}
-                        placeholder="Descripción"
+                        onChange={(e) => {
+                          const svc = services.find((s) => s.name === e.target.value);
+                          updateField("descripcion", e.target.value);
+                          if (svc && editData!.monto_lista === "") {
+                            updateField("monto_lista", String(svc.price));
+                          }
+                        }}
                         className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
-                      />
+                      >
+                        <option value="">— Servicio específico —</option>
+                        {services
+                          .filter((s) => !editData!.tipo_servicio || s.category === editData!.tipo_servicio)
+                          .map((s) => (
+                            <option key={s.id} value={s.name}>{s.name}</option>
+                          ))}
+                      </select>
                     </td>
-                    <td className="py-2 pr-3">
+                    {/* Operadora */}
+                    <td className="py-2 pr-3 align-top pt-3">
+                      <select
+                        value={editData!.professional_id}
+                        onChange={(e) => {
+                          const prof = professionals.find((p) => p.id === e.target.value);
+                          setEditData((prev) => prev ? {
+                            ...prev,
+                            professional_id: e.target.value,
+                            operadora: prof?.name ?? prev.operadora,
+                          } : prev);
+                        }}
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-xs mb-1"
+                      >
+                        <option value="">— Profesional —</option>
+                        {professionals.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
                       <input
                         type="text"
                         value={editData!.operadora}
@@ -200,18 +544,19 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
                         className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
                       />
                     </td>
-                    <td className="py-2 pr-3">
+                    {/* Cobrado */}
+                    <td className="py-2 pr-3 align-top pt-3">
                       <input
                         type="number"
                         value={editData!.monto_cobrado}
                         onChange={(e) => updateField("monto_cobrado", e.target.value)}
                         placeholder="Cobrado"
-                        className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
-                        min="0"
-                        step="0.01"
+                        className="w-24 rounded border border-gray-300 px-2 py-1 text-xs"
+                        min="0" step="0.01"
                       />
                     </td>
-                    <td className="py-2 pr-3">
+                    {/* Método */}
+                    <td className="py-2 pr-3 align-top pt-3">
                       <select
                         value={editData!.metodo_pago}
                         onChange={(e) => updateField("metodo_pago", e.target.value)}
@@ -222,22 +567,24 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
                         ))}
                       </select>
                     </td>
-                    <td className="py-2 pr-4">
+                    {/* Origen */}
+                    <td className="py-2 pr-4 align-top pt-3">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                         row.source === "system" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"
                       }`}>
                         {row.source === "system" ? "Sistema" : "Backoffice"}
                       </span>
                     </td>
-                    <td className="py-2">
+                    {/* Acciones */}
+                    <td className="py-2 align-top pt-3">
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => saveEdit(row)}
                           disabled={saving}
-                          title="Guardar"
+                          title={row.isPendingBooking ? "Confirmar sesión" : "Guardar"}
                           className="rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
                         >
-                          ✓
+                          {row.isPendingBooking ? "Confirmar" : "✓"}
                         </button>
                         <button
                           onClick={cancelEdit}
@@ -253,72 +600,7 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
                   <tr className="bg-blue-50 border-t-0">
                     <td colSpan={8} className="pb-3 pt-0 px-0">
                       <div className="flex flex-wrap gap-3 px-2 text-xs items-end">
-                        <label className="flex flex-col gap-0.5">
-                          <span className="text-gray-500">Monto lista</span>
-                          <input
-                            type="number"
-                            value={editData!.monto_lista}
-                            onChange={(e) => updateField("monto_lista", e.target.value)}
-                            placeholder="—"
-                            className="w-24 rounded border border-gray-300 px-2 py-1"
-                            min="0" step="0.01"
-                          />
-                        </label>
-                        <label className="flex flex-col gap-0.5">
-                          <span className="text-gray-500">Desc. %</span>
-                          <input
-                            type="number"
-                            value={editData!.descuento_pct}
-                            onChange={(e) => updateField("descuento_pct", e.target.value)}
-                            placeholder="—"
-                            className="w-16 rounded border border-gray-300 px-2 py-1"
-                            min="0" max="100" step="1"
-                          />
-                        </label>
-                        {showBanco && (
-                          <label className="flex flex-col gap-0.5">
-                            <span className="text-gray-500">Banco</span>
-                            <input
-                              type="text"
-                              value={editData!.banco}
-                              onChange={(e) => updateField("banco", e.target.value)}
-                              placeholder="Banco"
-                              className="w-28 rounded border border-gray-300 px-2 py-1"
-                            />
-                          </label>
-                        )}
-                        <label className="flex flex-col gap-0.5">
-                          <span className="text-gray-500">Sesión N°</span>
-                          <input
-                            type="number"
-                            value={editData!.sesion_n}
-                            onChange={(e) => updateField("sesion_n", e.target.value)}
-                            placeholder="—"
-                            className="w-14 rounded border border-gray-300 px-2 py-1"
-                            min="1"
-                          />
-                        </label>
-                        <label className="flex flex-col gap-0.5">
-                          <span className="text-gray-500">De</span>
-                          <input
-                            type="number"
-                            value={editData!.sesion_total_cuponera}
-                            onChange={(e) => updateField("sesion_total_cuponera", e.target.value)}
-                            placeholder="—"
-                            className="w-14 rounded border border-gray-300 px-2 py-1"
-                            min="1"
-                          />
-                        </label>
-                        <label className="flex flex-col gap-0.5 flex-1 min-w-40">
-                          <span className="text-gray-500">Notas</span>
-                          <input
-                            type="text"
-                            value={editData!.notas}
-                            onChange={(e) => updateField("notas", e.target.value)}
-                            placeholder="Notas"
-                            className="rounded border border-gray-300 px-2 py-1 w-full"
-                          />
-                        </label>
+                        {renderEditFields(row)}
                       </div>
                     </td>
                   </tr>
@@ -349,20 +631,17 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
                     )}
                   </td>
                   <td className="py-2">
-                    {row.isPendingBooking && row.bookingData ? (
-                      <button
-                        onClick={() => setConfirmBooking(row.bookingData!)}
-                        className="rounded-lg bg-amber-600 px-3 py-1 text-xs font-medium text-white hover:bg-amber-700 transition-colors"
-                      >
-                        Confirmar
-                      </button>
-                    ) : canEdit(row) ? (
+                    {canEdit(row) ? (
                       <button
                         onClick={() => startEdit(row)}
-                        title="Editar sesión"
-                        className="rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+                        title={row.isPendingBooking ? "Editar y confirmar" : "Editar sesión"}
+                        className={`rounded-lg border px-2 py-1 text-xs font-medium transition-colors ${
+                          row.isPendingBooking
+                            ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                            : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                        }`}
                       >
-                        ✏️
+                        {row.isPendingBooking ? "Editar / Confirmar" : "✏️"}
                       </button>
                     ) : (
                       <span className="text-xs text-green-600 font-medium">✓ Realizada</span>
@@ -383,7 +662,7 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
             <div
               key={row.id}
               className={`rounded-lg border p-3 space-y-2 ${
-                row.isPendingBooking
+                row.isPendingBooking && !editing
                   ? "border-amber-200 bg-amber-50"
                   : editing
                   ? "border-blue-300 bg-blue-50"
@@ -392,9 +671,13 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="font-medium text-sm text-gray-900">{row.clientName}</div>
-                  <div className="text-xs text-gray-500">{row.time ?? ""}{row.time ? " · " : ""}{row.tipoServicio}</div>
-                  {row.descripcion && !editing && <div className="text-xs text-gray-400">{row.descripcion}</div>}
+                  <div className="font-medium text-sm text-gray-900">{editing ? editData!.client_name : row.clientName}</div>
+                  <div className="text-xs text-gray-500">
+                    {row.time ?? ""}{row.time ? " · " : ""}{row.tipoServicio}
+                  </div>
+                  {row.descripcion && !editing && (
+                    <div className="text-xs text-gray-400">{row.descripcion}</div>
+                  )}
                 </div>
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                   row.source === "system" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"
@@ -405,131 +688,198 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
 
               {editing ? (
                 <div className="space-y-2 pt-1">
-                  <div className="grid grid-cols-1 gap-2">
-                    <label className="flex flex-col gap-0.5 text-xs">
-                      <span className="text-gray-500">Tipo servicio</span>
-                      <select
-                        value={editData!.tipo_servicio}
-                        onChange={(e) => updateField("tipo_servicio", e.target.value)}
-                        className="rounded border border-gray-300 px-2 py-1.5 text-sm"
-                      >
-                        {serviceCategories.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="flex flex-col gap-0.5 text-xs">
-                      <span className="text-gray-500">Descripción</span>
-                      <input
-                        type="text"
-                        value={editData!.descripcion}
-                        onChange={(e) => updateField("descripcion", e.target.value)}
-                        className="rounded border border-gray-300 px-2 py-1.5 text-sm"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-0.5 text-xs">
-                      <span className="text-gray-500">Operadora</span>
-                      <input
-                        type="text"
-                        value={editData!.operadora}
-                        onChange={(e) => updateField("operadora", e.target.value)}
-                        className="rounded border border-gray-300 px-2 py-1.5 text-sm"
-                      />
-                    </label>
+                  {/* Cliente */}
+                  <label className="flex flex-col gap-0.5 text-xs">
+                    <span className="text-gray-500">Cliente</span>
+                    <ClientCombobox
+                      value={editData!.client_name}
+                      clientId={editData!.client_id}
+                      onChange={(id, name) => setEditData((prev) => prev ? { ...prev, client_id: id, client_name: name } : prev)}
+                      className="rounded border border-gray-300 px-2 py-1.5 text-sm w-full"
+                    />
+                  </label>
+                  {/* Fecha + hora (pending only) */}
+                  {row.isPendingBooking && (
                     <div className="grid grid-cols-2 gap-2">
                       <label className="flex flex-col gap-0.5 text-xs">
-                        <span className="text-gray-500">Monto lista</span>
+                        <span className="text-gray-500">Fecha</span>
                         <input
-                          type="number"
-                          value={editData!.monto_lista}
-                          onChange={(e) => updateField("monto_lista", e.target.value)}
+                          type="date"
+                          value={editData!.fecha}
+                          onChange={(e) => updateField("fecha", e.target.value)}
                           className="rounded border border-gray-300 px-2 py-1.5 text-sm"
-                          min="0" step="0.01"
                         />
                       </label>
                       <label className="flex flex-col gap-0.5 text-xs">
-                        <span className="text-gray-500">Desc. %</span>
+                        <span className="text-gray-500">Hora</span>
                         <input
-                          type="number"
-                          value={editData!.descuento_pct}
-                          onChange={(e) => updateField("descuento_pct", e.target.value)}
+                          type="time"
+                          value={editData!.hora}
+                          onChange={(e) => updateField("hora", e.target.value)}
                           className="rounded border border-gray-300 px-2 py-1.5 text-sm"
-                          min="0" max="100"
                         />
                       </label>
                     </div>
+                  )}
+                  {/* Servicio */}
+                  <label className="flex flex-col gap-0.5 text-xs">
+                    <span className="text-gray-500">Categoría</span>
+                    <select
+                      value={editData!.tipo_servicio}
+                      onChange={(e) => updateField("tipo_servicio", e.target.value)}
+                      className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                    >
+                      {serviceCategories.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-0.5 text-xs">
+                    <span className="text-gray-500">Servicio</span>
+                    <select
+                      value={editData!.descripcion}
+                      onChange={(e) => {
+                        const svc = services.find((s) => s.name === e.target.value);
+                        updateField("descripcion", e.target.value);
+                        if (svc && editData!.monto_lista === "") {
+                          updateField("monto_lista", String(svc.price));
+                        }
+                      }}
+                      className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                    >
+                      <option value="">— Seleccionar —</option>
+                      {services
+                        .filter((s) => !editData!.tipo_servicio || s.category === editData!.tipo_servicio)
+                        .map((s) => (
+                          <option key={s.id} value={s.name}>{s.name}</option>
+                        ))}
+                    </select>
+                  </label>
+                  {/* Profesional */}
+                  <label className="flex flex-col gap-0.5 text-xs">
+                    <span className="text-gray-500">Profesional</span>
+                    <select
+                      value={editData!.professional_id}
+                      onChange={(e) => {
+                        const prof = professionals.find((p) => p.id === e.target.value);
+                        setEditData((prev) => prev ? {
+                          ...prev,
+                          professional_id: e.target.value,
+                          operadora: prof?.name ?? prev.operadora,
+                        } : prev);
+                      }}
+                      className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                    >
+                      <option value="">— Profesional —</option>
+                      {professionals.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-0.5 text-xs">
+                    <span className="text-gray-500">Operadora</span>
+                    <input
+                      type="text"
+                      value={editData!.operadora}
+                      onChange={(e) => updateField("operadora", e.target.value)}
+                      className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                  {/* Montos */}
+                  <div className="grid grid-cols-2 gap-2">
                     <label className="flex flex-col gap-0.5 text-xs">
-                      <span className="text-gray-500">Cobrado</span>
+                      <span className="text-gray-500">Monto lista</span>
                       <input
                         type="number"
-                        value={editData!.monto_cobrado}
-                        onChange={(e) => updateField("monto_cobrado", e.target.value)}
+                        value={editData!.monto_lista}
+                        onChange={(e) => updateField("monto_lista", e.target.value)}
                         className="rounded border border-gray-300 px-2 py-1.5 text-sm"
                         min="0" step="0.01"
                       />
                     </label>
                     <label className="flex flex-col gap-0.5 text-xs">
-                      <span className="text-gray-500">Método de pago</span>
-                      <select
-                        value={editData!.metodo_pago}
-                        onChange={(e) => updateField("metodo_pago", e.target.value)}
-                        className="rounded border border-gray-300 px-2 py-1.5 text-sm"
-                      >
-                        {METODOS_PAGO.map((m) => (
-                          <option key={m.value} value={m.value}>{m.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                    {showBanco && (
-                      <label className="flex flex-col gap-0.5 text-xs">
-                        <span className="text-gray-500">Banco</span>
-                        <input
-                          type="text"
-                          value={editData!.banco}
-                          onChange={(e) => updateField("banco", e.target.value)}
-                          className="rounded border border-gray-300 px-2 py-1.5 text-sm"
-                        />
-                      </label>
-                    )}
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="flex flex-col gap-0.5 text-xs">
-                        <span className="text-gray-500">Sesión N°</span>
-                        <input
-                          type="number"
-                          value={editData!.sesion_n}
-                          onChange={(e) => updateField("sesion_n", e.target.value)}
-                          className="rounded border border-gray-300 px-2 py-1.5 text-sm"
-                          min="1"
-                        />
-                      </label>
-                      <label className="flex flex-col gap-0.5 text-xs">
-                        <span className="text-gray-500">De</span>
-                        <input
-                          type="number"
-                          value={editData!.sesion_total_cuponera}
-                          onChange={(e) => updateField("sesion_total_cuponera", e.target.value)}
-                          className="rounded border border-gray-300 px-2 py-1.5 text-sm"
-                          min="1"
-                        />
-                      </label>
-                    </div>
-                    <label className="flex flex-col gap-0.5 text-xs">
-                      <span className="text-gray-500">Notas</span>
+                      <span className="text-gray-500">Desc. %</span>
                       <input
-                        type="text"
-                        value={editData!.notas}
-                        onChange={(e) => updateField("notas", e.target.value)}
+                        type="number"
+                        value={editData!.descuento_pct}
+                        onChange={(e) => updateField("descuento_pct", e.target.value)}
                         className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                        min="0" max="100"
                       />
                     </label>
                   </div>
+                  <label className="flex flex-col gap-0.5 text-xs">
+                    <span className="text-gray-500">Cobrado</span>
+                    <input
+                      type="number"
+                      value={editData!.monto_cobrado}
+                      onChange={(e) => updateField("monto_cobrado", e.target.value)}
+                      className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                      min="0" step="0.01"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-0.5 text-xs">
+                    <span className="text-gray-500">Método de pago</span>
+                    <select
+                      value={editData!.metodo_pago}
+                      onChange={(e) => updateField("metodo_pago", e.target.value)}
+                      className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                    >
+                      {METODOS_PAGO.map((m) => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {showBanco && (
+                    <label className="flex flex-col gap-0.5 text-xs">
+                      <span className="text-gray-500">Banco</span>
+                      <input
+                        type="text"
+                        value={editData!.banco}
+                        onChange={(e) => updateField("banco", e.target.value)}
+                        className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                      />
+                    </label>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex flex-col gap-0.5 text-xs">
+                      <span className="text-gray-500">Sesión N°</span>
+                      <input
+                        type="number"
+                        value={editData!.sesion_n}
+                        onChange={(e) => updateField("sesion_n", e.target.value)}
+                        className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                        min="1"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-0.5 text-xs">
+                      <span className="text-gray-500">De</span>
+                      <input
+                        type="number"
+                        value={editData!.sesion_total_cuponera}
+                        onChange={(e) => updateField("sesion_total_cuponera", e.target.value)}
+                        className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                        min="1"
+                      />
+                    </label>
+                  </div>
+                  <label className="flex flex-col gap-0.5 text-xs">
+                    <span className="text-gray-500">Notas</span>
+                    <input
+                      type="text"
+                      value={editData!.notas}
+                      onChange={(e) => updateField("notas", e.target.value)}
+                      className="rounded border border-gray-300 px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                  {/* Actions */}
                   <div className="flex gap-2 pt-1">
                     <button
                       onClick={() => saveEdit(row)}
                       disabled={saving}
                       className="flex-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
                     >
-                      Guardar
+                      {row.isPendingBooking ? "Confirmar sesión" : "Guardar"}
                     </button>
                     <button
                       onClick={cancelEdit}
@@ -546,19 +896,16 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
                     {row.metodoPago && <span>{row.metodoPago.replace(/_/g, " ")}</span>}
                     {row.operadora && <span>{row.operadora}</span>}
                   </div>
-                  {row.isPendingBooking && row.bookingData ? (
-                    <button
-                      onClick={() => setConfirmBooking(row.bookingData!)}
-                      className="w-full rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 transition-colors"
-                    >
-                      Confirmar sesión
-                    </button>
-                  ) : canEdit(row) ? (
+                  {canEdit(row) ? (
                     <button
                       onClick={() => startEdit(row)}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                      className={`w-full rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        row.isPendingBooking
+                          ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                      }`}
                     >
-                      ✏️ Editar
+                      {row.isPendingBooking ? "✏️ Editar / Confirmar" : "✏️ Editar"}
                     </button>
                   ) : null}
                 </>
@@ -567,11 +914,6 @@ export default function DaySessionsTable({ sessions, serviceCategories }: DaySes
           );
         })}
       </div>
-
-      <ConfirmBookingModal
-        booking={confirmBooking}
-        onClose={() => setConfirmBooking(null)}
-      />
     </>
   );
 }
