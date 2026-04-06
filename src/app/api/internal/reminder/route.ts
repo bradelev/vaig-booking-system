@@ -9,6 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
 import { sendTextMessage } from "@/lib/whatsapp";
 import { upsertSession } from "@/lib/bot/session";
+import { shouldSendMessage } from "@/lib/messaging-toggle";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const authHeader = request.headers.get("authorization");
@@ -54,6 +55,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const phone = booking.clients?.phone;
     if (!phone) continue;
 
+    const { send, phone: targetPhone } = await shouldSendMessage("messaging_reminder", phone);
+    if (!send) continue;
+
     const firstName = booking.clients?.first_name ?? "Cliente";
     const serviceName = booking.services?.name ?? "tu servicio";
 
@@ -75,7 +79,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .replace(/\{dateLabel\}/g, dateLabel);
 
     try {
-      await sendTextMessage({ to: phone, body: msg });
+      await sendTextMessage({ to: targetPhone, body: msg });
       await client
         .from("bookings")
         .update({ confirmation_sent_at: new Date().toISOString() })
@@ -105,6 +109,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   for (const prof of professionals ?? []) {
     if (!prof.phone) continue;
+
+    const { send: sendProf, phone: profTargetPhone } = await shouldSendMessage("messaging_reminder", prof.phone);
+    if (!sendProf) continue;
 
     const { data: profBookings } = await client
       .from("bookings")
@@ -141,7 +148,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       lines.join("\n");
 
     try {
-      await sendTextMessage({ to: prof.phone, body: profMsg });
+      await sendTextMessage({ to: profTargetPhone, body: profMsg });
       profSent++;
     } catch (err) {
       console.error(`[Reminder] Professional ${prof.name} failed:`, err);
