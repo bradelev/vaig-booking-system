@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { clearConfigCache } from "@/lib/config";
 import { TEMPLATE_KEYS } from "@/lib/templates";
 
@@ -9,8 +9,7 @@ import { TEMPLATE_KEYS } from "@/lib/templates";
 type AnyClient = any;
 
 export async function saveTemplates(formData: FormData) {
-  const supabase = await createClient();
-  const client = supabase as AnyClient;
+  const client = createAdminClient() as AnyClient;
 
   for (const key of TEMPLATE_KEYS) {
     const value = (formData.get(key) as string) ?? "";
