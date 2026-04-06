@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import SessionForm, { type Professional } from "@/components/backoffice/sesiones/session-form";
-import DaySessionsTable from "@/components/backoffice/sesiones/day-sessions-table";
+import DaySessionsTable, { type PendingBookingData } from "@/components/backoffice/sesiones/day-sessions-table";
 import Modal from "@/components/backoffice/modal";
-import { type BookingToConfirm } from "@/components/backoffice/sesiones/confirm-booking-modal";
 
 interface BookingItem {
   id: string;
@@ -39,9 +38,17 @@ interface SesionItem {
   clientSource?: string;
 }
 
+interface ServiceOption {
+  id: string;
+  name: string;
+  category: string | null;
+  price: number;
+}
+
 interface SessionsPageClientProps {
   professionals: Professional[];
   serviceCategories: string[];
+  services: ServiceOption[];
   weekDates: string[]; // 7 items, Mon..Sun, YYYY-MM-DD
   bookingsByDate: Record<string, BookingItem[]>;
   sesionesByDate: Record<string, SesionItem[]>;
@@ -80,6 +87,7 @@ function formatDDMM(dateStr: string): string {
 export default function SessionsPageClient({
   professionals,
   serviceCategories,
+  services,
   weekDates,
   bookingsByDate,
   sesionesByDate,
@@ -140,11 +148,13 @@ export default function SessionsPageClient({
         bookingData: {
           id: b.id,
           clientName: b.clientName,
+          clientId: undefined as string | undefined,
           serviceName: b.serviceName,
+          serviceCategory: b.serviceCategory,
           scheduledAt: b.scheduledAt,
           professionalName: b.professionalName,
           professionalId: b.professionalId,
-        } as BookingToConfirm,
+        } as PendingBookingData,
       })),
 
     // Realized bookings (already confirmed)
@@ -312,7 +322,12 @@ export default function SessionsPageClient({
             No hay sesiones para este día
           </p>
         ) : (
-          <DaySessionsTable sessions={tableRows} serviceCategories={serviceCategories} />
+          <DaySessionsTable
+            sessions={tableRows}
+            serviceCategories={serviceCategories}
+            services={services}
+            professionals={professionals}
+          />
         )}
       </div>
 
