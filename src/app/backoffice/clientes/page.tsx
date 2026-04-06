@@ -132,10 +132,25 @@ export default async function ClientesPage({
 
   const baseParams = { busqueda: busqueda || undefined, segmento: segmento || undefined, orden: orden !== "nombre_asc" ? orden : undefined };
 
+  // Build a sort href for a column: toggles asc↔desc if already active
+  function sortHref(ascValue: string, descValue: string): string {
+    const next = orden === ascValue ? descValue : ascValue;
+    const qs = buildSearchParams({ orden: next, pagina: undefined }, baseParams);
+    return `/backoffice/clientes${qs ? `?${qs}` : ""}`;
+  }
+
+  function sortActive(ascValue: string, descValue: string): "asc" | "desc" | null {
+    if (orden === ascValue) return "asc";
+    if (orden === descValue) return "desc";
+    return null;
+  }
+
   const columns: TableColumn<Cliente>[] = [
     {
       header: "Nombre",
       primaryOnMobile: true,
+      sortHref: sortHref("nombre_asc", "nombre_desc"),
+      sortActive: sortActive("nombre_asc", "nombre_desc"),
       accessor: (c) => (
         <Link href={`/backoffice/clientes/${c.id}`} className="text-sm font-medium text-gray-900 hover:underline">
           {c.first_name} {c.last_name}
@@ -173,6 +188,8 @@ export default async function ClientesPage({
     },
     {
       header: "Sesiones",
+      sortHref: sortHref("sesiones_asc", "sesiones_desc"),
+      sortActive: sortActive("sesiones_asc", "sesiones_desc"),
       accessor: (c) => (
         <span className="whitespace-nowrap">{c.total_sesiones}</span>
       ),
@@ -180,6 +197,8 @@ export default async function ClientesPage({
     {
       header: "Última visita",
       hideOnMobile: true,
+      sortHref: sortHref("visita_asc", "visita_desc"),
+      sortActive: sortActive("visita_asc", "visita_desc"),
       accessor: (c) => (
         <span className="whitespace-nowrap">
           {c.dias_inactivo != null ? `hace ${c.dias_inactivo} días` : "—"}
@@ -188,6 +207,8 @@ export default async function ClientesPage({
     },
     {
       header: "Segmento",
+      sortHref: sortHref("segmento_desc", "segmento_asc"),
+      sortActive: sortActive("segmento_desc", "segmento_asc"),
       accessor: (c) => {
         const badge = c.segmento ? SEGMENTO_BADGE[c.segmento] : null;
         return badge ? (
