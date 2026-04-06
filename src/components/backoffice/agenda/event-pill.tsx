@@ -19,9 +19,9 @@ const STATUS_DOT: Record<string, string> = {
 
 // Minimum height in px to show extra lines
 const MIN_H_TIME = 20;   // show start time
-const MIN_H_RANGE = 48;  // show full range
-const MIN_H_PROF = 38;   // show professional
-const MIN_H_SVC  = 60;   // show service
+const MIN_H_RANGE = 36;  // show full range (was 48)
+const MIN_H_PROF = 28;   // show professional (was 38)
+const MIN_H_SVC  = 40;   // show service (was 60)
 
 // GCal-style partial overlap constants
 const OVERLAP_OFFSET_PCT = 15; // each column shifts 15% to the right
@@ -78,11 +78,32 @@ export default function EventPill({
   const dotColor = STATUS_DOT[event.status] ?? "bg-gray-400";
   const isDraggable = event.source === "booking";
 
+  // Native tooltip with full detail for hover
+  const tooltipParts = [
+    event.clientName,
+    event.serviceName,
+    event.durationMinutes
+      ? `${formatTimeRange(event.scheduled_at, event.end_at)} · ${event.durationMinutes} min`
+      : formatTimeRange(event.scheduled_at, event.end_at),
+    event.professionalName,
+    event.clientPhone ? `Tel: ${event.clientPhone}` : undefined,
+    event.notes,
+  ].filter(Boolean);
+  const tooltipText = tooltipParts.join("\n");
+
+  // Time label: include duration if available
+  const timeLabel = h >= MIN_H_RANGE
+    ? event.durationMinutes
+      ? `${formatTimeRange(event.scheduled_at, event.end_at)} · ${event.durationMinutes} min`
+      : formatTimeRange(event.scheduled_at, event.end_at)
+    : formatStartTime(event.scheduled_at);
+
   return (
     <button
       type="button"
       style={style}
       className={containerClass}
+      title={tooltipText}
       draggable={isDraggable}
       onDragStart={isDraggable && onDragStart ? (e) => {
         e.dataTransfer.setData("text/plain", event.id);
@@ -100,27 +121,25 @@ export default function EventPill({
           {event.source === "booking" && (
             <span className={`shrink-0 h-1.5 w-1.5 rounded-full ${dotColor}`} />
           )}
-          <span className="truncate text-[11px] font-semibold leading-tight">
+          <span className="break-words text-[11px] font-semibold leading-tight">
             {event.clientName}
           </span>
         </div>
         {/* Time */}
         {h >= MIN_H_TIME && (
           <div className={`text-[10px] leading-tight ${textMutedClass}`}>
-            {h >= MIN_H_RANGE
-              ? formatTimeRange(event.scheduled_at, event.end_at)
-              : formatStartTime(event.scheduled_at)}
+            {timeLabel}
           </div>
         )}
         {/* Professional */}
         {h >= MIN_H_PROF && event.professionalName && (
-          <div className={`truncate text-[10px] leading-tight ${textMutedClass}`}>
+          <div className={`break-words text-[10px] leading-tight ${textMutedClass}`}>
             {event.professionalName}
           </div>
         )}
         {/* Service */}
         {h >= MIN_H_SVC && event.serviceName && (
-          <div className={`truncate text-[10px] leading-tight ${textMutedClass}`}>
+          <div className={`break-words text-[10px] leading-tight ${textMutedClass}`}>
             {event.serviceName}
           </div>
         )}
