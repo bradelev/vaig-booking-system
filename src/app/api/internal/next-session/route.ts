@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue, getConfig } from "@/lib/config";
 import { sendTextMessage } from "@/lib/whatsapp";
+import { shouldSendMessage } from "@/lib/messaging-toggle";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const authHeader = request.headers.get("authorization");
@@ -117,8 +118,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .replace(/\{intervalDays\}/g, String(intervalDays))
       .replace(/\{businessName\}/g, businessName);
 
+    const { send, phone: targetPhone } = await shouldSendMessage("messaging_next_session", phone);
+    if (!send) { skipped++; continue; }
+
     try {
-      await sendTextMessage({ to: phone, body: msg });
+      await sendTextMessage({ to: targetPhone, body: msg });
       sent++;
     } catch (err) {
       console.error(`[NextSession] Failed for client ${clientId}:`, err);

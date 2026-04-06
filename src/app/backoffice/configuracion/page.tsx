@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { saveSystemConfig } from "@/actions/schedule";
 
 export const metadata: Metadata = { title: "Configuración" };
 
 export default async function ConfiguracionPage() {
-  const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
+  const client = createAdminClient() as any;
 
   const { data } = await client.from("system_config").select("key, value");
   const cfg: Record<string, string> = {};
@@ -107,6 +106,35 @@ export default async function ConfiguracionPage() {
             />
           </div>
         </div>
+
+        <h2 className="text-base font-semibold text-gray-800 border-b pb-2 pt-2">Mensajería automática</h2>
+        <p className="text-xs text-gray-500 -mt-2">
+          Controlá qué mensajes se envían. <strong>admin_only</strong> envía al teléfono admin para probar sin afectar clientes reales.
+        </p>
+
+        {([
+          ["messaging_reminder",            "Recordatorio de turno (24h)"],
+          ["messaging_survey",              "Encuesta post-atención"],
+          ["messaging_payment_reminder",    "Recordatorio de pago pendiente"],
+          ["messaging_next_session",        "Sugerencia próxima sesión"],
+          ["messaging_cancel_notification", "Aviso cancelación al cliente"],
+          ["messaging_pack_notification",   "Confirmación compra de pack"],
+          ["messaging_waitlist",            "Aviso lista de espera"],
+        ] as [string, string][]).map(([key, label]) => (
+          <div key={key} className="flex items-center justify-between">
+            <label htmlFor={key} className="text-sm font-medium text-gray-700">{label}</label>
+            <select
+              id={key}
+              name={key}
+              defaultValue={cfg[key] ?? "off"}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-900 focus:outline-none"
+            >
+              <option value="off">Desactivado</option>
+              <option value="admin_only">Solo admin (testing)</option>
+              <option value="all">Todos los clientes</option>
+            </select>
+          </div>
+        ))}
 
         <div className="flex justify-end pt-2">
           <button
