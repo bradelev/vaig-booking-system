@@ -61,6 +61,13 @@ export default async function SesionesNuevaPage({ searchParams }: PageProps) {
     .eq("is_active", true)
     .order("name");
 
+  // Load active services for inline edit combobox
+  const { data: servicesRaw } = await client
+    .from("services")
+    .select("id, name, category, price")
+    .eq("is_active", true)
+    .order("name");
+
   const FALLBACK_CATEGORIES = [
     "Masajes",
     "Facial",
@@ -241,10 +248,14 @@ export default async function SesionesNuevaPage({ searchParams }: PageProps) {
     });
   }
 
+  type RawService = { id: string; name: string; category: string | null; price: number };
+  const services = (servicesRaw ?? []) as RawService[];
+
   return (
     <SessionsPageClient
       professionals={professionals ?? []}
       serviceCategories={categories}
+      services={services}
       weekDates={weekDates}
       bookingsByDate={bookingsByDate}
       sesionesByDate={sesionesByDate}

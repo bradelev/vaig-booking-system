@@ -71,8 +71,14 @@ export async function createSession(data: {
 export async function confirmBookingAsSession(
   bookingId: string,
   overrides: {
+    client_id?: string;
+    fecha?: string;
+    hora?: string; // HH:MM
     operadora?: string;
     professional_id?: string;
+    tipo_servicio?: string;
+    descripcion?: string;
+    monto_lista?: number;
     monto_cobrado?: number;
     descuento_pct?: number;
     metodo_pago?: string;
@@ -101,8 +107,10 @@ export async function confirmBookingAsSession(
     return { success: false, error: fetchError?.message ?? "Booking no encontrado" };
   }
 
-  const fecha = new Date(booking.scheduled_at).toISOString().split("T")[0];
-  const tipoServicio = booking.services?.category ?? booking.services?.name ?? "Servicio";
+  const fecha = overrides.fecha ?? new Date(booking.scheduled_at).toLocaleDateString("sv-SE", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  });
+  const tipoServicio = overrides.tipo_servicio ?? booking.services?.category ?? booking.services?.name ?? "Servicio";
 
   // Auto-populate sesion_n/sesion_total from client_packages if package present and overrides not provided
   let sesionN = overrides.sesion_n ?? null;
@@ -119,16 +127,28 @@ export async function confirmBookingAsSession(
     }
   }
 
+  // Build scheduled_at if hora provided (update booking time too)
+  let newScheduledAt: string | null = null;
+  if (overrides.fecha || overrides.hora) {
+    const baseFecha = overrides.fecha ?? fecha;
+    const baseHora = overrides.hora ?? new Date(booking.scheduled_at)
+      .toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires", hour12: false });
+    // Build as ART datetime → store as UTC
+    newScheduledAt = new Date(`${baseFecha}T${baseHora}:00-03:00`).toISOString();
+  }
+
+  const effectiveClientId = overrides.client_id ?? booking.client_id;
+
   // Insert sesion_historica linked to this booking
   const { error: insertError } = await client.from("sesiones_historicas").insert({
-    client_id: booking.client_id,
+    client_id: effectiveClientId,
     fecha,
     tipo_servicio: tipoServicio,
-    descripcion: booking.services?.name ?? null,
+    descripcion: overrides.descripcion ?? booking.services?.name ?? null,
     operadora: overrides.operadora ?? booking.professionals?.name ?? null,
     professional_id: overrides.professional_id ?? booking.professional_id ?? null,
     booking_id: bookingId,
-    monto_lista: booking.services?.price ?? null,
+    monto_lista: overrides.monto_lista ?? booking.services?.price ?? null,
     client_package_id: booking.client_package_id ?? null,
     monto_cobrado: overrides.monto_cobrado ?? null,
     descuento_pct: overrides.descuento_pct ?? null,
@@ -142,10 +162,18 @@ export async function confirmBookingAsSession(
 
   if (insertError) return { success: false, error: insertError.message };
 
-  // Mark booking as realized
+  // Update booking: status + optionally client_id / scheduled_at
+  const bookingUpdate: Record<string, unknown> = { status: "realized" };
+  if (overrides.client_id && overrides.client_id !== booking.client_id) {
+    bookingUpdate.client_id = overrides.client_id;
+  }
+  if (newScheduledAt) {
+    bookingUpdate.scheduled_at = newScheduledAt;
+  }
+
   const { error: updateError } = await client
     .from("bookings")
-    .update({ status: "realized" })
+    .update(bookingUpdate)
     .eq("id", bookingId);
 
   if (updateError) return { success: false, error: updateError.message };
@@ -174,6 +202,8 @@ export async function confirmBookingAsSession(
 export async function updateSession(
   sessionId: string,
   data: {
+    client_id?: string | null;
+    fecha?: string | null;
     tipo_servicio?: string;
     descripcion?: string | null;
     operadora?: string | null;
