@@ -17,6 +17,8 @@ export interface AgendaEvent {
   service_id?: string;
   professional_id?: string;
   notes?: string;
+  clientPhone?: string;
+  durationMinutes?: number;
 }
 
 export interface Professional {

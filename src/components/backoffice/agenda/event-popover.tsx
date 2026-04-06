@@ -15,6 +15,12 @@ interface EventPopoverProps {
 
 const BOOKING_STATUSES = ["pending", "deposit_paid", "confirmed", "realized", "no_show"] as const;
 
+const SOURCE_LABELS: Record<string, string> = {
+  booking: "Reserva",
+  gcal: "Google Calendar",
+  koobing: "Koobing",
+};
+
 export default function EventPopover({ event, anchor, onClose }: EventPopoverProps) {
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
@@ -38,8 +44,8 @@ export default function EventPopover({ event, anchor, onClose }: EventPopoverPro
   }, [onClose]);
 
   // Position: keep within viewport
-  const POPOVER_W = 280;
-  const POPOVER_H = 320;
+  const POPOVER_W = 340;
+  const POPOVER_H = 420;
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
   const left = Math.min(anchor.x + 8, vw - POPOVER_W - 12);
@@ -64,16 +70,16 @@ export default function EventPopover({ event, anchor, onClose }: EventPopoverPro
   return (
     <div
       ref={ref}
-      className="fixed z-50 w-[280px] rounded-xl border border-gray-200 bg-white shadow-xl"
+      className="fixed z-50 w-[340px] rounded-xl border border-gray-200 bg-white shadow-xl"
       style={{ left, top }}
     >
       {/* Header */}
       <div className={`rounded-t-xl border-b px-4 py-3 ${accentClass}`}>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate font-semibold text-sm">{event.clientName}</p>
+            <p className="break-words font-semibold text-sm">{event.clientName}</p>
             {event.serviceName && (
-              <p className="truncate text-xs opacity-75">{event.serviceName}</p>
+              <p className="break-words text-xs opacity-75">{event.serviceName}</p>
             )}
           </div>
           <button
@@ -90,13 +96,18 @@ export default function EventPopover({ event, anchor, onClose }: EventPopoverPro
       </div>
 
       {/* Body */}
-      <div className="px-4 py-3 space-y-2.5">
-        {/* Time */}
+      <div className="px-4 py-3 space-y-2.5 max-h-[60vh] overflow-y-auto">
+        {/* Time + duration */}
         <div className="flex items-center gap-2 text-sm text-gray-600">
           <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
           </svg>
-          <span>{timeRange}</span>
+          <span>
+            {timeRange}
+            {event.durationMinutes && (
+              <span className="ml-1.5 text-gray-400">· {event.durationMinutes} min</span>
+            )}
+          </span>
         </div>
 
         {/* Professional */}
@@ -109,15 +120,34 @@ export default function EventPopover({ event, anchor, onClose }: EventPopoverPro
           </div>
         )}
 
+        {/* Phone */}
+        {event.clientPhone && (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+            </svg>
+            <a href={`tel:${event.clientPhone}`} className="hover:underline">
+              {event.clientPhone}
+            </a>
+          </div>
+        )}
+
         {/* Notes */}
         {event.notes && (
           <div className="flex items-start gap-2 text-sm text-gray-600">
             <svg className="h-4 w-4 shrink-0 text-gray-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
             </svg>
-            <span className="line-clamp-2">{event.notes}</span>
+            <span className="whitespace-pre-wrap">{event.notes}</span>
           </div>
         )}
+
+        {/* Source badge */}
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+            {SOURCE_LABELS[event.source] ?? event.source}
+          </span>
+        </div>
 
         {/* Status (only for bookings) */}
         {event.source === "booking" && (
