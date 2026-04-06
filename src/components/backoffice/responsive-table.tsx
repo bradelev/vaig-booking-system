@@ -1,10 +1,13 @@
 import { type ReactNode } from "react";
+import Link from "next/link";
 
 export interface TableColumn<T> {
   header: string;
   accessor: (row: T) => ReactNode;
   primaryOnMobile?: boolean;
   hideOnMobile?: boolean;
+  sortHref?: string;
+  sortActive?: "asc" | "desc" | null;
 }
 
 interface ResponsiveTableProps<T> {
@@ -12,6 +15,11 @@ interface ResponsiveTableProps<T> {
   data: T[];
   keyExtractor: (row: T) => string;
   emptyMessage?: string;
+}
+
+function SortIndicator({ direction }: { direction: "asc" | "desc" | null | undefined }) {
+  if (!direction) return <span className="ml-1 text-gray-300">↕</span>;
+  return <span className="ml-1">{direction === "asc" ? "▲" : "▼"}</span>;
 }
 
 export default function ResponsiveTable<T>({
@@ -36,7 +44,19 @@ export default function ResponsiveTable<T>({
                   key={col.header}
                   className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
                 >
-                  {col.header}
+                  {col.sortHref ? (
+                    <Link
+                      href={col.sortHref}
+                      className={`inline-flex items-center gap-0.5 hover:text-gray-800 transition-colors ${
+                        col.sortActive ? "text-gray-900" : ""
+                      }`}
+                    >
+                      {col.header}
+                      <SortIndicator direction={col.sortActive} />
+                    </Link>
+                  ) : (
+                    col.header
+                  )}
                 </th>
               ))}
             </tr>
