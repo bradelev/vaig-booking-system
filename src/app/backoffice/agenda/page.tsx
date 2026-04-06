@@ -21,7 +21,7 @@ interface AgendaBooking {
   client_id?: string;
   service_id?: string;
   professional_id?: string;
-  clients: { first_name: string; last_name: string } | null;
+  clients: { first_name: string; last_name: string; phone?: string } | null;
   services: { name: string; duration_minutes: number } | null;
   professionals: { id: string; name: string } | null;
 }
@@ -54,7 +54,7 @@ export default async function AgendaPage({
       .from("bookings")
       .select(
         `id, scheduled_at, end_at, gcal_event_id, status, notes, client_id, service_id, professional_id,
-         clients(first_name, last_name),
+         clients(first_name, last_name, phone),
          services(name, duration_minutes),
          professionals(id, name)`
       )
@@ -95,6 +95,8 @@ export default async function AgendaPage({
     service_id: b.service_id,
     professional_id: b.professional_id,
     notes: b.notes,
+    clientPhone: b.clients?.phone,
+    durationMinutes: b.services?.duration_minutes,
   }));
 
   // Convert GCal events (skip ones already linked to a booking)
