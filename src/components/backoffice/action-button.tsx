@@ -2,6 +2,8 @@
 
 import { useTransition } from "react";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ActionButtonProps {
   action: () => Promise<void>;
@@ -36,8 +38,12 @@ export default function ActionButton({
       type="button"
       onClick={handleClick}
       disabled={isPending}
-      className={className}
+      className={cn(
+        "inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-50",
+        className
+      )}
     >
+      {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
       {isPending ? (pendingLabel ?? label) : label}
     </button>
   );

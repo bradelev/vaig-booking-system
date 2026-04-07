@@ -11,11 +11,11 @@ export default function Error({
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-sm text-center">
-        <p className="text-4xl font-bold text-gray-900">Error</p>
-        <p className="mt-2 text-sm text-gray-500">Ocurrió un error inesperado.</p>
+        <p className="text-4xl font-bold text-foreground">Error</p>
+        <p className="mt-2 text-sm text-muted-foreground">Ocurrió un error inesperado.</p>
         <button
           onClick={reset}
-          className="mt-6 rounded bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+          className="mt-6 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98]"
         >
           Reintentar
         </button>
