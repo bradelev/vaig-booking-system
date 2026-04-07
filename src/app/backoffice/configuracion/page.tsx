@@ -16,35 +16,35 @@ export default async function ConfiguracionPage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Configuración</h1>
+      <h1 className="text-2xl font-bold text-foreground">Configuración</h1>
 
-      <form action={saveSystemConfig} className="rounded-lg border bg-white p-6 shadow-sm space-y-5">
-        <h2 className="text-base font-semibold text-gray-800 border-b pb-2">Negocio</h2>
+      <form action={saveSystemConfig} className="rounded-lg border bg-card p-6 shadow-sm space-y-5">
+        <h2 className="text-base font-semibold text-foreground border-b pb-2">Negocio</h2>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Nombre del negocio</label>
+          <label className="block text-sm font-medium text-foreground">Nombre del negocio</label>
           <input
             name="business_name"
             defaultValue={cfg["business_name"] ?? "VAIG"}
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-ring focus:outline-none"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Teléfono admin</label>
+          <label className="block text-sm font-medium text-foreground">Teléfono admin</label>
           <input
             name="admin_phone"
             defaultValue={cfg["admin_phone"] ?? ""}
             placeholder="ej: 59891374904"
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
+            className="mt-1 block w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-ring focus:outline-none"
           />
-          <p className="mt-1 text-xs text-gray-500">Número completo con código de país, sin +.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Número completo con código de país, sin +.</p>
         </div>
 
         <div className="flex justify-end pt-2">
           <button
             type="submit"
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             Guardar configuración
           </button>

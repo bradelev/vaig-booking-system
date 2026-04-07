@@ -61,7 +61,7 @@ export default function Sidebar({ collapsed = false, onClose, email }: SidebarPr
   const pathname = usePathname();
 
   return (
-    <aside className="w-full h-full bg-[#5a7a6a] flex flex-col overflow-hidden">
+    <aside className="w-full h-full bg-brand flex flex-col overflow-hidden">
       {/* Logo */}
       <div className={cn(
         "flex items-center border-b border-white/10 h-[53px]",
