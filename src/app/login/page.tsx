@@ -10,7 +10,7 @@ export default async function LoginPage({
   return (
     <main className="flex min-h-screen">
       {/* Brand panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#5a7a6a] items-center justify-center p-12">
+      <div className="hidden lg:flex lg:w-1/2 bg-brand items-center justify-center p-12">
         <div className="text-center">
           <h1 className="text-5xl font-bold text-white tracking-tight">VAIG</h1>
           <p className="mt-2 text-sm font-semibold text-white/40 uppercase tracking-[0.3em]">Studio</p>
@@ -26,7 +26,7 @@ export default async function LoginPage({
         <div className="w-full max-w-sm">
           {/* Mobile brand header */}
           <div className="lg:hidden mb-8 text-center">
-            <h1 className="text-3xl font-bold text-[#5a7a6a]">VAIG</h1>
+            <h1 className="text-3xl font-bold text-brand">VAIG</h1>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.3em]">Studio</p>
           </div>
 
