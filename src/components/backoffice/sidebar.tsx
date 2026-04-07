@@ -11,6 +11,7 @@ import {
   UserCircle,
   FileSpreadsheet,
   BarChart3,
+  Zap,
   Settings,
   X,
 } from "lucide-react";
@@ -38,6 +39,7 @@ const navSections = [
     label: "Negocio",
     items: [
       { href: "/backoffice/sesiones/nueva", label: "Sesiones", icon: FileSpreadsheet },
+      { href: "/backoffice/metricas/depilacion", label: "Depilación", icon: Zap },
       { href: "/backoffice/metricas", label: "Métricas", icon: BarChart3 },
     ],
   },
@@ -99,8 +101,8 @@ export default function Sidebar({ collapsed = false, onClose, email }: SidebarPr
             <div className={cn("space-y-0.5", collapsed ? "px-1.5" : "px-2")}>
               {section.items.map((item) => {
                 const isActive =
-                  item.href === "/backoffice"
-                    ? pathname === "/backoffice"
+                  item.href === "/backoffice" || item.href === "/backoffice/metricas"
+                    ? pathname === item.href
                     : pathname.startsWith(item.href);
 
                 const Icon = item.icon;
