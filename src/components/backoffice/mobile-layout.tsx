@@ -2,7 +2,17 @@
 
 import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { Menu, PanelLeftClose, PanelLeft, Plus, LogOut, ChevronRight } from "lucide-react";
 import Sidebar from "./sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 
 interface MobileLayoutProps {
   email: string;
@@ -12,9 +22,27 @@ interface MobileLayoutProps {
 
 const COLLAPSED_KEY = "sidebar_collapsed";
 
+const BREADCRUMB_MAP: Record<string, string> = {
+  backoffice: "Dashboard",
+  agenda: "Agenda",
+  citas: "Citas",
+  nueva: "Nueva",
+  editar: "Editar",
+  servicios: "Servicios",
+  profesionales: "Profesionales",
+  clientes: "Clientes",
+  sesiones: "Sesiones",
+  metricas: "Métricas",
+  configuracion: "Configuración",
+  paquetes: "Paquetes",
+  pagos: "Pagos",
+  templates: "Templates",
+  automatizaciones: "Campañas",
+  horario: "Horario",
+};
+
 export default function MobileLayout({ email, logoutAction, children }: MobileLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  // Initialize from localStorage — lazy initializer runs only on client
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(COLLAPSED_KEY) === "1";
@@ -30,7 +58,6 @@ export default function MobileLayout({ email, logoutAction, children }: MobileLa
     });
   }
 
-  // Close mobile sidebar on navigation
   useEffect(() => {
     if (prevPathname.current !== pathname) {
       prevPathname.current = pathname;
@@ -39,8 +66,12 @@ export default function MobileLayout({ email, logoutAction, children }: MobileLa
     }
   }, [pathname]);
 
+  // Build breadcrumbs from pathname
+  const segments = pathname.split("/").filter(Boolean);
+  const breadcrumbs = segments.slice(1).map((seg) => BREADCRUMB_MAP[seg] || seg);
+
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen" style={{ background: "var(--surface-subtle)" }}>
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
@@ -58,45 +89,81 @@ export default function MobileLayout({ email, logoutAction, children }: MobileLa
         <Sidebar
           collapsed={collapsed}
           onClose={() => setMobileOpen(false)}
+          email={email}
         />
       </div>
 
       {/* Main area */}
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
-        <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 md:px-6">
+        <header className="flex items-center justify-between bg-white px-4 py-3 md:px-6 shadow-sm">
           <div className="flex items-center gap-3">
             {/* Mobile hamburger */}
             <button
               type="button"
-              className="md:hidden rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 transition-colors"
+              className="md:hidden rounded-lg p-1.5 text-muted-foreground hover:bg-accent transition-colors"
               onClick={() => setMobileOpen(true)}
               aria-label="Abrir menú"
             >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              <Menu className="h-5 w-5" />
             </button>
             {/* Desktop collapse toggle */}
             <button
               type="button"
-              className="hidden md:flex rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 transition-colors"
+              className="hidden md:flex rounded-lg p-1.5 text-muted-foreground hover:bg-accent transition-colors"
               onClick={toggleCollapsed}
               aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
             >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              {collapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
             </button>
-            <span className="text-sm text-gray-500">{email}</span>
+
+            {/* Breadcrumbs */}
+            {breadcrumbs.length > 0 && (
+              <nav className="hidden sm:flex items-center gap-1 text-sm text-muted-foreground">
+                {breadcrumbs.map((crumb, i) => (
+                  <span key={i} className="flex items-center gap-1">
+                    {i > 0 && <ChevronRight className="h-3.5 w-3.5" />}
+                    <span className={i === breadcrumbs.length - 1 ? "font-medium text-foreground" : ""}>
+                      {crumb}
+                    </span>
+                  </span>
+                ))}
+              </nav>
+            )}
           </div>
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+
+          <div className="flex items-center gap-2">
+            {/* Quick action */}
+            <Link
+              href="/backoffice/citas/nueva"
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
-              Cerrar sesión
-            </button>
-          </form>
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nueva cita</span>
+            </Link>
+
+            {/* User dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary hover:bg-primary/20 transition-colors">
+                {email.charAt(0).toUpperCase()}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>{email}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <form action={logoutAction}>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const form = e.currentTarget.closest("form");
+                      if (form) form.requestSubmit();
+                    }}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Cerrar sesión
+                  </DropdownMenuItem>
+                </form>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
