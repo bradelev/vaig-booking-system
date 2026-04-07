@@ -68,7 +68,7 @@ export default function ReactivacionTable({
           onClick={handleCopyPhones}
           className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
         >
-          {copied ? "Copiados!" : `Copiar teléfonos (${data.length})`}
+          {copied ? "Copiados!" : `Copiar ${data.length} teléfonos`}
         </button>
       </div>
 
