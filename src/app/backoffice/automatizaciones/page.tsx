@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Campañas" };
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   draft:     { label: "Borrador",    cls: "bg-muted text-muted-foreground" },
-  scheduled: { label: "Programada",  cls: "bg-blue-100 text-blue-700" },
+  scheduled: { label: "Programada",  cls: "bg-primary/10 text-primary" },
   sending:   { label: "Enviando",    cls: "bg-yellow-100 text-yellow-700" },
   completed: { label: "Completada",  cls: "bg-green-100 text-green-700" },
   failed:    { label: "Fallida",     cls: "bg-red-100 text-red-700" },

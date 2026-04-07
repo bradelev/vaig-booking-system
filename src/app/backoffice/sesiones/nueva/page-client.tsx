@@ -270,7 +270,7 @@ export default function SessionsPageClient({
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 }`}
               >
-                <span className={isToday ? "font-bold text-blue-600" : ""}>
+                <span className={isToday ? "font-bold text-primary" : ""}>
                   {DAY_LABELS[idx]} {formatDDMM(date)}
                 </span>
                 {dayCount > 0 && (
@@ -314,7 +314,7 @@ export default function SessionsPageClient({
           <span className="text-xs text-muted-foreground">
             {DAY_LABELS[activeTab]} {formatDDMM(activeDate)}
             {activeDate === today && (
-              <span className="ml-1 text-blue-500 font-medium">(hoy)</span>
+              <span className="ml-1 text-primary font-medium">(hoy)</span>
             )}
           </span>
         </div>
