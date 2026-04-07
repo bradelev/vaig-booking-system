@@ -8,8 +8,8 @@ import { deleteCampaign, cloneCampaign, cancelSchedule } from "@/actions/campaig
 export const metadata: Metadata = { title: "Campañas" };
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
-  draft:     { label: "Borrador",    cls: "bg-gray-100 text-gray-700" },
-  scheduled: { label: "Programada",  cls: "bg-blue-100 text-blue-700" },
+  draft:     { label: "Borrador",    cls: "bg-muted text-muted-foreground" },
+  scheduled: { label: "Programada",  cls: "bg-primary/10 text-primary" },
   sending:   { label: "Enviando",    cls: "bg-yellow-100 text-yellow-700" },
   completed: { label: "Completada",  cls: "bg-green-100 text-green-700" },
   failed:    { label: "Fallida",     cls: "bg-red-100 text-red-700" },
@@ -45,7 +45,7 @@ export default async function AutomatizacionesPage() {
       accessor: (c) => (
         <Link
           href={`/backoffice/automatizaciones/${c.id}`}
-          className="text-sm font-medium text-gray-900 hover:underline"
+          className="text-sm font-medium text-foreground hover:underline"
         >
           {c.name}
         </Link>
@@ -56,7 +56,7 @@ export default async function AutomatizacionesPage() {
       accessor: (c) => {
         const badge = STATUS_BADGE[c.status];
         return (
-          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${badge?.cls ?? "bg-gray-100 text-gray-600"}`}>
+          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${badge?.cls ?? "bg-muted text-muted-foreground"}`}>
             {badge?.label ?? c.status}
           </span>
         );
@@ -94,23 +94,23 @@ export default async function AutomatizacionesPage() {
             )}
           </span>
         ) : (
-          <span className="text-gray-400">—</span>
+          <span className="text-muted-foreground">—</span>
         ),
     },
     {
       header: "Acciones",
       accessor: (c) => (
         <div className="flex gap-3 text-sm">
-          <Link href={`/backoffice/automatizaciones/${c.id}`} className="text-blue-600 hover:underline">
+          <Link href={`/backoffice/automatizaciones/${c.id}`} className="text-primary hover:underline">
             Ver
           </Link>
           {c.status === "draft" && (
-            <Link href={`/backoffice/automatizaciones/${c.id}/editar`} className="text-gray-600 hover:underline">
+            <Link href={`/backoffice/automatizaciones/${c.id}/editar`} className="text-muted-foreground hover:underline">
               Editar
             </Link>
           )}
           <form action={cloneCampaign.bind(null, c.id)} className="inline">
-            <button type="submit" className="text-gray-600 hover:underline">
+            <button type="submit" className="text-muted-foreground hover:underline">
               Clonar
             </button>
           </form>
@@ -141,12 +141,12 @@ export default async function AutomatizacionesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Automatizaciones</h1>
-          <p className="mt-1 text-sm text-gray-500">Campañas de WhatsApp programadas</p>
+          <h1 className="text-2xl font-bold text-foreground">Automatizaciones</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Campañas de WhatsApp programadas</p>
         </div>
         <Link
           href="/backoffice/automatizaciones/nueva"
-          className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           + Nueva campaña
         </Link>
