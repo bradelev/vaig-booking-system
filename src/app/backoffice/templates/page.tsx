@@ -26,7 +26,7 @@ export default async function TemplatesPage() {
 
       <form action={saveTemplates} className="space-y-6">
         {TEMPLATE_KEYS.map((key) => (
-          <div key={key} className="rounded-lg border bg-white p-6 shadow-sm space-y-3">
+          <div key={key} className="rounded-lg border bg-card p-6 shadow-sm space-y-3">
             <div>
               <h2 className="text-base font-semibold text-foreground">{TEMPLATE_LABELS[key]}</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
