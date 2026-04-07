@@ -34,10 +34,10 @@ export default async function ServiciosPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Servicios</h1>
+        <h1 className="text-2xl font-bold text-foreground">Servicios</h1>
         <Link
           href="/backoffice/servicios/nuevo"
-          className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           + Nuevo servicio
         </Link>

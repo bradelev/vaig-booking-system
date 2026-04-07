@@ -42,11 +42,11 @@ export default function CancelModal({ bookingId }: { bookingId: string }) {
 
       <Modal open={open} onClose={() => setOpen(false)} title="Cancelar reserva">
         <div className="mb-3">
-          <label className="mb-1 block text-sm font-medium text-gray-700">Motivo</label>
+          <label className="mb-1 block text-sm font-medium text-foreground">Motivo</label>
           <select
             value={reason}
             onChange={(e) => setReason(e.target.value as CancellationReason)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-input px-3 py-2 text-sm"
           >
             {REASON_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -57,15 +57,15 @@ export default function CancelModal({ bookingId }: { bookingId: string }) {
         </div>
 
         <div className="mb-5">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Nota adicional <span className="text-gray-400">(opcional)</span>
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            Nota adicional <span className="text-muted-foreground">(opcional)</span>
           </label>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={2}
             placeholder="Detalles adicionales..."
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm resize-none"
+            className="w-full rounded-lg border border-input px-3 py-2 text-sm resize-none"
           />
         </div>
 
@@ -74,7 +74,7 @@ export default function CancelModal({ bookingId }: { bookingId: string }) {
             type="button"
             onClick={() => setOpen(false)}
             disabled={isPending}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="rounded-lg border border-input px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
           >
             Volver
           </button>
