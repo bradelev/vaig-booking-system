@@ -134,8 +134,8 @@ export default function Sidebar({ collapsed = false, onClose }: SidebarProps) {
       <nav className={`flex-1 py-3 space-y-0.5 overflow-y-auto ${collapsed ? "px-1.5" : "px-2"}`}>
         {navItems.map((item) => {
           const isActive =
-            item.href === "/backoffice"
-              ? pathname === "/backoffice"
+            item.href === "/backoffice" || item.href === "/backoffice/metricas"
+              ? pathname === item.href
               : pathname.startsWith(item.href);
 
           return (
