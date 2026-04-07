@@ -47,7 +47,7 @@ export default async function PagosPage() {
       accessor: (b) => (
         <div>
           <p className="font-medium">{formatDate(b.scheduled_at)}</p>
-          <p className="text-gray-500">{formatTime(b.scheduled_at)}</p>
+          <p className="text-muted-foreground">{formatTime(b.scheduled_at)}</p>
         </div>
       ),
     },
@@ -74,7 +74,7 @@ export default async function PagosPage() {
       accessor: (b) => {
         const depositAmount = b.services?.deposit_amount ?? 0;
         return (
-          <span className="whitespace-nowrap font-medium text-gray-900">
+          <span className="whitespace-nowrap font-medium text-foreground">
             ${Number(depositAmount).toLocaleString("es-AR")}
           </span>
         );
@@ -111,8 +111,8 @@ export default async function PagosPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pagos pendientes</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-foreground">Pagos pendientes</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Reservas esperando confirmación de seña por transferencia bancaria
           </p>
         </div>
@@ -122,8 +122,8 @@ export default async function PagosPage() {
       </div>
 
       {bookings.length === 0 ? (
-        <div className="rounded-lg border bg-white p-12 text-center shadow-sm">
-          <p className="text-gray-500">No hay pagos pendientes de confirmación.</p>
+        <div className="rounded-lg border bg-card p-12 text-center shadow-sm">
+          <p className="text-muted-foreground">No hay pagos pendientes de confirmación.</p>
         </div>
       ) : (
         <ResponsiveTable
