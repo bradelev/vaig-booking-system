@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { UserPlus } from "lucide-react";
 import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
+import PageHeader from "@/components/backoffice/page-header";
 
 export const metadata: Metadata = { title: "Clientes" };
 
@@ -17,11 +19,11 @@ interface Cliente {
 }
 
 const SEGMENTO_BADGE: Record<string, { label: string; cls: string }> = {
-  S5: { label: "S5 VIP",       cls: "bg-purple-100 text-purple-800" },
-  S4: { label: "S4 1ra visita", cls: "bg-blue-100 text-blue-800"   },
-  S3: { label: "S3 Cross-sell", cls: "bg-green-100 text-green-800" },
-  S2: { label: "S2 Cuponera",   cls: "bg-yellow-100 text-yellow-800" },
-  S1: { label: "S1 Dormido",    cls: "bg-red-100 text-red-800"     },
+  S5: { label: "S5 VIP",       cls: "border-purple-200 bg-purple-50 text-purple-800" },
+  S4: { label: "S4 1ra visita", cls: "border-blue-200 bg-blue-50 text-blue-800"   },
+  S3: { label: "S3 Cross-sell", cls: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+  S2: { label: "S2 Cuponera",   cls: "border-amber-200 bg-amber-50 text-amber-800" },
+  S1: { label: "S1 Dormido",    cls: "border-red-200 bg-red-50 text-red-800"     },
 };
 
 const SEGMENTO_OPTIONS = [
@@ -132,7 +134,6 @@ export default async function ClientesPage({
 
   const baseParams = { busqueda: busqueda || undefined, segmento: segmento || undefined, orden: orden !== "nombre_asc" ? orden : undefined };
 
-  // Build a sort href for a column: toggles asc↔desc if already active
   function sortHref(ascValue: string, descValue: string): string {
     const next = orden === ascValue ? descValue : ascValue;
     const qs = buildSearchParams({ orden: next, pagina: undefined }, baseParams);
@@ -152,7 +153,7 @@ export default async function ClientesPage({
       sortHref: sortHref("nombre_asc", "nombre_desc"),
       sortActive: sortActive("nombre_asc", "nombre_desc"),
       accessor: (c) => (
-        <Link href={`/backoffice/clientes/${c.id}`} className="text-sm font-medium text-gray-900 hover:underline">
+        <Link href={`/backoffice/clientes/${c.id}`} className="text-sm font-medium text-foreground hover:text-primary hover:underline transition-colors">
           {c.first_name} {c.last_name}
         </Link>
       ),
@@ -170,13 +171,13 @@ export default async function ClientesPage({
       hideOnMobile: true,
       accessor: (c) => {
         const svcs = c.servicios_usados ?? [];
-        if (svcs.length === 0) return <span className="text-gray-400 text-sm">—</span>;
+        if (svcs.length === 0) return <span className="text-muted-foreground text-sm">—</span>;
         return (
           <div className="flex flex-wrap gap-1 max-w-xs">
             {svcs.map((s) => (
               <span
                 key={s}
-                className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700"
+                className="inline-flex rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground"
                 title={s}
               >
                 {shortServiceName(s)}
@@ -212,11 +213,11 @@ export default async function ClientesPage({
       accessor: (c) => {
         const badge = c.segmento ? SEGMENTO_BADGE[c.segmento] : null;
         return badge ? (
-          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.cls}`}>
+          <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${badge.cls}`}>
             {badge.label}
           </span>
         ) : (
-          <span className="text-gray-400 text-sm">—</span>
+          <span className="text-muted-foreground text-sm">—</span>
         );
       },
     },
@@ -226,7 +227,7 @@ export default async function ClientesPage({
       accessor: (c) => (
         <Link
           href={`/backoffice/clientes/${c.id}`}
-          className="text-sm text-blue-600 hover:underline"
+          className="text-sm text-primary hover:underline"
         >
           Ver
         </Link>
@@ -236,46 +237,49 @@ export default async function ClientesPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
-        <Link
-          href="/backoffice/clientes/nuevo"
-          className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
-        >
-          + Nuevo cliente
-        </Link>
-      </div>
+      <PageHeader
+        title="Clientes"
+        actions={
+          <Link
+            href="/backoffice/clientes/nuevo"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98]"
+          >
+            <UserPlus className="h-4 w-4" />
+            Nuevo cliente
+          </Link>
+        }
+      />
 
       {/* Filtros */}
       <form method="GET" className="flex flex-wrap gap-3 items-end">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-gray-600">Buscar</label>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Buscar</label>
           <input
             type="text"
             name="busqueda"
             defaultValue={busqueda}
             placeholder="Nombre o teléfono..."
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 w-56"
+            className="h-10 rounded-lg border border-input bg-card px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-56"
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-gray-600">Segmento</label>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Segmento</label>
           <select
             name="segmento"
             defaultValue={segmento}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            className="h-10 rounded-lg border border-input bg-card px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             {SEGMENTO_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-gray-600">Ordenar por</label>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Ordenar por</label>
           <select
             name="orden"
             defaultValue={orden}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+            className="h-10 rounded-lg border border-input bg-card px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             {ORDEN_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -284,14 +288,14 @@ export default async function ClientesPage({
         </div>
         <button
           type="submit"
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
+          className="h-10 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98]"
         >
           Filtrar
         </button>
         {(busqueda || segmento || orden !== "nombre_asc") && (
           <Link
             href="/backoffice/clientes"
-            className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            className="h-10 inline-flex items-center rounded-lg border border-input px-4 text-sm text-muted-foreground hover:bg-accent transition-colors"
           >
             Limpiar
           </Link>
@@ -306,7 +310,7 @@ export default async function ClientesPage({
       />
 
       {/* Paginación */}
-      <div className="flex items-center justify-between text-sm text-gray-600">
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
           Mostrando {total === 0 ? 0 : from + 1}–{Math.min(to + 1, total)} de {total} clientes
         </span>
@@ -314,7 +318,7 @@ export default async function ClientesPage({
           {pagina > 1 && (
             <Link
               href={`?${buildSearchParams({ pagina: String(pagina - 1) }, baseParams)}`}
-              className="rounded-md border border-gray-300 px-3 py-1.5 hover:bg-gray-50 transition-colors"
+              className="rounded-lg border border-input px-3 py-1.5 text-sm hover:bg-accent transition-colors"
             >
               Anterior
             </Link>
@@ -322,7 +326,7 @@ export default async function ClientesPage({
           {pagina < totalPages && (
             <Link
               href={`?${buildSearchParams({ pagina: String(pagina + 1) }, baseParams)}`}
-              className="rounded-md border border-gray-300 px-3 py-1.5 hover:bg-gray-50 transition-colors"
+              className="rounded-lg border border-input px-3 py-1.5 text-sm hover:bg-accent transition-colors"
             >
               Siguiente
             </Link>

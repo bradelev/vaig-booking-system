@@ -1,31 +1,41 @@
+import { type LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+
 interface StatCardProps {
   title: string;
   value: string | number;
   subtitle?: string;
+  icon?: LucideIcon;
   trend?: {
-    value: number; // percentage change, e.g. 10 means +10%, -5 means -5%
-    label: string; // e.g. "vs ayer"
+    value: number;
+    label: string;
   };
 }
 
-export default function StatCard({ title, value, subtitle, trend }: StatCardProps) {
+export default function StatCard({ title, value, subtitle, icon: Icon, trend }: StatCardProps) {
   return (
-    <div className="rounded-lg border bg-white p-6 shadow-sm">
-      <p className="text-sm font-medium text-gray-500">{title}</p>
-      <p className="mt-2 text-3xl font-bold text-gray-900">{value}</p>
-      {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
+    <div className="rounded-lg border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md border-l-4 border-l-primary">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="mt-2 text-3xl font-bold text-foreground">{value}</p>
+          {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+        </div>
+        {Icon && (
+          <div className="rounded-lg bg-primary/10 p-2.5">
+            <Icon className="h-5 w-5 text-primary" />
+          </div>
+        )}
+      </div>
       {trend !== undefined && (
-        <div className={`mt-2 flex items-center gap-1 text-xs font-medium ${
-          trend.value > 0 ? "text-green-600" : trend.value < 0 ? "text-red-600" : "text-gray-500"
-        }`}>
+        <div className={cn(
+          "mt-3 flex items-center gap-1.5 text-xs font-medium",
+          trend.value > 0 ? "text-emerald-600" : trend.value < 0 ? "text-red-600" : "text-muted-foreground"
+        )}>
           {trend.value > 0 ? (
-            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M6 2L10 7H2L6 2Z" fill="currentColor"/>
-            </svg>
+            <TrendingUp className="h-3.5 w-3.5" />
           ) : trend.value < 0 ? (
-            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M6 10L2 5H10L6 10Z" fill="currentColor"/>
-            </svg>
+            <TrendingDown className="h-3.5 w-3.5" />
           ) : null}
           <span>
             {trend.value > 0 ? "+" : ""}{trend.value}% {trend.label}

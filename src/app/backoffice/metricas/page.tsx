@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import DailyActivityChart from "@/components/backoffice/metrics/daily-activity-chart";
 import FunnelChart from "@/components/backoffice/metrics/funnel-chart";
+import PageHeader from "@/components/backoffice/page-header";
 
 export const metadata: Metadata = { title: "Métricas" };
 
@@ -45,7 +46,6 @@ export default async function MetricasPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
 
-  // Fetch all sessions in the period
   const { data: sessions } = await client
     .from("conversation_sessions")
     .select("funnel_stage, last_message_at")
@@ -53,7 +53,6 @@ export default async function MetricasPage({
 
   const rows = (sessions ?? []) as { funnel_stage: string | null; last_message_at: string }[];
 
-  // Count sessions per funnel stage (cumulative: each stage includes sessions that reached at least that stage)
   const stageCounts: Record<string, number> = {};
   const stageOrder = FUNNEL_STAGES.map((s) => s.key);
 
@@ -65,10 +64,8 @@ export default async function MetricasPage({
     }).length;
   }
 
-  // Total = sessions with any funnel_stage (started at minimum)
   const total = stageCounts["started"] ?? 0;
 
-  // Daily trend for the last period (sessions started per day)
   const dailyMap: Record<string, number> = {};
   for (const row of rows) {
     if (!row.funnel_stage) continue;
@@ -78,7 +75,6 @@ export default async function MetricasPage({
 
   const selectedPeriod = PERIODS.find((p) => p.days === days) ?? PERIODS[1];
 
-  // Transform dailyMap into chart data (ascending order, short date label)
   const MONTH_LABELS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   const dailyChartData = Object.entries(dailyMap)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -88,7 +84,6 @@ export default async function MetricasPage({
       return { date: label, sesiones: count };
     });
 
-  // Transform stageCounts into funnel chart data
   const funnelChartData = FUNNEL_STAGES.map((stage) => {
     const count = stageCounts[stage.key] ?? 0;
     const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
@@ -97,28 +92,27 @@ export default async function MetricasPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">Métricas de conversión</h1>
-
-        {/* Period selector */}
-        <div className="flex gap-2">
-          {PERIODS.map((p) => (
-            <a
-              key={p.days}
-              href={`?periodo=${p.days}`}
-              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                p.days === days
-                  ? "border-gray-900 bg-gray-900 text-white"
-                  : "border-gray-300 text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {p.label.replace("Últimos ", "").replace(" días", "d")}
-            </a>
-          ))}
-        </div>
-      </div>
-
-      <p className="text-sm text-gray-500">{selectedPeriod.label}</p>
+      <PageHeader
+        title="Métricas de conversión"
+        subtitle={selectedPeriod.label}
+        actions={
+          <div className="flex gap-2">
+            {PERIODS.map((p) => (
+              <a
+                key={p.days}
+                href={`?periodo=${p.days}`}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors active:scale-[0.98] ${
+                  p.days === days
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-input text-muted-foreground hover:bg-accent"
+                }`}
+              >
+                {p.label.replace("Últimos ", "").replace(" días", "d")}
+              </a>
+            ))}
+          </div>
+        }
+      />
 
       {/* Funnel cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -132,27 +126,27 @@ export default async function MetricasPage({
               : null;
 
           return (
-            <div key={stage.key} className="rounded-lg border bg-white p-5 shadow-sm">
+            <div key={stage.key} className="rounded-lg border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
               <div className="mb-1 flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
                   {i + 1}
                 </span>
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {stage.label}
                 </p>
               </div>
-              <p className="mt-2 text-3xl font-bold text-gray-900">{count}</p>
-              <div className="mt-1 flex items-center gap-3 text-sm text-gray-500">
+              <p className="mt-2 text-3xl font-bold text-foreground">{count}</p>
+              <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
                 <span>{convRate}% del total</span>
                 {stepRate !== null && (
-                  <span className="text-gray-400">· {stepRate}% del paso anterior</span>
+                  <span className="text-muted-foreground/60">{stepRate}% del paso anterior</span>
                 )}
               </div>
 
               {/* Progress bar */}
-              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-gray-900 transition-all"
+                  className="h-full rounded-full bg-primary transition-all"
                   style={{ width: `${convRate}%` }}
                 />
               </div>
@@ -163,32 +157,30 @@ export default async function MetricasPage({
 
       {/* Charts row */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Daily activity chart */}
-        <div className="rounded-lg border bg-white shadow-sm">
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">Actividad diaria</h2>
+        <div className="rounded-lg border border-border bg-card shadow-sm">
+          <div className="border-b border-border px-6 py-4">
+            <h2 className="text-lg font-semibold text-foreground">Actividad diaria</h2>
           </div>
           <div className="p-6">
             {dailyChartData.length > 0 ? (
               <DailyActivityChart data={dailyChartData} />
             ) : (
-              <p className="py-8 text-center text-sm text-gray-500">
+              <p className="py-8 text-center text-sm text-muted-foreground">
                 No hay datos en el período seleccionado
               </p>
             )}
           </div>
         </div>
 
-        {/* Funnel chart */}
-        <div className="rounded-lg border bg-white shadow-sm">
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">Embudo de conversión</h2>
+        <div className="rounded-lg border border-border bg-card shadow-sm">
+          <div className="border-b border-border px-6 py-4">
+            <h2 className="text-lg font-semibold text-foreground">Embudo de conversión</h2>
           </div>
           <div className="p-6">
             {total > 0 ? (
               <FunnelChart data={funnelChartData} />
             ) : (
-              <p className="py-8 text-center text-sm text-gray-500">
+              <p className="py-8 text-center text-sm text-muted-foreground">
                 No hay datos en el período seleccionado
               </p>
             )}
@@ -197,28 +189,28 @@ export default async function MetricasPage({
       </div>
 
       {/* Funnel summary table */}
-      <div className="rounded-lg border bg-white shadow-sm">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">Resumen del funnel</h2>
+      <div className="rounded-lg border border-border bg-card shadow-sm">
+        <div className="border-b border-border px-6 py-4">
+          <h2 className="text-lg font-semibold text-foreground">Resumen del funnel</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted/50">
               <tr>
                 {["Etapa", "Sesiones", "Conv. total", "Conv. por paso", "Drop-off"].map((h) => (
                   <th
                     key={h}
-                    className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
                   >
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
+            <tbody className="divide-y divide-border">
               {total === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     No hay datos de sesiones con funnel en el período seleccionado
                   </td>
                 </tr>
@@ -236,23 +228,23 @@ export default async function MetricasPage({
                     prevCount !== null ? prevCount - count : null;
 
                   return (
-                    <tr key={stage.key} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                        <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-600">
+                    <tr key={stage.key} className="transition-colors duration-150 hover:bg-muted/50">
+                      <td className="px-4 py-4 text-sm font-medium text-foreground">
+                        <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
                           {i + 1}
                         </span>
                         {stage.label}
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-gray-900">
+                      <td className="whitespace-nowrap px-4 py-4 text-sm font-semibold text-foreground">
                         {count}
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                      <td className="whitespace-nowrap px-4 py-4 text-sm text-foreground">
                         {convTotal}%
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                      <td className="whitespace-nowrap px-4 py-4 text-sm text-foreground">
                         {convStep === "—" ? "—" : `${convStep}%`}
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                      <td className="whitespace-nowrap px-4 py-4 text-sm text-muted-foreground">
                         {dropoff !== null ? (dropoff > 0 ? `−${dropoff}` : "—") : "—"}
                       </td>
                     </tr>
@@ -264,34 +256,34 @@ export default async function MetricasPage({
         </div>
       </div>
 
-      {/* Daily activity */}
+      {/* Daily activity table */}
       {Object.keys(dailyMap).length > 0 && (
-        <div className="rounded-lg border bg-white shadow-sm">
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">Actividad diaria (sesiones activas)</h2>
+        <div className="rounded-lg border border-border bg-card shadow-sm">
+          <div className="border-b border-border px-6 py-4">
+            <h2 className="text-lg font-semibold text-foreground">Actividad diaria (sesiones activas)</h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted/50">
                 <tr>
                   {["Fecha", "Sesiones"].map((h) => (
                     <th
                       key={h}
-                      className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
+                      className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-border">
                 {Object.entries(dailyMap)
                   .sort(([a], [b]) => b.localeCompare(a))
                   .slice(0, 14)
                   .map(([day, count]) => (
-                    <tr key={day} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{day}</td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                    <tr key={day} className="transition-colors duration-150 hover:bg-muted/50">
+                      <td className="whitespace-nowrap px-4 py-4 text-sm text-foreground">{day}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm font-medium text-foreground">
                         {count}
                       </td>
                     </tr>
