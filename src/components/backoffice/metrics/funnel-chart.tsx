@@ -29,7 +29,7 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 export default function FunnelChart({ data }: FunnelChartProps) {
-  const colors = ["#171717", "#404040", "#737373", "#a3a3a3"];
+  const colors = ["#5a7a6a", "#6f9680", "#8aab9a", "#c5dace"];
 
   return (
     <ResponsiveContainer width="100%" height={200}>
@@ -38,7 +38,7 @@ export default function FunnelChart({ data }: FunnelChartProps) {
         layout="vertical"
         margin={{ top: 0, right: 40, left: 8, bottom: 0 }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#dce5df" horizontal={false} />
         <XAxis
           type="number"
           tick={{ fontSize: 11, fill: "#6b7280" }}
@@ -56,7 +56,7 @@ export default function FunnelChart({ data }: FunnelChartProps) {
           tickFormatter={(v: string) => STAGE_LABELS[v] ?? v}
         />
         <Tooltip
-          contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
+          contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #dce5df" }}
           formatter={(value, _name, props) => [
             `${value as number} (${(props.payload as FunnelDataPoint).percentage}%)`,
             "Sesiones",
