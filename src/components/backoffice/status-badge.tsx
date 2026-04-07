@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_COLORS } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const STATUS_ICONS: Record<string, ReactNode> = {
   pending: (
@@ -49,7 +50,10 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
   const color = BOOKING_STATUS_COLORS[status] ?? "bg-gray-100 text-gray-800";
   const icon = STATUS_ICONS[status];
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
+    <span className={cn(
+      "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+      color
+    )}>
       {icon}
       {label}
     </span>
