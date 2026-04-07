@@ -127,7 +127,7 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
 
   if (servicios.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 p-8 text-center text-sm text-gray-500">
+      <div className="rounded-lg border border-border p-8 text-center text-sm text-muted-foreground">
         No hay servicios creados aún
       </div>
     );
@@ -142,20 +142,20 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
         const activeCount = items.filter((s) => s.is_active).length;
 
         return (
-          <div key={category} className="rounded-lg border border-gray-200 overflow-hidden">
+          <div key={category} className="rounded-lg border border-border overflow-hidden">
             {/* Category header */}
             <button
               onClick={() => toggleCollapse(category)}
               aria-expanded={!isCollapsed}
-              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+              className="w-full flex items-center justify-between px-4 py-3 bg-muted hover:bg-accent transition-colors text-left"
             >
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm text-gray-800">{category}</span>
-                <span className="text-xs text-gray-500 bg-gray-200 rounded-full px-2 py-0.5">
+                <span className="font-semibold text-sm text-foreground">{category}</span>
+                <span className="text-xs text-muted-foreground bg-border rounded-full px-2 py-0.5">
                   {activeCount}/{items.length}
                 </span>
               </div>
-              <span className="text-gray-400 text-xs">{isCollapsed ? "▶" : "▼"}</span>
+              <span className="text-muted-foreground text-xs">{isCollapsed ? "▶" : "▼"}</span>
             </button>
 
             {!isCollapsed && (
@@ -164,7 +164,7 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                         <th className="px-4 py-2">Nombre</th>
                         <th className="px-4 py-2">Duración</th>
                         <th className="px-4 py-2">Precio</th>
@@ -174,32 +174,32 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
                         <th className="px-4 py-2">Acciones</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-border">
                       {items.map((s) => {
                         const editing = editingId === s.id;
                         const toggleAction = toggleServiceActive.bind(null, s.id, s.is_active);
 
                         return (
-                          <tr key={s.id} className={editing ? "bg-blue-50" : "bg-white hover:bg-gray-50"}>
+                          <tr key={s.id} className={editing ? "bg-primary/5" : "bg-card hover:bg-accent/50"}>
                             <td className="px-4 py-3">
                               {editing ? (
                                 <input
                                   type="text"
                                   value={editData.name}
                                   onChange={(e) => setEditData((prev) => ({ ...prev, name: e.target.value }))}
-                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  className="w-full rounded border border-input px-2 py-1 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
                                   autoFocus
                                 />
                               ) : (
                                 <div>
-                                  <p className="font-medium text-gray-900">{s.name}</p>
+                                  <p className="font-medium text-foreground">{s.name}</p>
                                   {s.description && (
-                                    <p className="text-xs text-gray-500 mt-0.5 max-w-xs truncate">{s.description}</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5 max-w-xs truncate">{s.description}</p>
                                   )}
                                 </div>
                               )}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                            <td className="px-4 py-3 whitespace-nowrap text-foreground">
                               {s.duration_minutes} min
                             </td>
                             <td className="px-4 py-3">
@@ -208,18 +208,18 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
                                   type="number"
                                   value={editData.price}
                                   onChange={(e) => setEditData((prev) => ({ ...prev, price: e.target.value }))}
-                                  className="w-28 rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  className="w-28 rounded border border-input px-2 py-1 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
                                   min="0"
                                   step="0.01"
                                 />
                               ) : (
-                                <span className="whitespace-nowrap text-gray-700">{formatCurrency(s.price)}</span>
+                                <span className="whitespace-nowrap text-foreground">{formatCurrency(s.price)}</span>
                               )}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                            <td className="px-4 py-3 whitespace-nowrap text-foreground">
                               {formatCurrency(s.deposit_amount)}
                             </td>
-                            <td className="px-4 py-3 text-gray-600">
+                            <td className="px-4 py-3 text-muted-foreground">
                               {s.professionals?.name ?? "—"}
                             </td>
                             <td className="px-4 py-3">
@@ -256,20 +256,20 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
                                 <div className="flex items-center gap-3">
                                   <button
                                     onClick={() => startEdit(s)}
-                                    className="text-sm text-blue-600 hover:underline"
+                                    className="text-sm text-primary hover:underline"
                                   >
                                     Editar
                                   </button>
                                   <Link
                                     href={`/backoffice/servicios/${s.id}/editar`}
-                                    className="text-sm text-gray-500 hover:underline"
+                                    className="text-sm text-muted-foreground hover:underline"
                                   >
                                     Ver más
                                   </Link>
                                   <form action={toggleAction}>
                                     <button
                                       type="submit"
-                                      className="text-sm text-gray-500 hover:text-gray-800 hover:underline"
+                                      className="text-sm text-muted-foreground hover:text-foreground hover:underline"
                                     >
                                       {s.is_active ? "Desactivar" : "Activar"}
                                     </button>
@@ -285,7 +285,7 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
                 </div>
 
                 {/* Mobile cards */}
-                <div className="sm:hidden divide-y divide-gray-100">
+                <div className="sm:hidden divide-y divide-border">
                   {items.map((s) => {
                     const editing = editingId === s.id;
                     const toggleAction = toggleServiceActive.bind(null, s.id, s.is_active);
@@ -293,7 +293,7 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
                     return (
                       <div
                         key={s.id}
-                        className={`p-3 space-y-2 ${editing ? "bg-blue-50" : "bg-white"}`}
+                        className={`p-3 space-y-2 ${editing ? "bg-primary/5" : "bg-card"}`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -302,14 +302,14 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
                                 type="text"
                                 value={editData.name}
                                 onChange={(e) => setEditData((prev) => ({ ...prev, name: e.target.value }))}
-                                className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full rounded border border-input px-2 py-1 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
                                 autoFocus
                               />
                             ) : (
                               <>
-                                <p className="font-medium text-sm text-gray-900 truncate">{s.name}</p>
+                                <p className="font-medium text-sm text-foreground truncate">{s.name}</p>
                                 {s.description && (
-                                  <p className="text-xs text-gray-500 mt-0.5 truncate">{s.description}</p>
+                                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{s.description}</p>
                                 )}
                               </>
                             )}
@@ -323,14 +323,14 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-3 text-xs text-gray-600">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span>{s.duration_minutes} min</span>
                           {editing ? (
                             <input
                               type="number"
                               value={editData.price}
                               onChange={(e) => setEditData((prev) => ({ ...prev, price: e.target.value }))}
-                              className="w-28 rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-28 rounded border border-input px-2 py-1 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
                               min="0"
                               step="0.01"
                               placeholder="Precio"
@@ -352,7 +352,7 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
                             </button>
                             <button
                               onClick={cancelEdit}
-                              className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                              className="flex-1 rounded-lg border border-input px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
                             >
                               Cancelar
                             </button>
@@ -361,20 +361,20 @@ export default function ServiciosTable({ servicios }: ServiciosTableProps) {
                           <div className="flex items-center gap-3 pt-1">
                             <button
                               onClick={() => startEdit(s)}
-                              className="text-sm text-blue-600 hover:underline"
+                              className="text-sm text-primary hover:underline"
                             >
                               Editar
                             </button>
                             <Link
                               href={`/backoffice/servicios/${s.id}/editar`}
-                              className="text-sm text-gray-500 hover:underline"
+                              className="text-sm text-muted-foreground hover:underline"
                             >
                               Ver más
                             </Link>
                             <form action={toggleAction} className="inline">
                               <button
                                 type="submit"
-                                className="text-sm text-gray-500 hover:text-gray-800 hover:underline"
+                                className="text-sm text-muted-foreground hover:text-foreground hover:underline"
                               >
                                 {s.is_active ? "Desactivar" : "Activar"}
                               </button>
