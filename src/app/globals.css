@@ -1,28 +1,68 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* shadcn/ui standard variables (HSL values without hsl() wrapper) */
+  --background: 150 10% 98%;
+  --foreground: 140 30% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 140 30% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 140 30% 14%;
+  --primary: 150 16% 41%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 150 14% 60%;
+  --secondary-foreground: 140 30% 14%;
+  --muted: 140 18% 95%;
+  --muted-foreground: 220 9% 46%;
+  --accent: 140 18% 95%;
+  --accent-foreground: 140 30% 14%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 140 10% 88%;
+  --input: 140 10% 88%;
+  --ring: 150 16% 41%;
+  --radius: 0.5rem;
 
-  /* Brand colors */
-  --brand-primary: #171717;
-  --brand-primary-hover: #404040;
-  --brand-accent: #2563eb;
+  /* Brand colors (legacy compat + extended palette) */
+  --brand-primary: #5a7a6a;
+  --brand-primary-hover: #4a6758;
+  --brand-primary-light: #f0f5f2;
+  --brand-accent: #8aab9a;
+  --brand-accent-light: #c5dace;
   --brand-danger: #dc2626;
   --brand-danger-hover: #b91c1c;
-  --brand-success: #16a34a;
+  --brand-success: #059669;
   --brand-warning: #d97706;
   --brand-muted: #6b7280;
 
   /* Surface colors */
   --surface-base: #ffffff;
-  --surface-subtle: #f9fafb;
-  --surface-border: #e5e7eb;
+  --surface-subtle: #f7faf8;
+  --surface-border: #dce5df;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* Legacy brand tokens */
   --color-brand: var(--brand-primary);
   --color-brand-hover: var(--brand-primary-hover);
   --color-brand-accent: var(--brand-accent);
@@ -34,16 +74,21 @@
   --color-surface-base: var(--surface-base);
   --color-surface-subtle: var(--surface-subtle);
   --color-surface-border: var(--surface-border);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-family: Arial, Helvetica, sans-serif;
 }
 
 input, select, textarea {
-  color: #171717;
+  color: hsl(var(--foreground));
 }
