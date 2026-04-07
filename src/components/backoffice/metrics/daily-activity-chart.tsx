@@ -25,11 +25,11 @@ export default function DailyActivityChart({ data }: DailyActivityChartProps) {
       <AreaChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="colorSesiones" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#171717" stopOpacity={0.15} />
-            <stop offset="95%" stopColor="#171717" stopOpacity={0} />
+            <stop offset="5%" stopColor="#5a7a6a" stopOpacity={0.2} />
+            <stop offset="95%" stopColor="#5a7a6a" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+        <CartesianGrid strokeDasharray="3 3" stroke="#dce5df" />
         <XAxis
           dataKey="date"
           tick={{ fontSize: 11, fill: "#6b7280" }}
@@ -44,18 +44,18 @@ export default function DailyActivityChart({ data }: DailyActivityChartProps) {
           allowDecimals={false}
         />
         <Tooltip
-          contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
+          contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #dce5df" }}
           labelStyle={{ fontWeight: 600 }}
           formatter={(value) => [value as number, "Sesiones"]}
         />
         <Area
           type="monotone"
           dataKey="sesiones"
-          stroke="#171717"
+          stroke="#5a7a6a"
           strokeWidth={2}
           fill="url(#colorSesiones)"
           dot={false}
-          activeDot={{ r: 4 }}
+          activeDot={{ r: 4, fill: "#5a7a6a" }}
         />
       </AreaChart>
     </ResponsiveContainer>
