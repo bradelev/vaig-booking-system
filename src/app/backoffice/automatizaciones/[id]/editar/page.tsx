@@ -26,7 +26,7 @@ export default async function EditarCampanaPage({
 
   const [{ data: campaignRaw }, { data: recipientsRaw }, { data: clientsWithConsent }] = await Promise.all([
     db.from("campaigns")
-      .select("id, name, body, image_url, scheduled_at, target_all, status")
+      .select("id, name, body, image_url, scheduled_at, target_all, status, filter_criteria")
       .eq("id", id)
       .single(),
     db.from("campaign_recipients")
