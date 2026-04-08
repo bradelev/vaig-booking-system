@@ -21,6 +21,16 @@ async function getDb() {
   return supabase as any;
 }
 
+function parseFilterCriteria(formData: FormData): CampaignFilterCriteria | null {
+  const raw = formData.get("filter_criteria") as string | null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as CampaignFilterCriteria;
+  } catch {
+    return null;
+  }
+}
+
 async function insertRecipients(db: unknown, campaignId: string, clientIds: string[]) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = db as any;
@@ -44,8 +54,7 @@ export async function createCampaign(formData: FormData) {
   const scheduledAtRaw = formData.get("scheduled_at") as string | null;
   const scheduledAt = scheduledAtRaw ? new Date(`${scheduledAtRaw}:00-03:00`).toISOString() : null;
 
-  const filterCriteriaRaw = formData.get("filter_criteria") as string | null;
-  const filterCriteria = filterCriteriaRaw ? JSON.parse(filterCriteriaRaw) : null;
+  const filterCriteria = parseFilterCriteria(formData);
 
   const { data: campaign, error } = await db
     .from("campaigns")
@@ -79,8 +88,7 @@ export async function createAndScheduleCampaign(formData: FormData) {
 
   const scheduledAt = new Date(`${scheduledAtRaw}:00-03:00`).toISOString();
 
-  const filterCriteriaRaw = formData.get("filter_criteria") as string | null;
-  const filterCriteria = filterCriteriaRaw ? JSON.parse(filterCriteriaRaw) : null;
+  const filterCriteria = parseFilterCriteria(formData);
 
   // Insert as draft first so we have an ID
   const { data: campaign, error } = await db
@@ -130,8 +138,7 @@ export async function updateCampaign(id: string, formData: FormData) {
   const scheduledAtRaw = formData.get("scheduled_at") as string | null;
   const scheduledAt = scheduledAtRaw ? new Date(`${scheduledAtRaw}:00-03:00`).toISOString() : null;
 
-  const filterCriteriaRaw = formData.get("filter_criteria") as string | null;
-  const filterCriteria = filterCriteriaRaw ? JSON.parse(filterCriteriaRaw) : null;
+  const filterCriteria = parseFilterCriteria(formData);
 
   const { error } = await db
     .from("campaigns")

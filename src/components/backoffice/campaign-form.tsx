@@ -247,7 +247,13 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
     return fd;
   }
 
+  const filterNotReady = recipientMode === "filter" && !filterApplied;
+
   function handleSaveDraft() {
+    if (filterNotReady) {
+      alert("Aplicá los filtros antes de guardar");
+      return;
+    }
     startTransition(async () => {
       const fd = buildFormData();
       if (isEdit && campaign) {
@@ -259,6 +265,10 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
   }
 
   function handleScheduleNew() {
+    if (filterNotReady) {
+      alert("Aplicá los filtros antes de programar");
+      return;
+    }
     if (!scheduledAt) {
       alert("Configurá una fecha y hora de envío antes de programar");
       return;
