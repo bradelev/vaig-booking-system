@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { v2 as cloudinary } from "cloudinary";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 async function getDb() {
   const supabase = await createClient();
@@ -246,25 +252,25 @@ export async function cloneCampaign(id: string) {
 }
 
 export async function uploadCampaignImage(formData: FormData): Promise<{ url: string }> {
-  const supabase = createAdminClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const storage = (supabase as any).storage;
-
   const file = formData.get("file") as File;
   if (!file) throw new Error("No file provided");
-
-  const ext = file.name.split(".").pop() ?? "jpg";
-  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  const { error } = await storage
-    .from("campaign-images")
-    .upload(fileName, buffer, { contentType: file.type, upsert: false });
+  const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "campaign-images",
+        transformation: [{ width: 800, quality: "auto", fetch_format: "auto" }],
+      },
+      (error, result) => {
+        if (error || !result) reject(error ?? new Error("Upload failed"));
+        else resolve(result);
+      }
+    );
+    stream.end(buffer);
+  });
 
-  if (error) throw new Error(error.message);
-
-  const { data } = storage.from("campaign-images").getPublicUrl(fileName);
-  return { url: data.publicUrl };
+  return { url: result.secure_url };
 }
