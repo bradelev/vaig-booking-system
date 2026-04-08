@@ -33,7 +33,7 @@ export default function CampaignFilterPreview({
           {totalCount} cliente{totalCount !== 1 ? "s" : ""} coinciden
         </div>
         {totalCount > 500 && (
-          <span className="text-xs text-gray-500">(mostrando primeros 500)</span>
+          <span className="text-xs text-amber-600 font-medium">La campaña se enviará a los primeros 500 clientes</span>
         )}
         {noConsentCount > 0 && (
           <div className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
