@@ -53,7 +53,7 @@ export default async function CampanaDetallePage({
   const badge = STATUS_BADGE[campaign.status];
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
