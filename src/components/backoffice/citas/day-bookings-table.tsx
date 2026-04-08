@@ -267,7 +267,7 @@ export default function DayBookingsTable({
                         >
                           Editar
                         </button>
-                        {row.status !== "cancelled" && row.status !== "realized" && (
+                        {row.status !== "cancelled" && row.status !== "realized" && row.status !== "no_show" && (
                           <CancelModal bookingId={row.id} />
                         )}
                       </div>
@@ -390,7 +390,7 @@ export default function DayBookingsTable({
                     >
                       Editar
                     </button>
-                    {row.status !== "cancelled" && row.status !== "realized" && (
+                    {row.status !== "cancelled" && row.status !== "realized" && row.status !== "no_show" && (
                       <CancelModal bookingId={row.id} />
                     )}
                   </div>
