@@ -1,7 +1,18 @@
 "use client";
 
 import { useRef, useState, useTransition, useId, useCallback, useEffect } from "react";
-import { createCampaign, createAndScheduleCampaign, updateCampaign, uploadCampaignImage, scheduleCampaign } from "@/actions/campaigns";
+import {
+  createCampaign,
+  createAndScheduleCampaign,
+  updateCampaign,
+  uploadCampaignImage,
+  scheduleCampaign,
+  filterCampaignClients,
+  type CampaignFilterCriteria,
+  type FilteredClient,
+} from "@/actions/campaigns";
+import CampaignFilterPanel, { hasAnyCriteria } from "@/components/backoffice/campaign-filter-panel";
+import CampaignFilterPreview from "@/components/backoffice/campaign-filter-preview";
 
 interface Client {
   id: string;
@@ -10,6 +21,8 @@ interface Client {
   phone: string;
   consent_accepted_at: string | null;
 }
+
+type RecipientMode = "all" | "filter" | "manual";
 
 interface CampaignFormProps {
   clients: Client[];
@@ -22,13 +35,13 @@ interface CampaignFormProps {
     target_all: boolean;
     status: string;
     recipient_ids: string[];
+    filter_criteria?: CampaignFilterCriteria | null;
   };
 }
 
 function toLocalDatetimeValue(isoString: string | null): string {
   if (!isoString) return "";
   const date = new Date(isoString);
-  // Format as YYYY-MM-DDTHH:MM in ART using Intl (timezone-safe, independent of browser locale)
   const parts = new Intl.DateTimeFormat("sv-SE", {
     timeZone: "America/Argentina/Buenos_Aires",
     year: "numeric",
@@ -51,6 +64,13 @@ function formatTimeART(isoString: string | null): string {
   });
 }
 
+function deriveInitialMode(campaign?: CampaignFormProps["campaign"]): RecipientMode {
+  if (!campaign) return "all";
+  if (campaign.target_all) return "all";
+  if (campaign.filter_criteria && hasAnyCriteria(campaign.filter_criteria)) return "filter";
+  return "manual";
+}
+
 export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
   const isEdit = !!campaign;
   const isDraft = !campaign || campaign.status === "draft";
@@ -59,7 +79,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
   const [body, setBody] = useState(campaign?.body ?? "");
   const [imageUrl, setImageUrl] = useState(campaign?.image_url ?? "");
   const [imagePreview, setImagePreview] = useState(campaign?.image_url ?? "");
-  const [targetAll, setTargetAll] = useState(campaign?.target_all ?? false);
+  const [recipientMode, setRecipientMode] = useState<RecipientMode>(deriveInitialMode(campaign));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     new Set(campaign?.recipient_ids ?? [])
   );
@@ -72,10 +92,36 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
   const [uploading, setUploading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
+  // Filter mode state
+  const [filterCriteria, setFilterCriteria] = useState<CampaignFilterCriteria>(
+    campaign?.filter_criteria ?? {}
+  );
+  const [filteredClients, setFilteredClients] = useState<FilteredClient[]>([]);
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [filterApplied, setFilterApplied] = useState(false);
+  const [isFiltering, startFilterTransition] = useTransition();
+
   const fileRef = useRef<HTMLInputElement>(null);
   const comboboxId = useId();
   const listboxId = `${comboboxId}-listbox`;
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-apply filters on mount if editing a filter-based campaign
+  useEffect(() => {
+    if (
+      recipientMode === "filter" &&
+      hasAnyCriteria(filterCriteria) &&
+      !filterApplied
+    ) {
+      startFilterTransition(async () => {
+        const result = await filterCampaignClients(filterCriteria);
+        setFilteredClients(result.clients);
+        setFilteredCount(result.count);
+        setFilterApplied(true);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const dropdownClients = clients.filter((c) => {
     if (selectedIds.has(c.id)) return false;
@@ -129,7 +175,6 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
     }
   }
 
-  // Close dropdown on outside click
   useEffect(() => {
     if (!comboboxOpen) return;
     function handleClick(e: MouseEvent) {
@@ -147,7 +192,6 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Local preview
     const reader = new FileReader();
     reader.onload = (ev) => setImagePreview(ev.target?.result as string);
     reader.readAsDataURL(file);
@@ -160,7 +204,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
       setImageUrl(result.url);
     } catch (err) {
       alert(`Error al subir imagen: ${err instanceof Error ? err.message : "Error desconocido"}`);
-      setImagePreview(imageUrl); // revert preview
+      setImagePreview(imageUrl);
     } finally {
       setUploading(false);
     }
@@ -172,22 +216,44 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
     if (fileRef.current) fileRef.current.value = "";
   }
 
+  function handleApplyFilters() {
+    startFilterTransition(async () => {
+      const result = await filterCampaignClients(filterCriteria);
+      setFilteredClients(result.clients);
+      setFilteredCount(result.count);
+      setFilterApplied(true);
+    });
+  }
+
   function buildFormData(): FormData {
     const fd = new FormData();
     fd.append("name", name);
     fd.append("body", body);
     fd.append("image_url", imageUrl);
-    fd.append("target_all", String(targetAll));
+    fd.append("target_all", String(recipientMode === "all"));
     fd.append("scheduled_at", scheduledAt);
-    if (!targetAll) {
+
+    if (recipientMode === "filter") {
+      fd.append("filter_criteria", JSON.stringify(filterCriteria));
+      for (const client of filteredClients) {
+        fd.append("client_ids", client.id);
+      }
+    } else if (recipientMode === "manual") {
       for (const id of selectedIds) {
         fd.append("client_ids", id);
       }
     }
+
     return fd;
   }
 
+  const filterNotReady = recipientMode === "filter" && !filterApplied;
+
   function handleSaveDraft() {
+    if (filterNotReady) {
+      alert("Aplicá los filtros antes de guardar");
+      return;
+    }
     startTransition(async () => {
       const fd = buildFormData();
       if (isEdit && campaign) {
@@ -199,12 +265,15 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
   }
 
   function handleScheduleNew() {
+    if (filterNotReady) {
+      alert("Aplicá los filtros antes de programar");
+      return;
+    }
     if (!scheduledAt) {
       alert("Configurá una fecha y hora de envío antes de programar");
       return;
     }
     startTransition(async () => {
-      // createAndScheduleCampaign inserts the campaign directly as "scheduled"
       const fd = buildFormData();
       await createAndScheduleCampaign(fd);
     });
@@ -219,9 +288,18 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
 
   const minDatetime = toLocalDatetimeValue(new Date().toISOString());
 
+  // Recipient count for meta info
+  const recipientLabel =
+    recipientMode === "all"
+      ? "Todos los activos"
+      : recipientMode === "filter"
+        ? filterApplied
+          ? `${filteredCount} por filtro`
+          : "Filtros sin aplicar"
+        : `${selectedIds.size} seleccionados`;
+
   return (
     <div className="space-y-6">
-      {/* Two-column layout on desktop */}
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         {/* LEFT: Form fields */}
         <div className="space-y-5">
@@ -299,16 +377,16 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
             />
           </div>
 
-          {/* Recipients */}
+          {/* Recipients — three modes */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Destinatarios</label>
             <div className="space-y-2">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
-                  name="target_all"
-                  checked={targetAll}
-                  onChange={() => setTargetAll(true)}
+                  name="recipient_mode"
+                  checked={recipientMode === "all"}
+                  onChange={() => setRecipientMode("all")}
                   disabled={!isDraft}
                   className="h-4 w-4 text-gray-900"
                 />
@@ -317,9 +395,20 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
-                  name="target_all"
-                  checked={!targetAll}
-                  onChange={() => setTargetAll(false)}
+                  name="recipient_mode"
+                  checked={recipientMode === "filter"}
+                  onChange={() => setRecipientMode("filter")}
+                  disabled={!isDraft}
+                  className="h-4 w-4 text-gray-900"
+                />
+                <span className="text-sm text-gray-700">Filtrar por criterios</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="recipient_mode"
+                  checked={recipientMode === "manual"}
+                  onChange={() => setRecipientMode("manual")}
                   disabled={!isDraft}
                   className="h-4 w-4 text-gray-900"
                 />
@@ -327,9 +416,32 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
               </label>
             </div>
 
-            {!targetAll && (
+            {/* Filter mode */}
+            {recipientMode === "filter" && (
+              <div className="mt-3 space-y-3">
+                <CampaignFilterPanel
+                  criteria={filterCriteria}
+                  onChange={(c) => {
+                    setFilterCriteria(c);
+                    setFilterApplied(false);
+                  }}
+                  onApply={handleApplyFilters}
+                  isPending={isFiltering}
+                  disabled={!isDraft}
+                />
+                {filterApplied && (
+                  <CampaignFilterPreview
+                    clients={filteredClients}
+                    totalCount={filteredCount}
+                    loading={isFiltering}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Manual mode */}
+            {recipientMode === "manual" && (
               <div className="mt-3 space-y-2">
-                {/* Combobox input */}
                 <div id={comboboxId} className="relative">
                   <input
                     ref={inputRef}
@@ -395,7 +507,6 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
                   )}
                 </div>
 
-                {/* Selected chips */}
                 {selectedClients.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {selectedClients.map((c) => (
@@ -492,12 +603,10 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
             className="rounded-2xl p-4 max-w-xs mx-auto shadow-sm"
             style={{ backgroundColor: "#E5DDD5", backgroundImage: "none" }}
           >
-            {/* Chat bubble */}
             <div
               className="rounded-2xl rounded-tl-none overflow-hidden max-w-[280px] ml-auto shadow"
               style={{ backgroundColor: "#DCF8C6" }}
             >
-              {/* Image area */}
               {imagePreview && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -506,7 +615,6 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
                   className="w-full object-cover max-h-48 rounded-t-2xl rounded-tl-none"
                 />
               )}
-              {/* Text */}
               <div className="px-3 py-2">
                 {body ? (
                   <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-snug">
@@ -515,7 +623,6 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
                 ) : (
                   <p className="text-sm text-gray-400 italic">Tu mensaje aparecerá aquí...</p>
                 )}
-                {/* Timestamp */}
                 <div className="mt-1 flex justify-end">
                   <span className="text-xs text-gray-500">
                     {scheduledAt
@@ -536,9 +643,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
           <div className="mt-4 rounded-md bg-gray-50 border border-gray-200 p-3 space-y-1 text-xs text-gray-500">
             <div className="flex justify-between">
               <span>Destinatarios</span>
-              <span className="font-medium text-gray-700">
-                {targetAll ? `Todos los activos` : `${selectedIds.size} seleccionados`}
-              </span>
+              <span className="font-medium text-gray-700">{recipientLabel}</span>
             </div>
             {scheduledAt && (
               <div className="flex justify-between">
