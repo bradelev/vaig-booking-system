@@ -6,6 +6,7 @@ import Combobox, { type ComboboxItem } from "@/components/backoffice/agenda/comb
 import StatusBadge from "@/components/backoffice/status-badge";
 import { updateBookingInline } from "@/actions/citas";
 import type { BookingItem } from "@/app/backoffice/citas/page";
+import CancelModal from "@/components/backoffice/cancel-modal";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pendiente" },
@@ -259,12 +260,17 @@ export default function DayBookingsTable({
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => startEdit(row)}
-                        className="text-xs text-blue-600 hover:underline"
-                      >
-                        Editar
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => startEdit(row)}
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          Editar
+                        </button>
+                        {row.status !== "cancelled" && row.status !== "realized" && row.status !== "no_show" && (
+                          <CancelModal bookingId={row.id} />
+                        )}
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -377,12 +383,17 @@ export default function DayBookingsTable({
                       <p className="text-xs text-gray-400 italic truncate">{row.notes}</p>
                     )}
                   </div>
-                  <button
-                    onClick={() => startEdit(row)}
-                    className="shrink-0 text-xs text-blue-600 hover:underline"
-                  >
-                    Editar
-                  </button>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <button
+                      onClick={() => startEdit(row)}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Editar
+                    </button>
+                    {row.status !== "cancelled" && row.status !== "realized" && row.status !== "no_show" && (
+                      <CancelModal bookingId={row.id} />
+                    )}
+                  </div>
                 </div>
               )}
             </div>
