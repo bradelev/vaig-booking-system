@@ -140,67 +140,65 @@ export default async function CampanaDetallePage({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {/* Message preview */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-700">Mensaje</h2>
-          <div
-            className="rounded-2xl p-4 shadow-sm"
-            style={{ backgroundColor: "#E5DDD5" }}
-          >
-            <div
-              className="rounded-2xl rounded-tl-none overflow-hidden max-w-[280px] ml-auto shadow"
-              style={{ backgroundColor: "#DCF8C6" }}
-            >
-              {campaign.image_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={campaign.image_url}
-                  alt="Campaign image"
-                  className="w-full object-cover max-h-48"
-                />
-              )}
-              <div className="px-3 py-2">
-                <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-snug">
-                  {campaign.body || <span className="italic text-gray-400">Sin texto</span>}
-                </p>
-              </div>
-            </div>
+      {/* Stats */}
+      <div className="space-y-4">
+        <h2 className="text-sm font-semibold text-gray-700">Estadísticas</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-lg border bg-white p-4">
+            <p className="text-xs text-gray-500">Destinatarios</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900">
+              {campaign.target_all ? "Todos" : campaign.total_recipients}
+            </p>
           </div>
-        </div>
-
-        {/* Stats */}
-        <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700">Estadísticas</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg border bg-white p-4">
+            <p className="text-xs text-gray-500">Enviados</p>
+            <p className="mt-1 text-2xl font-bold text-green-600">{campaign.sent_count}</p>
+          </div>
+          <div className="rounded-lg border bg-white p-4">
+            <p className="text-xs text-gray-500">Errores</p>
+            <p className="mt-1 text-2xl font-bold text-red-500">{campaign.failed_count}</p>
+          </div>
+          {campaign.completed_at && (
             <div className="rounded-lg border bg-white p-4">
-              <p className="text-xs text-gray-500">Destinatarios</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">
-                {campaign.target_all ? "Todos" : campaign.total_recipients}
+              <p className="text-xs text-gray-500">Completada</p>
+              <p className="mt-1 text-sm font-medium text-gray-700">
+                {new Date(campaign.completed_at).toLocaleString("es-AR", {
+                  timeZone: "America/Argentina/Buenos_Aires",
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </p>
             </div>
-            <div className="rounded-lg border bg-white p-4">
-              <p className="text-xs text-gray-500">Enviados</p>
-              <p className="mt-1 text-2xl font-bold text-green-600">{campaign.sent_count}</p>
-            </div>
-            <div className="rounded-lg border bg-white p-4">
-              <p className="text-xs text-gray-500">Errores</p>
-              <p className="mt-1 text-2xl font-bold text-red-500">{campaign.failed_count}</p>
-            </div>
-            {campaign.completed_at && (
-              <div className="rounded-lg border bg-white p-4">
-                <p className="text-xs text-gray-500">Completada</p>
-                <p className="mt-1 text-sm font-medium text-gray-700">
-                  {new Date(campaign.completed_at).toLocaleString("es-AR", {
-                    timeZone: "America/Argentina/Buenos_Aires",
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
-              </div>
+          )}
+        </div>
+      </div>
+
+      {/* Message preview */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-gray-700">Mensaje</h2>
+        <div
+          className="inline-block rounded-2xl p-4 shadow-sm"
+          style={{ backgroundColor: "#E5DDD5" }}
+        >
+          <div
+            className="rounded-2xl rounded-tl-none overflow-hidden max-w-[280px] shadow"
+            style={{ backgroundColor: "#DCF8C6" }}
+          >
+            {campaign.image_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={campaign.image_url}
+                alt="Campaign image"
+                className="w-full object-cover max-h-48"
+              />
             )}
+            <div className="px-3 py-2">
+              <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-snug">
+                {campaign.body || <span className="italic text-gray-400">Sin texto</span>}
+              </p>
+            </div>
           </div>
         </div>
       </div>
