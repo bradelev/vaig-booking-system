@@ -7,12 +7,14 @@ import { buildKnowledgeBase } from "./knowledge";
 import { getSession, upsertSession, clearSession, advanceFunnel } from "./session";
 import { getSlotsByWindow, getSlotsByWindowAllProfessionals, getNextAvailableSlots, checkSlotAvailability, getNearbySlots, formatSlotLabel } from "@/lib/scheduler/db";
 import type { TimeWindow, SlotsByDay } from "@/lib/scheduler/db";
-import { artDateTime, getARTComponents } from "@/lib/timezone";
+import { getARTComponents } from "@/lib/timezone";
 import { getConfigValue } from "@/lib/config";
 import { createMPPreference, createPackMPPreference } from "@/lib/payments/mp";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "./rate-limit";
 import { answerWithLLM } from "./llm";
+import { parseSmartDateTime } from "./date-parser";
+import { detectIntent } from "./intent";
 import { notifyAdminNewBooking } from "./notifications";
 import type { BotConversationState, BookingFlowContext, ServiceInfo, SlotOption, MultiProfSlot } from "./types";
 
@@ -171,13 +173,56 @@ async function route(
     return handleBack(phone, state, context);
   }
 
-  if (state === "idle" || isMenuTrigger(text)) {
+  // VBS-153: LLM intent detection for idle/menu — natural language shortcuts
+  if (state === "idle" || state === "menu" || isMenuTrigger(text)) {
+    if (state === "idle" || state === "menu") {
+      const kb = await buildKnowledgeBase();
+      const intent = await detectIntent(text, kb);
+      if (intent && intent.confidence >= 0.8) {
+        switch (intent.intent) {
+          case "greeting":
+          case "unknown":
+            return handleMenu(phone);
+          case "thanks":
+            await reply(phone, "¡De nada! Si necesitás algo más, escribí *hola*. 😊");
+            return;
+          case "my_bookings":
+            return handleMisTurnos(phone);
+          case "pack":
+            await upsertSession(phone, "pack_service", {});
+            return handlePackServiceSelection(phone, text, {});
+          case "cancel":
+            return handleRescheduleStart(phone);
+          case "question":
+          case "info":
+            return handleInfoFlow(phone, text);
+          case "book": {
+            // If we have service + time entities, try to shortcut deep into the flow
+            const matchedService = intent.entities.service
+              ? kb.services.find((s) =>
+                  s.name.toLowerCase().includes(intent.entities.service!.toLowerCase()) ||
+                  intent.entities.service!.toLowerCase().includes(s.name.toLowerCase())
+                )
+              : undefined;
+
+            if (matchedService) {
+              const newCtx: BookingFlowContext = { selectedServiceId: matchedService.id };
+              return proceedToSlotSelection(newCtx, phone);
+            }
+            // No service detected — fall through to normal menu
+            return handleMenu(phone);
+          }
+          default:
+            return handleMenu(phone);
+        }
+      }
+    }
+    // Intent not confident enough — fall back to normal menu handling
+    if (state === "menu") return handleMenuSelection(phone, text, context);
     return handleMenu(phone);
   }
 
   switch (state) {
-    case "menu":
-      return handleMenuSelection(phone, text, context);
     case "info_flow":
       return handleInfoFlow(phone, text);
     case "booking_category":
@@ -642,8 +687,8 @@ async function handleWindowSelection(
   const windows = (context._windows as TimeWindow[]) ?? DEFAULT_WINDOWS;
 
   // Try to parse as exact date/time — delegate to handleSlotSelection which re-parses
-  const parsedDate = parseUserDateTime(text);
-  if (parsedDate) {
+  const parsedResult = await parseSmartDateTime(text);
+  if (parsedResult) {
     return handleSlotSelection(phone, text, context as BookingFlowContext & { _slots?: SlotOption[] });
   }
 
@@ -729,7 +774,8 @@ async function handleSlotSelection(
     if (!service) return handleMenu(phone);
 
     // Parse something like "viernes 10:00" or "17/03 15:30"
-    const parsedDate = parseUserDateTime(text);
+    const parsedResult = await parseSmartDateTime(text);
+    const parsedDate = parsedResult?.date ?? null;
     if (parsedDate) {
       const bufferMinutes = parseInt(await getConfigValue("buffer_minutes", "0"));
 
@@ -1845,52 +1891,3 @@ function formatDateLabel(date: Date): string {
   });
 }
 
-function parseUserDateTime(text: string): Date | null {
-  // Try to parse patterns like "viernes 10:00", "17/03 15:30", "mañana 10:00"
-  const timeMatch = text.match(/(\d{1,2}):(\d{2})/);
-  if (!timeMatch) return null;
-
-  const hour = parseInt(timeMatch[1]);
-  const minute = parseInt(timeMatch[2]);
-
-  const now = new Date();
-  // Use ART day-of-week so "lunes" resolves correctly when server is UTC
-  const { dayOfWeek: currentArtDay } = getARTComponents(now);
-
-  // candidate tracks the target date (as a Date object used only for date arithmetic)
-  const candidate = new Date(now);
-
-  const t = normalize(text);
-
-  if (t.includes("manana") || t.includes("mañana")) {
-    candidate.setDate(now.getDate() + 1);
-  } else if (t.includes("pasado")) {
-    candidate.setDate(now.getDate() + 2);
-  } else {
-    // Try day name
-    const dayMap: Record<string, number> = {
-      domingo: 0, lunes: 1, martes: 2, miercoles: 3,
-      jueves: 4, viernes: 5, sabado: 6,
-    };
-    for (const [name, dayNum] of Object.entries(dayMap)) {
-      if (t.includes(name)) {
-        let daysAhead = (dayNum - currentArtDay + 7) % 7;
-        if (daysAhead === 0) daysAhead = 7; // next week same day
-        candidate.setDate(now.getDate() + daysAhead);
-        break;
-      }
-    }
-
-    // Try dd/mm pattern
-    const dateMatch = text.match(/(\d{1,2})\/(\d{1,2})/);
-    if (dateMatch) {
-      const day = parseInt(dateMatch[1]);
-      const month = parseInt(dateMatch[2]) - 1;
-      candidate.setMonth(month, day);
-      if (candidate < now) candidate.setFullYear(now.getFullYear() + 1);
-    }
-  }
-
-  // Build the final Date in ART so hour/minute are interpreted as Argentina time
-  return artDateTime(candidate, hour, minute);
-}
