@@ -19,7 +19,6 @@ interface Client {
   first_name: string;
   last_name: string;
   phone: string;
-  consent_accepted_at: string | null;
 }
 
 type RecipientMode = "all" | "filter" | "manual";
@@ -491,11 +490,6 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
                               {c.first_name} {c.last_name}
                               <span className="ml-2 text-gray-400 text-xs">{c.phone}</span>
                             </span>
-                            {!c.consent_accepted_at && (
-                              <span className="ml-2 shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
-                                Sin RNPD
-                              </span>
-                            )}
                           </li>
                         ))
                       )}
@@ -508,17 +502,8 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
                     {selectedClients.map((c) => (
                       <span
                         key={c.id}
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
-                          !c.consent_accepted_at
-                            ? "border border-orange-300 bg-orange-50 text-orange-800"
-                            : "border border-gray-200 bg-gray-100 text-gray-700"
-                        }`}
+                        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border border-gray-200 bg-gray-100 text-gray-700"
                       >
-                        {!c.consent_accepted_at && (
-                          <svg className="h-3 w-3 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-label="Sin RNPD">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                          </svg>
-                        )}
                         {c.first_name} {c.last_name}
                         {isDraft && (
                           <button

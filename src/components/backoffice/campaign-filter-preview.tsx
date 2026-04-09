@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import type { FilteredClient } from "@/actions/campaigns";
 import { updateClientPhone } from "@/actions/campaigns";
 import { SEGMENTO_BADGE } from "@/lib/constants/segments";
-import { AlertTriangle, Users, Check, X, Pencil } from "lucide-react";
+import { Users, Check, X, Pencil } from "lucide-react";
 
 interface CampaignFilterPreviewProps {
   clients: FilteredClient[];
@@ -114,7 +114,6 @@ export default function CampaignFilterPreview({
     );
   }
 
-  const noConsentCount = clients.filter((c) => !c.consent_accepted_at).length;
   const allSelected = clients.length > 0 && clients.every((c) => selectedIds.has(c.id));
   const someSelected = clients.some((c) => selectedIds.has(c.id));
 
@@ -150,12 +149,6 @@ export default function CampaignFilterPreview({
         )}
         {totalCount > 500 && (
           <span className="text-xs text-amber-600 font-medium">La campaña se enviará a los primeros 500 clientes</span>
-        )}
-        {noConsentCount > 0 && (
-          <div className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-            <AlertTriangle className="h-3 w-3" />
-            {noConsentCount} sin RNPD
-          </div>
         )}
       </div>
 
@@ -210,12 +203,6 @@ export default function CampaignFilterPreview({
                     </td>
                     <td className="px-3 py-1.5">
                       <span className="font-medium text-gray-900">{c.first_name} {c.last_name}</span>
-                      {!c.consent_accepted_at && (
-                        <span className="ml-1.5 inline-flex items-center gap-0.5 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                          <AlertTriangle className="h-2.5 w-2.5" />
-                          RNPD
-                        </span>
-                      )}
                     </td>
                     <td className="px-3 py-1.5 text-gray-500">
                       <InlinePhoneEdit
