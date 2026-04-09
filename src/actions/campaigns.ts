@@ -280,7 +280,6 @@ export interface CampaignFilterCriteria {
   totalSesionesMax?: number | null;
   diasInactivoMin?: number | null;
   diasInactivoMax?: number | null;
-  consentOnly?: boolean;
 }
 
 export interface FilteredClient {
@@ -292,7 +291,6 @@ export interface FilteredClient {
   categoria: string | null;
   total_sesiones: number;
   dias_inactivo: number | null;
-  consent_accepted_at: string | null;
 }
 
 export async function filterCampaignClients(
@@ -303,7 +301,7 @@ export async function filterCampaignClients(
   let query = db
     .from("clientes_metricas")
     .select(
-      "id, first_name, last_name, phone, segmento, categoria, total_sesiones, dias_inactivo, consent_accepted_at",
+      "id, first_name, last_name, phone, segmento, categoria, total_sesiones, dias_inactivo",
       { count: "exact" }
     )
     .eq("is_blocked", false);
@@ -346,10 +344,6 @@ export async function filterCampaignClients(
   }
   if (criteria.totalSesionesMax != null) {
     query = query.lte("total_sesiones", criteria.totalSesionesMax);
-  }
-
-  if (criteria.consentOnly) {
-    query = query.not("consent_accepted_at", "is", null);
   }
 
   const { data, count, error } = await query.order("first_name").limit(500);

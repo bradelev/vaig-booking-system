@@ -10,7 +10,6 @@ interface Client {
   first_name: string;
   last_name: string;
   phone: string;
-  consent_accepted_at: string | null;
 }
 
 export default async function NuevaCampanaPage() {
@@ -18,26 +17,13 @@ export default async function NuevaCampanaPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  const { data: withConsent } = await db
+  const { data } = await db
     .from("clients")
-    .select("id, first_name, last_name, phone, consent_accepted_at")
+    .select("id, first_name, last_name, phone")
     .eq("is_blocked", false)
     .order("first_name");
 
-  let clients: Client[];
-  if (withConsent) {
-    clients = withConsent as Client[];
-  } else {
-    // Fallback: consent_accepted_at column may not exist in DB yet
-    const { data: withoutConsent } = await db
-      .from("clients")
-      .select("id, first_name, last_name, phone")
-      .eq("is_blocked", false)
-      .order("first_name");
-    clients = ((withoutConsent ?? []) as Array<Omit<Client, "consent_accepted_at">>).map(
-      (c) => ({ ...c, consent_accepted_at: null }),
-    );
-  }
+  const clients = (data ?? []) as Client[];
 
   return (
     <div className="max-w-5xl space-y-6">
