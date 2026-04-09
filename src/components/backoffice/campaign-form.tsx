@@ -100,6 +100,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
   const [filteredCount, setFilteredCount] = useState(0);
   const [filterApplied, setFilterApplied] = useState(false);
   const [isFiltering, startFilterTransition] = useTransition();
+  const [filterSelectedIds, setFilterSelectedIds] = useState<Set<string>>(new Set());
 
   const fileRef = useRef<HTMLInputElement>(null);
   const comboboxId = useId();
@@ -118,6 +119,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
         setFilteredClients(result.clients);
         setFilteredCount(result.count);
         setFilterApplied(true);
+        setFilterSelectedIds(new Set(result.clients.map((c) => c.id)));
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -222,6 +224,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
       setFilteredClients(result.clients);
       setFilteredCount(result.count);
       setFilterApplied(true);
+      setFilterSelectedIds(new Set(result.clients.map((c) => c.id)));
     });
   }
 
@@ -235,8 +238,8 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
 
     if (recipientMode === "filter") {
       fd.append("filter_criteria", JSON.stringify(filterCriteria));
-      for (const client of filteredClients) {
-        fd.append("client_ids", client.id);
+      for (const id of filterSelectedIds) {
+        fd.append("client_ids", id);
       }
     } else if (recipientMode === "manual") {
       for (const id of selectedIds) {
@@ -294,7 +297,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
       ? "Todos los activos"
       : recipientMode === "filter"
         ? filterApplied
-          ? `${filteredCount} por filtro`
+          ? `${filterSelectedIds.size} de ${filteredCount} por filtro`
           : "Filtros sin aplicar"
         : `${selectedIds.size} seleccionados`;
 
@@ -429,13 +432,6 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
                   isPending={isFiltering}
                   disabled={!isDraft}
                 />
-                {filterApplied && (
-                  <CampaignFilterPreview
-                    clients={filteredClients}
-                    totalCount={filteredCount}
-                    loading={isFiltering}
-                  />
-                )}
               </div>
             )}
 
@@ -663,6 +659,18 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
           </div>
         </div>
       </div>
+
+      {/* Filter preview — full width below the grid */}
+      {recipientMode === "filter" && filterApplied && (
+        <CampaignFilterPreview
+          clients={filteredClients}
+          totalCount={filteredCount}
+          loading={isFiltering}
+          selectedIds={filterSelectedIds}
+          onSelectionChange={setFilterSelectedIds}
+          disabled={!isDraft}
+        />
+      )}
     </div>
   );
 }
