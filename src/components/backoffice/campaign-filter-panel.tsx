@@ -122,8 +122,7 @@ const hasAnyCriteria = (c: CampaignFilterCriteria) =>
   c.totalSesionesMin != null ||
   c.totalSesionesMax != null ||
   c.diasInactivoMin != null ||
-  c.diasInactivoMax != null ||
-  c.consentOnly === true;
+  c.diasInactivoMax != null;
 
 export { hasAnyCriteria };
 
@@ -191,19 +190,6 @@ export default function CampaignFilterPanel({
           placeholderMax="365"
           disabled={disabled}
         />
-      </div>
-
-      <div className="flex items-center gap-3 sm:col-span-2">
-        <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-            checked={criteria.consentOnly ?? false}
-            onChange={(e) => update({ consentOnly: e.target.checked || undefined })}
-            disabled={disabled}
-          />
-          Solo clientes con consentimiento RNPD
-        </label>
       </div>
 
       <div className="flex items-center gap-2 border-t border-gray-200 pt-3">
