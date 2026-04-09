@@ -358,6 +358,12 @@ export async function filterCampaignClients(
   return { clients: (data ?? []) as FilteredClient[], count: count ?? 0 };
 }
 
+export async function updateClientPhone(clientId: string, phone: string): Promise<void> {
+  const db = await getDb();
+  const { error } = await db.from("clients").update({ phone }).eq("id", clientId);
+  if (error) throw new Error(error.message);
+}
+
 export async function uploadCampaignImage(formData: FormData): Promise<{ url: string }> {
   const file = formData.get("file") as File;
   if (!file) throw new Error("No file provided");
