@@ -233,6 +233,24 @@ export async function updateSession(
   return { success: true };
 }
 
+export async function deleteSession(
+  sessionId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const client = supabase as SupabaseClient;
+
+  const { error } = await client
+    .from("sesiones_historicas")
+    .delete()
+    .eq("id", sessionId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/backoffice/sesiones");
+  revalidatePath("/backoffice/sesiones/nueva");
+  return { success: true };
+}
+
 export async function quickCreateClientForSession(data: {
   first_name: string;
   last_name: string;
