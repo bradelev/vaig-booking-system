@@ -14,8 +14,9 @@
 import ExcelJS from "exceljs";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+// Export the full workbook (all sheets) — sheet is selected by name after parsing
 const DEFAULT_SHEET_URL =
-  "https://docs.google.com/spreadsheets/d/1WMzhgTMYu3Qt4O1zErtNU3DAe5P7pFI_/export?format=xlsx&sheet=Ingresos%20pacientes";
+  "https://docs.google.com/spreadsheets/d/1WMzhgTMYu3Qt4O1zErtNU3DAe5P7pFI_/export?format=xlsx";
 
 function getSheetUrl(): string {
   return process.env.SHEET_HISTORICO_URL ?? DEFAULT_SHEET_URL;
@@ -167,12 +168,15 @@ export async function syncSheetHistorico(): Promise<SheetSyncResult> {
   // ExcelJS .load() accepts ArrayBuffer at runtime; cast needed for Node 22 Buffer types
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await workbook.xlsx.load(arrayBuffer as any);
-  const worksheet = workbook.worksheets[0];
+  const worksheet = workbook.getWorksheet("Ingresos pacientes");
   if (!worksheet) {
-    throw new Error("No worksheet found in the XLSX file");
+    throw new Error(
+      'Sheet "Ingresos pacientes" not found. Available: ' +
+        workbook.worksheets.map((ws) => ws.name).join(", ")
+    );
   }
 
-  // 3. Find header row (scan for row containing "Paciente")
+  // 3. Find header row (scan for cell containing "Paciente")
   let headerRowNum = 0;
   worksheet.eachRow((row, rowNumber) => {
     if (headerRowNum > 0) return;
@@ -246,17 +250,27 @@ export async function syncSheetHistorico(): Promise<SheetSyncResult> {
     const row = worksheet.getRow(rowNum);
 
     try {
-      // Column 3 = Fecha (YYYY-MM-DD) — ExcelJS may return a Date object
-      const fechaCell = row.getCell(3).value;
+      // Column 2 = Fecha Original (Date object from ExcelJS)
+      // Column 3 = Fecha (formula TEXT(B,"YYYY-MM-DD")) — result is null when not computed
+      // Use col 2 which always contains the raw date value
+      const fechaCell = row.getCell(2).value;
       let fecha: string;
       if (fechaCell instanceof Date) {
+        // Strip time — stored as UTC midnight, extract date portion
         fecha = fechaCell.toISOString().split("T")[0];
       } else if (fechaCell != null) {
         const str = String(fechaCell).trim();
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) continue;
-        fecha = str;
+        // Accept YYYY-MM-DD string or D/M/YYYY
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+          fecha = str;
+        } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+          const [d, m, y] = str.split("/");
+          fecha = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+        } else {
+          continue; // unrecognized date format — skip row
+        }
       } else {
-        continue;
+        continue; // empty date — skip row (spacer/total rows)
       }
 
       // Column 5 = Paciente
@@ -312,7 +326,9 @@ export async function syncSheetHistorico(): Promise<SheetSyncResult> {
         });
       }
 
-      // Map columns
+      // Map remaining columns (col indices per XLSX: 5=Paciente, 6=Tipo, 7=Desc,
+      // 8=Operadora, 9=MontoLista, 10=Descuento, 11=MontoCobrado, 12=MetodoPago,
+      // 13=Banco, 15=Comentarios)
       const tipoServicio = cellStr(row, 6);
       if (!tipoServicio) {
         result.errors.push(`Row ${rowNum}: missing Tipo de Servicio`);
