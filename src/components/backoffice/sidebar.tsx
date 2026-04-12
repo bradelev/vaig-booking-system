@@ -59,9 +59,10 @@ interface SidebarProps {
   collapsed?: boolean;
   onClose?: () => void;
   email?: string;
+  inboxUnreadCount?: number;
 }
 
-export default function Sidebar({ collapsed = false, onClose, email }: SidebarProps) {
+export default function Sidebar({ collapsed = false, onClose, email, inboxUnreadCount = 0 }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -111,6 +112,8 @@ export default function Sidebar({ collapsed = false, onClose, email }: SidebarPr
 
                 const Icon = item.icon;
 
+                const showBadge = item.href === "/backoffice/inbox" && inboxUnreadCount > 0;
+
                 const linkEl = (
                   <Link
                     href={item.href}
@@ -122,8 +125,24 @@ export default function Sidebar({ collapsed = false, onClose, email }: SidebarPr
                         : "text-white/70 hover:bg-white/10 hover:text-white"
                     )}
                   >
-                    <Icon className="h-5 w-5 shrink-0" />
-                    {!collapsed && item.label}
+                    <span className="relative shrink-0">
+                      <Icon className="h-5 w-5" />
+                      {showBadge && collapsed && (
+                        <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                          {inboxUnreadCount > 99 ? "99+" : inboxUnreadCount}
+                        </span>
+                      )}
+                    </span>
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1">{item.label}</span>
+                        {showBadge && (
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                            {inboxUnreadCount > 99 ? "99+" : inboxUnreadCount}
+                          </span>
+                        )}
+                      </>
+                    )}
                   </Link>
                 );
 
