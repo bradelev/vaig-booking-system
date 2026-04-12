@@ -6,21 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { MessageSquare, User, Search } from "lucide-react";
-
-interface InboxConversation {
-  phone: string;
-  handoff_active: boolean;
-  handoff_at: string | null;
-  last_inbound_at: string | null;
-  bot_state: string;
-  client_id: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  last_message_body: string | null;
-  last_message_direction: string | null;
-  last_message_at: string | null;
-  unread_count: number;
-}
+import type { InboxConversation } from "./types";
 
 type Filter = "all" | "unread" | "handoff";
 
