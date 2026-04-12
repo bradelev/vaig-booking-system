@@ -920,6 +920,7 @@ export default function DaySessionsTable({
                         <button
                           onClick={() => handleDelete(row)}
                           disabled={deletingId === row.id}
+                          title="Eliminar sesión"
                           className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
                         >
                           {deletingId === row.id ? "…" : "🗑️"}
