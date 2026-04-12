@@ -3,7 +3,7 @@
  * When handoff is active, the bot engine skips processing for that phone.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendTextMessage } from "@/lib/whatsapp";
+import { sendTextMessage } from "@/lib/whatsapp/logged";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
@@ -61,7 +61,7 @@ export async function activateHandoff(phone: string): Promise<void> {
   await sendTextMessage({
     to: phone,
     body: "Te paso con una persona de nuestro equipo. En breve te responden. 🙋",
-  });
+  }, "bot");
 }
 
 /** Release handoff — bot resumes handling messages for this phone. */
@@ -81,7 +81,7 @@ export async function releaseHandoff(phone: string): Promise<void> {
   await sendTextMessage({
     to: phone,
     body: "Nuestro equipo ya te atendió. Si necesitás algo más, escribí *hola*. 👋",
-  });
+  }, "bot");
 }
 
 /** Update last_inbound_at on the session (called from webhook). */

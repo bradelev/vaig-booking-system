@@ -7,7 +7,7 @@
  * Admin phone is read from system_config key "admin_phone".
  * If not set, notifications are silently skipped.
  */
-import { sendTextMessage } from "@/lib/whatsapp";
+import { sendTextMessage } from "@/lib/whatsapp/logged";
 import { getConfigValue } from "@/lib/config";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
 
@@ -63,7 +63,7 @@ export async function notifyAdminNewBooking(params: NewBookingNotificationParams
   });
 
   try {
-    await sendTextMessage({ to: adminPhone, body: msg });
+    await sendTextMessage({ to: adminPhone, body: msg }, "admin_notification");
   } catch (err) {
     console.error("[Notifications] Failed to send new booking notification to admin:", err);
   }
@@ -95,7 +95,7 @@ export async function notifyClientPackPurchased(
   });
 
   try {
-    await sendTextMessage({ to: targetPhone, body: msg });
+    await sendTextMessage({ to: targetPhone, body: msg }, "admin_notification");
   } catch (err) {
     console.error("[Notifications] Failed to send pack purchased notification:", err);
   }
@@ -147,7 +147,7 @@ export async function notifyClientCancellation(
   });
 
   try {
-    await sendTextMessage({ to: targetPhone, body: msg });
+    await sendTextMessage({ to: targetPhone, body: msg }, "admin_notification");
   } catch (err) {
     console.error("[Notifications] Failed to send cancellation notification to client:", err);
   }
@@ -197,7 +197,7 @@ export async function notifyAdminPaymentConfirmed(
   });
 
   try {
-    await sendTextMessage({ to: adminPhone, body: msg });
+    await sendTextMessage({ to: adminPhone, body: msg }, "admin_notification");
   } catch (err) {
     console.error("[Notifications] Failed to send payment confirmation to admin:", err);
   }
