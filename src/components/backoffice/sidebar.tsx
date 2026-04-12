@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   CalendarDays,
   ClipboardList,
+  MessageSquare,
   Package,
   Users,
   UserCircle,
@@ -26,6 +27,7 @@ const navSections = [
       { href: "/backoffice", label: "Dashboard", icon: LayoutDashboard },
       { href: "/backoffice/agenda", label: "Agenda", icon: CalendarDays },
       { href: "/backoffice/citas", label: "Citas", icon: ClipboardList },
+      { href: "/backoffice/inbox", label: "Inbox", icon: MessageSquare },
     ],
   },
   {
