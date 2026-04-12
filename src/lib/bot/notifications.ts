@@ -153,6 +153,41 @@ export async function notifyClientCancellation(
   }
 }
 
+/**
+ * Notify the human-operated VAIG WhatsApp Business number when a new booking is
+ * created via the bot. Uses vaig_business_phone from system_config.
+ */
+export async function notifyBusinessNewBooking(
+  params: NewBookingNotificationParams
+): Promise<void> {
+  const businessPhone = (await getConfigValue("vaig_business_phone", "")).trim();
+  if (!businessPhone) return;
+
+  const date = new Date(params.scheduledAt);
+  const dateLabel = date.toLocaleDateString("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const msg =
+    `📅 *Nueva reserva*\n\n` +
+    `👤 ${params.clientName} (${params.clientPhone})\n` +
+    `📋 ${params.serviceName}` +
+    (params.professionalName ? ` — ${params.professionalName}` : "") +
+    `\n🕐 ${dateLabel}`;
+
+  try {
+    await sendTextMessage({ to: businessPhone, body: msg }, "admin_notification");
+  } catch (err) {
+    console.error("[Notifications] Failed to send booking notification to business phone:", err);
+  }
+}
+
 export interface PaymentConfirmedNotificationParams {
   bookingId: string;
   clientName: string;
