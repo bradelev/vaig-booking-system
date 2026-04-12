@@ -15,8 +15,9 @@ import { checkRateLimit } from "./rate-limit";
 import { answerWithLLM } from "./llm";
 import { parseSmartDateTime } from "./date-parser";
 import { detectIntent } from "./intent";
-import { notifyAdminNewBooking } from "./notifications";
+import { notifyAdminNewBooking, notifyBusinessNewBooking } from "./notifications";
 import { isHandoffTrigger, activateHandoff } from "./handoff";
+import { getRecentCampaignForPhone, type RecentCampaign } from "./campaign-context";
 import type { BotConversationState, BookingFlowContext, ServiceInfo, SlotOption, MultiProfSlot } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,6 +130,13 @@ export async function handleIncomingMessage(phone: string, messageText: string):
   let state: BotConversationState = session?.state ?? "idle";
   let context: BookingFlowContext = session?.context ?? {};
 
+  // VBS-166: Campaign context — look up most recent campaign sent to this phone
+  // within 48h when starting a fresh conversation (idle, no existing session)
+  let recentCampaign: RecentCampaign | null = null;
+  if (state === "idle" && !session) {
+    recentCampaign = await getRecentCampaignForPhone(phone);
+  }
+
   // VBS-114: Session timeout — clear stale sessions after configurable inactivity
   // VBS-156: Never timeout handoff sessions — only admin can release
   if (session && state !== "idle" && !session.handoffActive) {
@@ -157,7 +165,7 @@ export async function handleIncomingMessage(phone: string, messageText: string):
   }
 
   try {
-    await route(phone, messageText, state, context);
+    await route(phone, messageText, state, context, recentCampaign);
   } catch (err) {
     console.error("[Bot] Error in state machine:", err);
     await reply(phone, "Ocurrió un error. Por favor intentá nuevamente o escribí *hola* para empezar. 🙏");
@@ -178,7 +186,8 @@ async function route(
   phone: string,
   text: string,
   state: BotConversationState,
-  context: BookingFlowContext
+  context: BookingFlowContext,
+  campaignCtx: RecentCampaign | null = null
 ): Promise<void> {
   // Intercept "0" as back navigation when inside the booking flow
   if (isBackTrigger(text) && state in BOOKING_BACK_MAP) {
@@ -189,12 +198,13 @@ async function route(
   if (state === "idle" || state === "menu" || isMenuTrigger(text)) {
     if (state === "idle" || state === "menu") {
       const kb = await buildKnowledgeBase();
-      const intent = await detectIntent(text, kb);
+      // VBS-166: pass campaign context so LLM can factor in recent promo
+      const intent = await detectIntent(text, kb, campaignCtx);
       if (intent && intent.confidence >= 0.8) {
         switch (intent.intent) {
           case "greeting":
           case "unknown":
-            return handleMenu(phone);
+            return handleMenu(phone, campaignCtx);
           case "thanks":
             await reply(phone, "¡De nada! Si necesitás algo más, escribí *hola*. 😊");
             return;
@@ -222,16 +232,16 @@ async function route(
               return proceedToSlotSelection(newCtx, phone);
             }
             // No service detected — fall through to normal menu
-            return handleMenu(phone);
+            return handleMenu(phone, campaignCtx);
           }
           default:
-            return handleMenu(phone);
+            return handleMenu(phone, campaignCtx);
         }
       }
     }
     // Intent not confident enough — fall back to normal menu handling
     if (state === "menu") return handleMenuSelection(phone, text, context);
-    return handleMenu(phone);
+    return handleMenu(phone, campaignCtx);
   }
 
   switch (state) {
@@ -393,12 +403,20 @@ async function handleBack(
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
-async function handleMenu(phone: string): Promise<void> {
+async function handleMenu(
+  phone: string,
+  campaignCtx?: RecentCampaign | null
+): Promise<void> {
   await upsertSession(phone, "menu", {});
   void advanceFunnel(phone, "started");
+
+  const greeting = campaignCtx
+    ? `¡Hola! Vi que te llegó info sobre *${campaignCtx.name}*. ¿En qué te puedo ayudar?`
+    : "¡Hola! Soy el asistente de *VAIG*. ¿Qué necesitás?";
+
   await replyButtons(
     phone,
-    "¡Hola! Soy el asistente de *VAIG*. ¿Qué necesitás?",
+    greeting,
     [
       { id: "book", title: "Agendar turno" },
       { id: "pack", title: "Comprar pack" },
@@ -1142,7 +1160,7 @@ async function handleBookingConfirm(
   const bookingId = booking.id as string;
 
   // VBS-50: Notify admin of new booking (fire-and-forget)
-  void notifyAdminNewBooking({
+  const bookingNotifyParams = {
     bookingId,
     clientName: `${context.clientFirstName ?? ""} ${context.clientLastName ?? ""}`.trim(),
     clientPhone: phone,
@@ -1150,7 +1168,10 @@ async function handleBookingConfirm(
     professionalName: context.selectedProfessionalName ?? null,
     scheduledAt: slot.start,
     depositAmount: service?.depositAmount ?? 0,
-  });
+  };
+  void notifyAdminNewBooking(bookingNotifyParams);
+  // VBS-166: Also notify the human-operated VAIG Business WhatsApp number
+  void notifyBusinessNewBooking(bookingNotifyParams);
 
   // VBS-67: If client has an active pack, skip payment flow
   if (packInfo && clientPackageId) {
