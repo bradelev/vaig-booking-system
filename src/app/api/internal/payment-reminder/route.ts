@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
-import { sendTextMessage } from "@/lib/whatsapp";
+import { sendTextMessage } from "@/lib/whatsapp/logged";
 import { createMPPreference } from "@/lib/payments/mp";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
 
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .replace(/\{hoursRemaining\}/g, String(hoursRemaining));
 
     try {
-      await sendTextMessage({ to: targetPhone, body: msg });
+      await sendTextMessage({ to: targetPhone, body: msg }, "cron_payment");
       await client
         .from("bookings")
         .update({ payment_reminder_sent_at: new Date().toISOString() })

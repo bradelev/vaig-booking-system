@@ -2,7 +2,7 @@
  * Bot engine — routes incoming messages through the state machine.
  * Each handler returns the messages to send back to the user.
  */
-import { sendTextMessage, sendInteractiveButtons } from "@/lib/whatsapp";
+import { sendTextMessage, sendInteractiveButtons } from "@/lib/whatsapp/logged";
 import { buildKnowledgeBase } from "./knowledge";
 import { getSession, upsertSession, clearSession, advanceFunnel } from "./session";
 import { getSlotsByWindow, getSlotsByWindowAllProfessionals, getNextAvailableSlots, checkSlotAvailability, getNearbySlots, formatSlotLabel } from "@/lib/scheduler/db";
@@ -74,7 +74,7 @@ export function isMisTurnosTrigger(text: string): boolean {
 }
 
 async function reply(phone: string, text: string): Promise<void> {
-  await sendTextMessage({ to: phone, body: text });
+  await sendTextMessage({ to: phone, body: text }, "bot");
 }
 
 async function replyButtons(
@@ -83,7 +83,7 @@ async function replyButtons(
   buttons: Array<{ id: string; title: string }>
 ): Promise<void> {
   // WhatsApp buttons max 3, titles max 20 chars
-  await sendInteractiveButtons({ to: phone, body, buttons });
+  await sendInteractiveButtons({ to: phone, body, buttons }, "bot");
 }
 
 // ── State machine ─────────────────────────────────────────────────────────────
@@ -1528,8 +1528,8 @@ export async function notifyWaitlistForSlot(
     `Escribí *hola* para agendar antes de que se ocupe. ¡Rápido! ⚡`;
 
   try {
-    const { sendTextMessage: send } = await import("@/lib/whatsapp");
-    await send({ to: targetPhone, body: msg });
+    const { sendTextMessage: send } = await import("@/lib/whatsapp/logged");
+    await send({ to: targetPhone, body: msg }, "bot");
     await dbClient
       .from("waitlist")
       .update({ notified_at: new Date().toISOString() })
