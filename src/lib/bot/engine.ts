@@ -16,6 +16,7 @@ import { answerWithLLM } from "./llm";
 import { parseSmartDateTime } from "./date-parser";
 import { detectIntent } from "./intent";
 import { notifyAdminNewBooking } from "./notifications";
+import { isHandoffTrigger, activateHandoff } from "./handoff";
 import type { BotConversationState, BookingFlowContext, ServiceInfo, SlotOption, MultiProfSlot } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,6 +98,16 @@ export async function handleIncomingMessage(phone: string, messageText: string):
     .maybeSingle();
   if (clientCheck?.is_blocked) return;
 
+  // VBS-156: Human handoff gate — if active, bot does not process
+  const handoffSession = await getSession(phone);
+  if (handoffSession?.handoffActive) return;
+
+  // VBS-156: Handoff keyword detection
+  if (isHandoffTrigger(messageText)) {
+    await activateHandoff(phone);
+    return;
+  }
+
   // VBS-29: Rate limiting check
   const rateLimit = await checkRateLimit(phone);
   if (!rateLimit.allowed) {
@@ -119,7 +130,8 @@ export async function handleIncomingMessage(phone: string, messageText: string):
   let context: BookingFlowContext = session?.context ?? {};
 
   // VBS-114: Session timeout — clear stale sessions after configurable inactivity
-  if (session && state !== "idle") {
+  // VBS-156: Never timeout handoff sessions — only admin can release
+  if (session && state !== "idle" && !session.handoffActive) {
     try {
       const timeoutMinutesStr = await getConfigValue("bot_session_timeout_minutes", "30");
       const timeoutMinutes = parseInt(timeoutMinutesStr, 10) || 30;
