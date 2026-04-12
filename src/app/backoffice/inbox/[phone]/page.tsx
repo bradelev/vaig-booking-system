@@ -6,21 +6,12 @@ import { ArrowLeft } from "lucide-react";
 import ChatThread from "./chat-thread";
 import ReplyBox from "./reply-box";
 import MarkAsRead from "./mark-as-read";
+import type { ChatMessage } from "../types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
 
 export const metadata: Metadata = { title: "Chat" };
-
-interface Message {
-  id: string;
-  direction: "inbound" | "outbound";
-  message_type: string;
-  body: string | null;
-  source: string;
-  status: string;
-  created_at: string;
-}
 
 export default async function ChatPage({
   params,
@@ -85,7 +76,7 @@ export default async function ChatPage({
 
       {/* Messages */}
       <ChatThread
-        initialMessages={(messages ?? []) as Message[]}
+        initialMessages={(messages ?? []) as ChatMessage[]}
         phone={decodedPhone}
       />
 
