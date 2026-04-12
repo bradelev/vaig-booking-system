@@ -29,7 +29,7 @@ describe("parseWebhookPayload", () => {
     const payload = makePayload([
       { id: "msg-1", from: "5491100001111", timestamp: "1700000000", type: "text", text: { body: "Hola" } },
     ]);
-    const result = parseWebhookPayload(payload);
+    const { messages: result } = parseWebhookPayload(payload);
     assert.equal(result.length, 1);
     assert.equal(result[0].from, "5491100001111");
     assert.equal(result[0].type, "text");
@@ -51,7 +51,7 @@ describe("parseWebhookPayload", () => {
         },
       },
     ]);
-    const result = parseWebhookPayload(payload);
+    const { messages: result } = parseWebhookPayload(payload);
     assert.equal(result.length, 1);
     assert.equal(result[0].type, "interactive");
     if (result[0].type === "interactive") {
@@ -73,7 +73,7 @@ describe("parseWebhookPayload", () => {
         },
       },
     ]);
-    const result = parseWebhookPayload(payload);
+    const { messages: result } = parseWebhookPayload(payload);
     assert.equal(result.length, 1);
     if (result[0].type === "interactive") {
       assert.equal(result[0].interactive.type, "list_reply");
@@ -102,7 +102,7 @@ describe("parseWebhookPayload", () => {
         },
       ],
     };
-    const result = parseWebhookPayload(payload);
+    const { messages: result } = parseWebhookPayload(payload);
     assert.equal(result.length, 0);
   });
 
@@ -111,7 +111,7 @@ describe("parseWebhookPayload", () => {
       object: "whatsapp_business_account",
       entry: [],
     };
-    const result = parseWebhookPayload(payload);
+    const { messages: result } = parseWebhookPayload(payload);
     assert.equal(result.length, 0);
   });
 
@@ -151,7 +151,7 @@ describe("parseWebhookPayload", () => {
         },
       ],
     };
-    const result = parseWebhookPayload(payload);
+    const { messages: result } = parseWebhookPayload(payload);
     assert.equal(result.length, 2);
   });
 
@@ -176,7 +176,7 @@ describe("parseWebhookPayload", () => {
         },
       ],
     };
-    const result = parseWebhookPayload(payload);
+    const { messages: result } = parseWebhookPayload(payload);
     assert.equal(result.length, 0);
   });
 });
