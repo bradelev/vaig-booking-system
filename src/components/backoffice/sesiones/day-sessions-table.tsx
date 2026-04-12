@@ -81,14 +81,17 @@ interface DaySessionsTableProps {
 
 const METODOS_PAGO = [
   { value: "", label: "— Sin método —" },
-  { value: "efectivo", label: "Efectivo" },
-  { value: "transferencia", label: "Transferencia" },
-  { value: "debito", label: "Débito" },
-  { value: "credito", label: "Crédito" },
-  { value: "mercado_pago", label: "Mercado Pago" },
+  { value: "Transferencia", label: "Transferencia" },
+  { value: "Efectivo", label: "Efectivo" },
+  { value: "Mercado_Pago", label: "Mercado Pago" },
+  { value: "Pos_débito", label: "Pos débito" },
+  { value: "Pos_crédito", label: "Pos crédito" },
+  { value: "Cuponera", label: "Cuponera" },
+  { value: "Canje", label: "Canje" },
+  { value: "Regalo", label: "Regalo" },
 ];
 
-const METODOS_CON_BANCO = ["transferencia", "debito", "credito"];
+const METODOS_CON_BANCO = ["Transferencia", "Pos_débito", "Pos_crédito"];
 
 function formatCurrency(n?: number): string {
   if (n == null) return "—";
