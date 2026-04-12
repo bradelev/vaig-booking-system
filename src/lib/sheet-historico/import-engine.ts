@@ -14,8 +14,12 @@
 import ExcelJS from "exceljs";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const SHEET_EXPORT_URL =
+const DEFAULT_SHEET_URL =
   "https://docs.google.com/spreadsheets/d/1WMzhgTMYu3Qt4O1zErtNU3DAe5P7pFI_/export?format=xlsx&sheet=Ingresos%20pacientes";
+
+function getSheetUrl(): string {
+  return process.env.SHEET_HISTORICO_URL ?? DEFAULT_SHEET_URL;
+}
 
 export interface SheetSyncResult {
   imported: number;
@@ -106,13 +110,17 @@ function findClientByName(
   const exact = clients.find((c) => c.normalized === norm);
   if (exact) return exact;
 
-  // 2. Includes match
-  const includes = clients.find(
-    (c) => c.normalized.includes(norm) || norm.includes(c.normalized)
-  );
-  if (includes) return includes;
+  // 2. Includes match (only if both strings are long enough to avoid false positives)
+  if (norm.length >= 5) {
+    const includes = clients.find(
+      (c) =>
+        c.normalized.length >= 5 &&
+        (c.normalized.includes(norm) || norm.includes(c.normalized))
+    );
+    if (includes) return includes;
+  }
 
-  // 3. Word overlap (≥2 words)
+  // 3. Word overlap (≥2 exact word matches)
   const words = norm.split(" ").filter(Boolean);
   if (words.length < 2) return null;
 
@@ -120,9 +128,7 @@ function findClientByName(
   let bestOverlap = 0;
   for (const c of clients) {
     const cWords = c.normalized.split(" ").filter(Boolean);
-    const overlap = words.filter((w) =>
-      cWords.some((cw) => cw === w || cw.includes(w) || w.includes(cw))
-    ).length;
+    const overlap = words.filter((w) => cWords.includes(w)).length;
     if (overlap >= 2 && overlap > bestOverlap) {
       bestOverlap = overlap;
       bestMatch = c;
@@ -148,7 +154,7 @@ export async function syncSheetHistorico(): Promise<SheetSyncResult> {
   };
 
   // 1. Fetch XLSX
-  const response = await fetch(SHEET_EXPORT_URL);
+  const response = await fetch(getSheetUrl());
   if (!response.ok) {
     throw new Error(
       `Failed to fetch spreadsheet: ${response.status} ${response.statusText}`
@@ -240,10 +246,18 @@ export async function syncSheetHistorico(): Promise<SheetSyncResult> {
     const row = worksheet.getRow(rowNum);
 
     try {
-      // Column 3 = Fecha (YYYY-MM-DD)
-      const fechaRaw = cellStr(row, 3);
-      if (!fechaRaw || !/^\d{4}-\d{2}-\d{2}$/.test(fechaRaw)) continue;
-      const fecha = fechaRaw;
+      // Column 3 = Fecha (YYYY-MM-DD) — ExcelJS may return a Date object
+      const fechaCell = row.getCell(3).value;
+      let fecha: string;
+      if (fechaCell instanceof Date) {
+        fecha = fechaCell.toISOString().split("T")[0];
+      } else if (fechaCell != null) {
+        const str = String(fechaCell).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) continue;
+        fecha = str;
+      } else {
+        continue;
+      }
 
       // Column 5 = Paciente
       const paciente = cellStr(row, 5);
