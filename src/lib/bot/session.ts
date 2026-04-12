@@ -11,6 +11,9 @@ export interface ConversationSession {
   context: BookingFlowContext;
   lastMessageAt: Date;
   updatedAt: Date;
+  handoffActive: boolean;
+  handoffAt: Date | null;
+  lastInboundAt: Date | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,7 +24,7 @@ export async function getSession(phone: string): Promise<ConversationSession | n
 
   const { data } = await client
     .from("conversation_sessions")
-    .select("id, phone, state, context_json, last_message_at, updated_at")
+    .select("id, phone, state, context_json, last_message_at, updated_at, handoff_active, handoff_at, last_inbound_at")
     .eq("phone", phone)
     .order("last_message_at", { ascending: false })
     .limit(1)
@@ -36,6 +39,9 @@ export async function getSession(phone: string): Promise<ConversationSession | n
     context: (data.context_json as BookingFlowContext) ?? {},
     lastMessageAt: new Date(data.last_message_at as string),
     updatedAt: new Date((data.updated_at ?? data.last_message_at) as string),
+    handoffActive: (data.handoff_active as boolean) ?? false,
+    handoffAt: data.handoff_at ? new Date(data.handoff_at as string) : null,
+    lastInboundAt: data.last_inbound_at ? new Date(data.last_inbound_at as string) : null,
   };
 }
 
