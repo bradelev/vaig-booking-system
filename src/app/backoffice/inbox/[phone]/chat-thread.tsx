@@ -3,16 +3,7 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Check, CheckCheck, Clock, AlertCircle } from "lucide-react";
-
-interface Message {
-  id: string;
-  direction: "inbound" | "outbound";
-  message_type: string;
-  body: string | null;
-  source: string;
-  status: string;
-  created_at: string;
-}
+import type { ChatMessage as Message } from "../types";
 
 const SOURCE_LABELS: Record<string, string> = {
   bot: "Bot",

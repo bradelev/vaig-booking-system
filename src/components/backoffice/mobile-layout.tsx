@@ -18,6 +18,7 @@ interface MobileLayoutProps {
   email: string;
   logoutAction: () => Promise<void>;
   children: React.ReactNode;
+  inboxUnreadCount?: number;
 }
 
 const COLLAPSED_KEY = "sidebar_collapsed";
@@ -42,7 +43,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   horario: "Horario",
 };
 
-export default function MobileLayout({ email, logoutAction, children }: MobileLayoutProps) {
+export default function MobileLayout({ email, logoutAction, children, inboxUnreadCount = 0 }: MobileLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -91,6 +92,7 @@ export default function MobileLayout({ email, logoutAction, children }: MobileLa
           collapsed={collapsed}
           onClose={() => setMobileOpen(false)}
           email={email}
+          inboxUnreadCount={inboxUnreadCount}
         />
       </div>
 
