@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
-import { sendTextMessage } from "@/lib/whatsapp";
+import { sendTextMessage } from "@/lib/whatsapp/logged";
 import { upsertSession } from "@/lib/bot/session";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
 
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .replace(/\{surveyUrl\}/g, surveyUrl);
 
     try {
-      await sendTextMessage({ to: targetPhone, body: msg });
+      await sendTextMessage({ to: targetPhone, body: msg }, "cron_survey");
       await client
         .from("bookings")
         .update({ survey_sent_at: new Date().toISOString() })
