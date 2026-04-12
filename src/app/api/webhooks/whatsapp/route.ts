@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
+import { logInboundMessage, updateMessageStatus } from "@/lib/whatsapp/log";
 
 // GET — webhook verification (Meta challenge)
 export function GET(request: NextRequest) {
@@ -73,16 +74,28 @@ export type WhatsAppWebhookPayload = {
   }>;
 };
 
-export function parseWebhookPayload(payload: WhatsAppWebhookPayload): WhatsAppMessage[] {
+export type WhatsAppStatusUpdate = {
+  id: string;
+  status: "sent" | "delivered" | "read" | "failed";
+  timestamp: string;
+  recipient_id: string;
+};
+
+export function parseWebhookPayload(payload: WhatsAppWebhookPayload): {
+  messages: WhatsAppMessage[];
+  statuses: WhatsAppStatusUpdate[];
+} {
   const messages: WhatsAppMessage[] = [];
+  const statuses: WhatsAppStatusUpdate[] = [];
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
-      if (change.field === "messages" && change.value.messages) {
-        messages.push(...change.value.messages);
+      if (change.field === "messages") {
+        if (change.value.messages) messages.push(...change.value.messages);
+        if (change.value.statuses) statuses.push(...change.value.statuses);
       }
     }
   }
-  return messages;
+  return { messages, statuses };
 }
 
 async function processMessages(messages: WhatsAppMessage[]): Promise<void> {
@@ -90,6 +103,8 @@ async function processMessages(messages: WhatsAppMessage[]): Promise<void> {
 
   for (const msg of messages) {
     let text = "";
+    const msgType = msg.type === "text" ? "text" : "interactive";
+
     if (msg.type === "text") {
       text = msg.text.body;
     } else if (msg.type === "interactive") {
@@ -102,10 +117,32 @@ async function processMessages(messages: WhatsAppMessage[]): Promise<void> {
 
     if (!text) continue;
 
+    // Log inbound message before bot processing
+    try {
+      await logInboundMessage({
+        phone: msg.from,
+        waMessageId: msg.id,
+        messageType: msgType,
+        body: text,
+      });
+    } catch (err) {
+      console.error(`[WA Webhook] Failed to log inbound message:`, err);
+    }
+
     try {
       await handleIncomingMessage(msg.from, text);
     } catch (err) {
       console.error(`[WA Webhook] Error processing message from ${msg.from}:`, err);
+    }
+  }
+}
+
+async function processStatuses(statuses: WhatsAppStatusUpdate[]): Promise<void> {
+  for (const s of statuses) {
+    try {
+      await updateMessageStatus(s.id, s.status);
+    } catch (err) {
+      console.error(`[WA Webhook] Failed to update status for ${s.id}:`, err);
     }
   }
 }
@@ -131,9 +168,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "ignored" }, { status: 200 });
   }
 
-  const messages = parseWebhookPayload(payload);
+  const { messages, statuses } = parseWebhookPayload(payload);
 
-  await processMessages(messages);
+  await Promise.all([
+    processMessages(messages),
+    processStatuses(statuses),
+  ]);
 
   return NextResponse.json({ status: "ok" }, { status: 200 });
 }
