@@ -38,6 +38,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   pagos: "Pagos",
   templates: "Templates",
   automatizaciones: "Campañas",
+  inbox: "Inbox",
   horario: "Horario",
 };
 
