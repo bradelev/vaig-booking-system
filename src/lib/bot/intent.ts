@@ -47,13 +47,15 @@ const DAY_NAMES = ["domingo", "lunes", "martes", "miércoles", "jueves", "vierne
  * Detects the user's intent from a natural language message.
  * Only call from idle/menu states — not mid-flow.
  *
- * @param text - Raw user message
- * @param kb   - Knowledge base with services and professionals
+ * @param text           - Raw user message
+ * @param kb             - Knowledge base with services and professionals
+ * @param campaignContext - Optional: recent campaign sent to this user (name + body)
  * @returns DetectedIntent or null if API unavailable/parse failure
  */
 export async function detectIntent(
   text: string,
-  kb: KnowledgeBase
+  kb: KnowledgeBase,
+  campaignContext?: { name: string; body: string } | null
 ): Promise<DetectedIntent | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
@@ -70,9 +72,13 @@ export async function detectIntent(
   const serviceNames = kb.services.map((s) => s.name).join(", ");
   const professionalNames = kb.professionals.map((p) => p.name).join(", ");
 
+  const campaignLine = campaignContext
+    ? `\nEl usuario recibió recientemente la campaña: "${campaignContext.name}" — ${campaignContext.body.slice(0, 120)}${campaignContext.body.length > 120 ? "..." : ""}. Tené esto en cuenta al interpretar su intención.`
+    : "";
+
   const prompt = `Hoy es ${DAY_NAMES[dayOfWeek]} ${todayStr} (Argentina, UTC-3). El centro de belleza abre de 9 a 21.
 Servicios disponibles: ${serviceNames}
-Profesionales: ${professionalNames}
+Profesionales: ${professionalNames}${campaignLine}
 
 Reglas de hora: si el usuario dice una hora sin AM/PM entre 1 y 8, es PM (ej: "las 5"→17:00, "a las 3"→15:00, "10hs"→10:00).
 Hora "mañana/tarde/noche": mañana=9-12, tarde=12-19, noche=19-21.
