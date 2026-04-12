@@ -102,7 +102,7 @@ export async function logInboundMessage({
   const clientId = await resolveClientId(phone);
   const db = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db as any)
+  const { error } = await (db as any)
     .from("messages")
     .upsert(
       {
@@ -117,6 +117,9 @@ export async function logInboundMessage({
       },
       { onConflict: "wa_message_id" }
     );
+  if (error) {
+    console.error("[WA Log] Failed to log inbound message:", error.message);
+  }
 }
 
 /** Update message delivery status from webhook status callback. */
