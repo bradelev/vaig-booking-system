@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { useRealtimeMessages } from "@/app/backoffice/inbox/use-realtime-messages";
 import Link from "next/link";
 import { Menu, PanelLeftClose, PanelLeft, Plus, LogOut, ChevronRight } from "lucide-react";
 import Sidebar from "./sidebar";
@@ -45,6 +46,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
 
 export default function MobileLayout({ email, logoutAction, children, inboxUnreadCount = 0 }: MobileLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(inboxUnreadCount);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(COLLAPSED_KEY) === "1";
@@ -59,6 +61,18 @@ export default function MobileLayout({ email, logoutAction, children, inboxUnrea
       return next;
     });
   }
+
+  // Sync initial count from server when layout re-renders (e.g. navigation)
+  useEffect(() => {
+    setUnreadCount(inboxUnreadCount);
+  }, [inboxUnreadCount]);
+
+  // Increment badge in real-time when new inbound messages arrive
+  useRealtimeMessages((newMsg) => {
+    if (newMsg.direction === "inbound") {
+      setUnreadCount((prev) => prev + 1);
+    }
+  });
 
   useEffect(() => {
     if (prevPathname.current !== pathname) {
@@ -92,7 +106,7 @@ export default function MobileLayout({ email, logoutAction, children, inboxUnrea
           collapsed={collapsed}
           onClose={() => setMobileOpen(false)}
           email={email}
-          inboxUnreadCount={inboxUnreadCount}
+          inboxUnreadCount={unreadCount}
         />
       </div>
 
