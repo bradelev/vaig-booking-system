@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { MessageSquare, User, Search } from "lucide-react";
 import type { InboxConversation } from "./types";
+import { useRealtimeMessages } from "./use-realtime-messages";
 
 type Filter = "all" | "unread" | "handoff";
 
@@ -40,10 +42,41 @@ export default function ConversationList({
 }: {
   initialConversations: InboxConversation[];
 }) {
+  const router = useRouter();
+  const [conversations, setConversations] = useState<InboxConversation[]>(initialConversations);
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
 
-  const filtered = initialConversations.filter((conv) => {
+  useRealtimeMessages((newMsg) => {
+    setConversations((prev) => {
+      const idx = prev.findIndex((c) => c.phone === newMsg.phone);
+      if (idx === -1) {
+        // New conversation not in list — fetch updated view data
+        router.refresh();
+        return prev;
+      }
+      const updated = [...prev];
+      updated[idx] = {
+        ...updated[idx],
+        last_message_body: newMsg.body,
+        last_message_direction: newMsg.direction,
+        last_message_at: newMsg.created_at,
+        unread_count:
+          newMsg.direction === "inbound"
+            ? updated[idx].unread_count + 1
+            : updated[idx].unread_count,
+      };
+      // Re-sort by last_message_at descending
+      updated.sort(
+        (a, b) =>
+          new Date(b.last_message_at ?? 0).getTime() -
+          new Date(a.last_message_at ?? 0).getTime()
+      );
+      return updated;
+    });
+  });
+
+  const filtered = conversations.filter((conv) => {
     if (filter === "unread" && conv.unread_count === 0) return false;
     if (filter === "handoff" && !conv.handoff_active) return false;
     if (search) {
@@ -74,12 +107,12 @@ export default function ConversationList({
               {opt.label}
               {opt.value === "unread" && (
                 <span className="ml-1 text-xs">
-                  ({initialConversations.filter((c) => c.unread_count > 0).length})
+                  ({conversations.filter((c) => c.unread_count > 0).length})
                 </span>
               )}
               {opt.value === "handoff" && (
                 <span className="ml-1 text-xs">
-                  ({initialConversations.filter((c) => c.handoff_active).length})
+                  ({conversations.filter((c) => c.handoff_active).length})
                 </span>
               )}
             </button>

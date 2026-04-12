@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Check, CheckCheck, Clock, AlertCircle } from "lucide-react";
 import type { ChatMessage as Message } from "../types";
+import { useRealtimeMessages } from "../use-realtime-messages";
 
 const SOURCE_LABELS: Record<string, string> = {
   bot: "Bot",
@@ -67,19 +68,36 @@ function shouldShowDateSeparator(messages: Message[], index: number): boolean {
 
 export default function ChatThread({
   initialMessages,
+  phone,
 }: {
   initialMessages: Message[];
   phone: string;
 }) {
+  const [messages, setMessages] = useState<Message[]>(initialMessages);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Sync when server re-renders with fresh data (e.g. after router.refresh())
+  useEffect(() => {
+    setMessages(initialMessages);
+  }, [initialMessages]);
+
+  useRealtimeMessages(
+    (newMsg) => {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg as unknown as Message];
+      });
+    },
+    { phone }
+  );
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [initialMessages.length]);
+  }, [messages.length]);
 
-  if (initialMessages.length === 0) {
+  if (messages.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
         No hay mensajes en esta conversación
@@ -89,10 +107,10 @@ export default function ChatThread({
 
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
-      {initialMessages.map((msg, i) => (
+      {messages.map((msg, i) => (
         <div key={msg.id}>
           {/* Date separator */}
-          {shouldShowDateSeparator(initialMessages, i) && (
+          {shouldShowDateSeparator(messages, i) && (
             <div className="flex items-center justify-center py-2">
               <span className="rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-muted-foreground">
                 {formatDateSeparator(msg.created_at)}
