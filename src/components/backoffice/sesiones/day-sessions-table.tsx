@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { toast } from "sonner";
-import { updateSession, confirmBookingAsSession, searchClients } from "@/actions/sesiones";
+import { updateSession, confirmBookingAsSession, searchClients, deleteSession } from "@/actions/sesiones";
 import type { Professional } from "@/components/backoffice/sesiones/session-form";
 
 export interface PendingBookingData {
@@ -234,6 +234,23 @@ export default function DaySessionsTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<EditData | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleDelete(row: SessionRow) {
+    if (!row.sessionId) return;
+    if (!window.confirm("¿Eliminar esta sesión? Esta acción no se puede deshacer.")) return;
+    setDeletingId(row.id);
+    try {
+      const result = await deleteSession(row.sessionId);
+      if (result.success) {
+        toast.success("Sesión eliminada");
+      } else {
+        toast.error(result.error ?? "Error al eliminar");
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   const cancelEdit = useCallback(() => {
     setEditingId(null);
@@ -611,17 +628,29 @@ export default function DaySessionsTable({
                   </td>
                   <td className="py-2">
                     {canEdit(row) ? (
-                      <button
-                        onClick={() => startEdit(row)}
-                        title={row.isPendingBooking ? "Editar y confirmar" : "Editar sesión"}
-                        className={`rounded-lg border px-2 py-1 text-xs font-medium transition-colors ${
-                          row.isPendingBooking
-                            ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                            : "border-gray-300 text-gray-600 hover:bg-gray-50"
-                        }`}
-                      >
-                        {row.isPendingBooking ? "Editar / Confirmar" : "✏️"}
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => startEdit(row)}
+                          title={row.isPendingBooking ? "Editar y confirmar" : "Editar sesión"}
+                          className={`rounded-lg border px-2 py-1 text-xs font-medium transition-colors ${
+                            row.isPendingBooking
+                              ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                              : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          {row.isPendingBooking ? "Editar / Confirmar" : "✏️"}
+                        </button>
+                        {row.sessionId && (
+                          <button
+                            onClick={() => handleDelete(row)}
+                            disabled={deletingId === row.id}
+                            title="Eliminar sesión"
+                            className="rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                          >
+                            {deletingId === row.id ? "…" : "🗑️"}
+                          </button>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-xs text-green-600 font-medium">✓ Realizada</span>
                     )}
@@ -876,16 +905,27 @@ export default function DaySessionsTable({
                     {row.operadora && <span>{row.operadora}</span>}
                   </div>
                   {canEdit(row) ? (
-                    <button
-                      onClick={() => startEdit(row)}
-                      className={`w-full rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                        row.isPendingBooking
-                          ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      {row.isPendingBooking ? "✏️ Editar / Confirmar" : "✏️ Editar"}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => startEdit(row)}
+                        className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          row.isPendingBooking
+                            ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                            : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {row.isPendingBooking ? "✏️ Editar / Confirmar" : "✏️ Editar"}
+                      </button>
+                      {row.sessionId && (
+                        <button
+                          onClick={() => handleDelete(row)}
+                          disabled={deletingId === row.id}
+                          className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          {deletingId === row.id ? "…" : "🗑️"}
+                        </button>
+                      )}
+                    </div>
                   ) : null}
                 </>
               )}
