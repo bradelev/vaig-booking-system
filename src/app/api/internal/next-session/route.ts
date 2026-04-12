@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue, getConfig } from "@/lib/config";
-import { sendTextMessage } from "@/lib/whatsapp";
+import { sendTextMessage } from "@/lib/whatsapp/logged";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (!send) { skipped++; continue; }
 
     try {
-      await sendTextMessage({ to: targetPhone, body: msg });
+      await sendTextMessage({ to: targetPhone, body: msg }, "cron_next_session");
       sent++;
     } catch (err) {
       console.error(`[NextSession] Failed for client ${clientId}:`, err);
