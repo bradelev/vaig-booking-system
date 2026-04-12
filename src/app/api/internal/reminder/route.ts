@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
-import { sendTextMessage } from "@/lib/whatsapp";
+import { sendTextMessage } from "@/lib/whatsapp/logged";
 import { upsertSession } from "@/lib/bot/session";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
 
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .replace(/\{dateLabel\}/g, dateLabel);
 
     try {
-      await sendTextMessage({ to: targetPhone, body: msg });
+      await sendTextMessage({ to: targetPhone, body: msg }, "cron_reminder");
       await client
         .from("bookings")
         .update({ confirmation_sent_at: new Date().toISOString() })
@@ -148,7 +148,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       lines.join("\n");
 
     try {
-      await sendTextMessage({ to: profTargetPhone, body: profMsg });
+      await sendTextMessage({ to: profTargetPhone, body: profMsg }, "cron_reminder");
       profSent++;
     } catch (err) {
       console.error(`[Reminder] Professional ${prof.name} failed:`, err);
