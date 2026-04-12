@@ -106,6 +106,35 @@ export default function SessionsPageClient({
   const [exportFrom, setExportFrom] = useState(`${currentYear}-01-01`);
   const [exportTo, setExportTo] = useState(`${currentYear}-12-31`);
 
+  // Sheet sync state
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    imported: number;
+    skipped: number;
+    errors: string[];
+    clientsCreated: string[];
+  } | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  async function handleSheetSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    setSyncError(null);
+    try {
+      const res = await fetch("/api/internal/sheet-sync", { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? `Error ${res.status}`);
+      }
+      const data = await res.json();
+      setSyncResult(data);
+    } catch (err: unknown) {
+      setSyncError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   const weekMonday = weekDates[0];
   const weekSunday = weekDates[6];
 
@@ -211,13 +240,63 @@ export default function SessionsPageClient({
             Registrá sesiones manuales y confirmá citas del sistema
           </p>
         </div>
-        <button
-          onClick={() => setShowExport(true)}
-          className="shrink-0 rounded-lg border border-input px-3 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
-        >
-          Exportar XLSX
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSheetSync}
+            disabled={syncing}
+            className="shrink-0 rounded-lg border border-input px-3 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            {syncing ? "Sincronizando..." : "Importar Sheet"}
+          </button>
+          <button
+            onClick={() => setShowExport(true)}
+            className="shrink-0 rounded-lg border border-input px-3 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+          >
+            Exportar XLSX
+          </button>
+        </div>
       </div>
+
+      {/* Sheet sync result */}
+      {(syncResult || syncError) && (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            syncError
+              ? "border-destructive/50 bg-destructive/10 text-destructive"
+              : "border-border bg-card text-foreground"
+          }`}
+        >
+          {syncError && <p>Error al sincronizar: {syncError}</p>}
+          {syncResult && (
+            <div className="space-y-1">
+              <p>
+                Sync completado — <strong>{syncResult.imported}</strong>{" "}
+                insertados, <strong>{syncResult.skipped}</strong> omitidos
+                {syncResult.errors.length > 0 && (
+                  <>, <strong className="text-destructive">{syncResult.errors.length}</strong> errores</>
+                )}
+              </p>
+              {syncResult.clientsCreated.length > 0 && (
+                <p className="text-muted-foreground">
+                  Clientes nuevos: {syncResult.clientsCreated.join(", ")}
+                </p>
+              )}
+              {syncResult.errors.length > 0 && (
+                <details className="mt-1">
+                  <summary className="cursor-pointer text-destructive text-xs">
+                    Ver errores
+                  </summary>
+                  <ul className="mt-1 text-xs space-y-0.5 text-muted-foreground">
+                    {syncResult.errors.map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Week navigator */}
       <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3">
