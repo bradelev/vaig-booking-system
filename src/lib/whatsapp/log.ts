@@ -67,7 +67,7 @@ export async function logOutboundMessage({
 
   if (error) {
     console.error("[WA Log] Failed to log outbound message:", error.message);
-    throw error;
+    throw new Error(error.message);
   }
   return data.id;
 }
