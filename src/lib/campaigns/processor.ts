@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendTemplateMessage } from "@/lib/whatsapp";
+import { sendTemplateMessage } from "@/lib/whatsapp/logged";
 
 const DELAY_MS = 100;
 const STUCK_SENDING_MINUTES = 30;
@@ -107,7 +107,7 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
             templateName: campaign.image_url ? "campana_general_con_imagen" : "campana_general",
             languageCode: "es_UY",
             components,
-          });
+          }, "campaign");
 
           sentCount++;
           await db.from("campaign_recipients").upsert({
