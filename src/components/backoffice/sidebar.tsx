@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ClipboardList,
   MessageSquare,
+  Bell,
   Package,
   Users,
   UserCircle,
@@ -28,6 +29,7 @@ const navSections = [
       { href: "/backoffice/agenda", label: "Agenda", icon: CalendarDays },
       { href: "/backoffice/citas", label: "Citas", icon: ClipboardList },
       { href: "/backoffice/inbox", label: "Inbox", icon: MessageSquare },
+      { href: "/backoffice/recordatorios", label: "Recordatorios", icon: Bell },
     ],
   },
   {
