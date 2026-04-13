@@ -203,6 +203,12 @@ async function route(
     return;
   }
 
+  // VBS-167: When in menu state, handle button IDs directly — skip LLM
+  const MENU_BUTTON_IDS = new Set(["book", "cancel"]);
+  if (state === "menu" && MENU_BUTTON_IDS.has(normalize(text))) {
+    return handleMenuSelection(phone, text, context);
+  }
+
   // VBS-153: LLM intent detection for idle/menu — natural language shortcuts
   if (state === "idle" || state === "menu" || isMenuTrigger(text)) {
     if (state === "idle" || state === "menu") {
