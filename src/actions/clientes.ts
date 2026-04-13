@@ -61,30 +61,77 @@ export async function getDuplicadosCandidatos(): Promise<ParDuplicado[]> {
       .trim();
   }
 
-  // Pre-compute normalized names once to avoid O(n²) re-normalization
-  const normNames = clientes.map((c) => norm(`${c.first_name} ${c.last_name}`));
+  // Pre-compute normalized names
+  const entries = clientes.map((c, idx) => ({
+    idx,
+    client: c,
+    norm: norm(`${c.first_name} ${c.last_name}`),
+  })).filter((e) => e.norm.split(" ").length >= 2);
 
   const pairs: ParDuplicado[] = [];
   const seen = new Set<string>();
 
-  for (let i = 0; i < clientes.length; i++) {
-    for (let j = i + 1; j < clientes.length; j++) {
-      const a = clientes[i];
-      const b = clientes[j];
-      const normA = normNames[i];
-      const normB = normNames[j];
+  // Phase 1: Exact nombre_normalizado matches (O(n) via Map grouping)
+  const normGroups = new Map<string, typeof entries>();
+  for (const e of entries) {
+    const group = normGroups.get(e.norm);
+    if (group) group.push(e);
+    else normGroups.set(e.norm, [e]);
+  }
+  for (const group of normGroups.values()) {
+    if (group.length < 2) continue;
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const key = [group[i].client.id, group[j].client.id].sort().join("|");
+        seen.add(key);
+        pairs.push({ a: group[i].client, b: group[j].client, distancia: 0 });
+      }
+    }
+  }
 
-      // Must be multi-word names to avoid false positives
-      if (normA.split(" ").length < 2 || normB.split(" ").length < 2) continue;
+  // Phase 2: Fuzzy matches (Levenshtein 1-2) — block by first name to avoid O(n²)
+  // Only compare clients that share the same first name (or first name within edit distance 1)
+  const firstNameGroups = new Map<string, typeof entries>();
+  for (const e of entries) {
+    const firstName = e.norm.split(" ")[0];
+    const group = firstNameGroups.get(firstName);
+    if (group) group.push(e);
+    else firstNameGroups.set(firstName, [e]);
+  }
 
-      const dist = levenshtein(normA, normB);
-      if (dist > 2) continue;
+  // Compare within same first-name blocks and across blocks with similar first names
+  const firstNames = Array.from(firstNameGroups.keys());
+  for (let fi = 0; fi < firstNames.length; fi++) {
+    const blockA = firstNameGroups.get(firstNames[fi])!;
 
-      const key = [a.id, b.id].sort().join("|");
-      if (seen.has(key)) continue;
-      seen.add(key);
+    // Within same block
+    for (let i = 0; i < blockA.length; i++) {
+      for (let j = i + 1; j < blockA.length; j++) {
+        const key = [blockA[i].client.id, blockA[j].client.id].sort().join("|");
+        if (seen.has(key)) continue;
+        const dist = levenshtein(blockA[i].norm, blockA[j].norm);
+        if (dist >= 1 && dist <= 2) {
+          seen.add(key);
+          pairs.push({ a: blockA[i].client, b: blockA[j].client, distancia: dist });
+        }
+      }
+    }
 
-      pairs.push({ a, b, distancia: dist });
+    // Cross-block: only if first names are within edit distance 1
+    for (let fj = fi + 1; fj < firstNames.length; fj++) {
+      if (levenshtein(firstNames[fi], firstNames[fj]) > 1) continue;
+      const blockB = firstNameGroups.get(firstNames[fj])!;
+      for (const ea of blockA) {
+        for (const eb of blockB) {
+          const key = [ea.client.id, eb.client.id].sort().join("|");
+          if (seen.has(key)) continue;
+          const dist = levenshtein(ea.norm, eb.norm);
+          if (dist >= 1 && dist <= 2) {
+            seen.add(key);
+            pairs.push({ a: ea.client, b: eb.client, distancia: dist });
+          }
+        }
+      }
     }
   }
 
