@@ -7,7 +7,7 @@
  * Admin phone is read from system_config key "admin_phone".
  * If not set, notifications are silently skipped.
  */
-import { sendTextMessage } from "@/lib/whatsapp/logged";
+import { sendTextMessage, sendTemplateMessage } from "@/lib/whatsapp/logged";
 import { getConfigValue } from "@/lib/config";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
 
@@ -63,7 +63,12 @@ export async function notifyAdminNewBooking(params: NewBookingNotificationParams
   });
 
   try {
-    await sendTextMessage({ to: adminPhone, body: msg }, "admin_notification");
+    await sendTemplateMessage({
+      to: adminPhone,
+      templateName: "campana_general",
+      languageCode: "es_UY",
+      components: [{ type: "body", parameters: [{ type: "text", text: "Admin" }, { type: "text", text: msg }] }],
+    }, "admin_notification");
   } catch (err) {
     console.error("[Notifications] Failed to send new booking notification to admin:", err);
   }
@@ -182,7 +187,12 @@ export async function notifyBusinessNewBooking(
     `\n🕐 ${dateLabel}`;
 
   try {
-    await sendTextMessage({ to: businessPhone, body: msg }, "admin_notification");
+    await sendTemplateMessage({
+      to: businessPhone,
+      templateName: "campana_general",
+      languageCode: "es_UY",
+      components: [{ type: "body", parameters: [{ type: "text", text: "VAIG" }, { type: "text", text: msg }] }],
+    }, "admin_notification");
   } catch (err) {
     console.error("[Notifications] Failed to send booking notification to business phone:", err);
   }
@@ -232,7 +242,12 @@ export async function notifyAdminPaymentConfirmed(
   });
 
   try {
-    await sendTextMessage({ to: adminPhone, body: msg }, "admin_notification");
+    await sendTemplateMessage({
+      to: adminPhone,
+      templateName: "campana_general",
+      languageCode: "es_UY",
+      components: [{ type: "body", parameters: [{ type: "text", text: "Admin" }, { type: "text", text: msg }] }],
+    }, "admin_notification");
   } catch (err) {
     console.error("[Notifications] Failed to send payment confirmation to admin:", err);
   }
