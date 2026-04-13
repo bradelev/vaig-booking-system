@@ -194,6 +194,15 @@ async function route(
     return handleBack(phone, state, context);
   }
 
+  // VBS-167: awaiting_payment — remind client about pending booking, don't re-show menu
+  if (state === "awaiting_payment") {
+    await reply(
+      phone,
+      "Ya tenés una reserva pendiente de pago. Revisá el mensaje anterior para abonar la seña. Si necesitás ayuda, escribí *cancelar* para empezar de nuevo."
+    );
+    return;
+  }
+
   // VBS-153: LLM intent detection for idle/menu — natural language shortcuts
   if (state === "idle" || state === "menu" || isMenuTrigger(text)) {
     if (state === "idle" || state === "menu") {
@@ -211,8 +220,8 @@ async function route(
           case "my_bookings":
             return handleMisTurnos(phone);
           case "pack":
-            await upsertSession(phone, "pack_service", {});
-            return handlePackServiceSelection(phone, text, {});
+            // Packs disabled — fall through to menu
+            return handleMenu(phone, campaignCtx);
           case "cancel":
             return handleRescheduleStart(phone);
           case "question":
@@ -268,9 +277,10 @@ async function route(
     case "awaiting_reminder_confirm":
       return handleReminderConfirm(phone, text, context);
     case "pack_service":
-      return handlePackServiceSelection(phone, text, context);
     case "pack_selection":
-      return handlePackSelection(phone, text, context);
+      // Packs disabled — clear stale pack session and show menu
+      await clearSession(phone);
+      return handleMenu(phone);
     case "waitlist_offer":
       return handleWaitlistConfirm(phone, text, context);
     case "reschedule_confirm":
@@ -419,7 +429,6 @@ async function handleMenu(
     greeting,
     [
       { id: "book", title: "Agendar turno" },
-      { id: "pack", title: "Comprar pack" },
       { id: "cancel", title: "Cancelar turno" },
     ]
   );
@@ -450,11 +459,7 @@ async function handleMenuSelection(
     return startBookingFlow(phone);
   }
 
-  if (t === "pack" || t.includes("pack") || t === "3") {
-    return startPackFlow(phone);
-  }
-
-  if (t === "cancel" || t.includes("cancelar") || t === "4") {
+  if (t === "cancel" || t.includes("cancelar") || t === "3") {
     return handleCancelFlow(phone);
   }
 
@@ -1658,8 +1663,9 @@ async function handleMisTurnos(phone: string): Promise<void> {
   await reply(phone, msg);
 }
 
-// ── Pack purchase flow (VBS-69) ───────────────────────────────────────────────
+// ── Pack purchase flow (VBS-69) — disabled, no active packs ─────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function startPackFlow(phone: string): Promise<void> {
   const kb = await buildKnowledgeBase();
 
@@ -1678,6 +1684,7 @@ async function startPackFlow(phone: string): Promise<void> {
   await reply(phone, msg);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function handlePackServiceSelection(
   phone: string,
   text: string,
@@ -1723,6 +1730,7 @@ async function handlePackServiceSelection(
   await reply(phone, msg);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function handlePackSelection(
   phone: string,
   text: string,
