@@ -36,7 +36,8 @@ export async function sendReminders(
     .from("bookings")
     .select("id, clients(id, phone, first_name)")
     .in("id", bookingIds)
-    .in("status", ["confirmed", "deposit_paid", "pending"]);
+    .in("status", ["confirmed", "deposit_paid", "pending"])
+    .is("confirmation_sent_at", null);
 
   if (error) {
     return { sent: 0, failed: 0, errors: [`Error al obtener citas: ${error.message}`] };
