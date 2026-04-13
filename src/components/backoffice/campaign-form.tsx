@@ -599,7 +599,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
               <div className="px-3 py-2">
                 {body ? (
                   <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-snug">
-                    {"Hola María, te escribimos desde VIAG Depilación Láser.\n\n"}{body}{"\n\nCualquier consulta estamos a tu disposición."}
+                    {"Hola María, te escribimos desde VAIG Depilación Láser.\n\n"}{body}{"\n\nCualquier consulta estamos a tu disposición."}
                   </p>
                 ) : (
                   <p className="text-sm text-gray-400 italic">Tu mensaje aparecerá aquí...</p>
