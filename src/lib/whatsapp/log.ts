@@ -11,6 +11,7 @@ export type MessageSource =
   | "cron_next_session"
   | "admin_manual"
   | "admin_notification"
+  | "admin_reminder"
   | "client";
 export type MessageStatus = "pending" | "sent" | "delivered" | "read" | "failed";
 
