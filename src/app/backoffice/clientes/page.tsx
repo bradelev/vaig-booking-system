@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { UserPlus } from "lucide-react";
+import { UserPlus, GitMerge } from "lucide-react";
 import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
 import PageHeader from "@/components/backoffice/page-header";
 import { SEGMENTO_BADGE, SEGMENTO_OPTIONS } from "@/lib/constants/segments";
@@ -30,7 +30,7 @@ const ORDEN_OPTIONS = [
   { label: "Segmento (menor)", value: "segmento_asc" },
 ];
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 50;
 
 function isPlaceholderPhone(phone: string): boolean {
   return phone.startsWith("historico_") || phone.startsWith("migrated_nophone_");
@@ -48,16 +48,22 @@ function buildSearchParams(
   return params.toString();
 }
 
-// Short labels for service pills
-const SERVICE_SHORT: Record<string, string> = {
-  "Depilación Láser": "Láser",
-  "Aparatología / HIFU": "HIFU",
-  "Cejas y Pestañas": "Cejas/Pest.",
-  "Manos y Pies": "Manos/Pies",
-};
+// Categorías de servicios via regex — orden importa (primer match gana)
+const CATEGORIA_REGEXES: Array<{ label: string; pattern: RegExp }> = [
+  { label: "Depilación",       pattern: /depila|laser|l[aá]ser/i },
+  { label: "HIFU",             pattern: /hifu|aparatolog/i },
+  { label: "Masajes",          pattern: /masaje|masaj/i },
+  { label: "Cejas/Pestañas",   pattern: /ceja|pesta[ñn]/i },
+  { label: "Manos/Pies",       pattern: /mano|pie|manicur|pedicur/i },
+];
 
-function shortServiceName(name: string): string {
-  return SERVICE_SHORT[name] ?? name;
+function serviciosACategorias(servicios: string[]): string[] {
+  const cats = new Set<string>();
+  for (const s of servicios) {
+    const match = CATEGORIA_REGEXES.find((c) => c.pattern.test(s));
+    cats.add(match ? match.label : "Otros");
+  }
+  return Array.from(cats);
 }
 
 export default async function ClientesPage({
@@ -82,6 +88,17 @@ export default async function ClientesPage({
 
   const from = (pagina - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
+
+  const hayFiltros = !!(busqueda || segmento);
+
+  // Total absoluto (sin filtros) — solo necesario cuando hay filtros activos
+  let totalAbsoluto = 0;
+  if (hayFiltros) {
+    const { count: countAll } = await client
+      .from("clientes_metricas")
+      .select("id", { count: "exact", head: true });
+    totalAbsoluto = countAll ?? 0;
+  }
 
   let query = client
     .from("clientes_metricas")
@@ -113,6 +130,7 @@ export default async function ClientesPage({
   const { data: raw, count } = await query;
   const clientes = (raw ?? []) as Cliente[];
   const total = count ?? 0;
+  if (!hayFiltros) totalAbsoluto = total;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const baseParams = { busqueda: busqueda || undefined, segmento: segmento || undefined, orden: orden !== "nombre_asc" ? orden : undefined };
@@ -150,20 +168,19 @@ export default async function ClientesPage({
       ),
     },
     {
-      header: "Servicios",
+      header: "Categorías",
       hideOnMobile: true,
       accessor: (c) => {
-        const svcs = c.servicios_usados ?? [];
-        if (svcs.length === 0) return <span className="text-muted-foreground text-sm">—</span>;
+        const cats = serviciosACategorias(c.servicios_usados ?? []);
+        if (cats.length === 0) return <span className="text-muted-foreground text-sm">—</span>;
         return (
-          <div className="flex flex-wrap gap-1 max-w-xs">
-            {svcs.map((s) => (
+          <div className="flex flex-wrap gap-1">
+            {cats.map((cat) => (
               <span
-                key={s}
+                key={cat}
                 className="inline-flex rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground"
-                title={s}
               >
-                {shortServiceName(s)}
+                {cat}
               </span>
             ))}
           </div>
@@ -222,14 +239,24 @@ export default async function ClientesPage({
     <div className="space-y-6">
       <PageHeader
         title="Clientes"
+        subtitle={`${totalAbsoluto.toLocaleString("es-UY")} en total`}
         actions={
-          <Link
-            href="/backoffice/clientes/nuevo"
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98]"
-          >
-            <UserPlus className="h-4 w-4" />
-            Nuevo cliente
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/backoffice/clientes/duplicados"
+              className="inline-flex items-center gap-2 rounded-lg border border-input bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors active:scale-[0.98]"
+            >
+              <GitMerge className="h-4 w-4" />
+              Duplicados
+            </Link>
+            <Link
+              href="/backoffice/clientes/nuevo"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98]"
+            >
+              <UserPlus className="h-4 w-4" />
+              Nuevo cliente
+            </Link>
+          </div>
         }
       />
 
@@ -295,7 +322,14 @@ export default async function ClientesPage({
       {/* Paginación */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
-          Mostrando {total === 0 ? 0 : from + 1}–{Math.min(to + 1, total)} de {total} clientes
+          {total === 0 ? (
+            "Sin resultados"
+          ) : (
+            <>
+              Mostrando {from + 1}–{Math.min(to + 1, total)} de {total.toLocaleString("es-UY")}
+              {hayFiltros && ` (de ${totalAbsoluto.toLocaleString("es-UY")} total)`}
+            </>
+          )}
         </span>
         <div className="flex gap-2">
           {pagina > 1 && (
