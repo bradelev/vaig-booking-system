@@ -61,6 +61,9 @@ export async function getDuplicadosCandidatos(): Promise<ParDuplicado[]> {
       .trim();
   }
 
+  // Pre-compute normalized names once to avoid O(n²) re-normalization
+  const normNames = clientes.map((c) => norm(`${c.first_name} ${c.last_name}`));
+
   const pairs: ParDuplicado[] = [];
   const seen = new Set<string>();
 
@@ -68,8 +71,8 @@ export async function getDuplicadosCandidatos(): Promise<ParDuplicado[]> {
     for (let j = i + 1; j < clientes.length; j++) {
       const a = clientes[i];
       const b = clientes[j];
-      const normA = norm(`${a.first_name} ${a.last_name}`);
-      const normB = norm(`${b.first_name} ${b.last_name}`);
+      const normA = normNames[i];
+      const normB = normNames[j];
 
       // Must be multi-word names to avoid false positives
       if (normA.split(" ").length < 2 || normB.split(" ").length < 2) continue;
@@ -91,6 +94,10 @@ export async function getDuplicadosCandidatos(): Promise<ParDuplicado[]> {
 }
 
 export async function mergeClients(keepId: string, deleteId: string): Promise<void> {
+  if (!keepId || !deleteId || keepId === deleteId) {
+    throw new Error("IDs inválidos para fusión");
+  }
+
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;
@@ -130,17 +137,28 @@ export async function mergeClients(keepId: string, deleteId: string): Promise<vo
     }
   }
 
-  // 2. Reasignar bookings
+  // 2. Reasignar client_packages (ON DELETE RESTRICT — debe moverse antes de borrar)
+  const { error: errPkg } = await sb
+    .from("client_packages")
+    .update({ client_id: keepId })
+    .eq("client_id", deleteId);
+  if (errPkg) throw new Error(`Error reasignando paquetes: ${errPkg.message}`);
+
+  // 3. Reasignar bookings
   const { error: errBook } = await sb
     .from("bookings")
     .update({ client_id: keepId })
     .eq("client_id", deleteId);
   if (errBook) throw new Error(`Error reasignando bookings: ${errBook.message}`);
 
-  // 3. Reasignar conversation_sessions del bot
-  await sb.from("conversation_sessions").update({ client_id: keepId }).eq("client_id", deleteId);
+  // 4. Reasignar conversation_sessions del bot
+  const { error: errSess } = await sb
+    .from("conversation_sessions")
+    .update({ client_id: keepId })
+    .eq("client_id", deleteId);
+  if (errSess) throw new Error(`Error reasignando sesiones bot: ${errSess.message}`);
 
-  // 4. Eliminar el cliente duplicado
+  // 5. Eliminar el cliente duplicado
   const { error: errDel } = await sb.from("clients").delete().eq("id", deleteId);
   if (errDel) throw new Error(`Error eliminando cliente: ${errDel.message}`);
 
