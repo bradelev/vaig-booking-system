@@ -133,9 +133,9 @@ INSERT INTO services (name, duration_minutes, price, deposit_amount, is_active) 
 INSERT INTO system_config (key, value) VALUES
   ('address',               'REDACTED'),
   ('phone',                 'REDACTED'),
-  ('access_instructions',   'PIN DE ACCESO FOXYS PARA INGRESAR: REDACTED. En la puerta de vidrio: REDACTED#'),
+  ('access_instructions',   'REDACTED'),
   ('preparation_notes',     'Depilación: venir rasurada del día anterior. Facial/lifting/cejas: venir sin maquillaje.'),
   ('bank_brou',             'REDACTED'),
   ('bank_itau',             'REDACTED'),
   ('payment_instructions',  'Transferir a nombre/apellido. Enviar comprobante por WhatsApp. Sin confirmación en 24h se cancela la reserva.')
-ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
+ON CONFLICT (key) DO NOTHING;
