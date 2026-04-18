@@ -297,7 +297,7 @@ The bot uses a **campaign-aware** greeting: if the client received a WhatsApp ca
 
 ---
 
-## Getting Started
+Sistema de reservas end-to-end para **VAIG — Depilación Láser & Estética**. Combina un chatbot conversacional de WhatsApp (con LLM), un motor de scheduling, un backoffice web para el equipo, y automatizaciones post-atención.
 
 ### Prerequisites
 
