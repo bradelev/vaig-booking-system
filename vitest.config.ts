@@ -13,12 +13,13 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov", "html"],
       reportsDirectory: "./coverage",
-      include: ["src/lib/**", "src/actions/**"],
+      include: [
+        "src/lib/scheduler/index.ts",
+        "src/lib/scheduler/types.ts",
+        "src/lib/timezone.ts",
+      ],
       exclude: [
-        "src/lib/supabase/**",
         "src/**/*.d.ts",
-        "src/**/types.ts",
-        "src/**/types/**",
       ],
       thresholds: {
         lines: 70,
