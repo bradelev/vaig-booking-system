@@ -1,16 +1,18 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { detectIntent } from "../intent";
 import type { KnowledgeBase } from "../types";
 
 const KB: KnowledgeBase = {
   services: [
-    { id: "s1", name: "Depilación láser", category: "depilacion", durationMinutes: 60, price: 1000 },
-    { id: "s2", name: "Masaje relajante", category: "masajes", durationMinutes: 90, price: 1500 },
+    { id: "s1", name: "Depilación láser", category: "depilacion", durationMinutes: 60, price: 1000, description: null, depositAmount: 0, defaultProfessionalId: null },
+    { id: "s2", name: "Masaje relajante", category: "masajes", durationMinutes: 90, price: 1500, description: null, depositAmount: 0, defaultProfessionalId: null },
   ],
   professionals: [
-    { id: "p1", name: "Cynthia", serviceIds: ["s1", "s2"] },
-    { id: "p2", name: "Lucia", serviceIds: ["s1"] },
+    { id: "p1", name: "Cynthia", specialties: null },
+    { id: "p2", name: "Lucia", specialties: null },
   ],
+  packages: [],
+  generatedAt: new Date("2026-04-20T12:00:00.000Z"),
 };
 
 afterEach(() => {
