@@ -15,27 +15,31 @@ if (!email) {
   process.exit(1);
 }
 
-const supabase = createAdminClient();
+async function main() {
+  const supabase = createAdminClient();
 
-const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
-if (listError) {
-  console.error("Error listing users:", listError.message);
-  process.exit(1);
+  const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
+  if (listError) {
+    console.error("Error listing users:", listError.message);
+    process.exit(1);
+  }
+
+  const user = users.find((u) => u.email === email);
+  if (!user) {
+    console.error(`User not found: ${email}`);
+    process.exit(1);
+  }
+
+  const { error } = await supabase.auth.admin.updateUserById(user.id, {
+    app_metadata: { ...(user.app_metadata ?? {}), role: "admin" },
+  });
+
+  if (error) {
+    console.error("Error promoting user:", error.message);
+    process.exit(1);
+  }
+
+  console.log(`✓ ${email} (${user.id}) promoted to admin via app_metadata`);
 }
 
-const user = users.find((u) => u.email === email);
-if (!user) {
-  console.error(`User not found: ${email}`);
-  process.exit(1);
-}
-
-const { error } = await supabase.auth.admin.updateUserById(user.id, {
-  app_metadata: { ...(user.app_metadata ?? {}), role: "admin" },
-});
-
-if (error) {
-  console.error("Error promoting user:", error.message);
-  process.exit(1);
-}
-
-console.log(`✓ ${email} (${user.id}) promoted to admin via app_metadata`);
+main();
