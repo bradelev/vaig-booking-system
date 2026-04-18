@@ -2,8 +2,8 @@
  * Integration tests for booking business logic extracted from citas.ts.
  * Tests core business rules without Next.js or Supabase dependencies.
  */
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
+import { describe, it, expect } from "vitest";
+
 
 // ── Business logic helpers (testable in isolation) ─────────────────────────────
 
@@ -57,78 +57,78 @@ function shouldNotifyWaitlist(serviceId: string | null | undefined): boolean {
 
 describe("shouldCreateCalendarEvent", () => {
   it("returns true for 'confirmed' status", () => {
-    assert.equal(shouldCreateCalendarEvent("confirmed"), true);
+    expect(shouldCreateCalendarEvent("confirmed")).toBe(true);
   });
 
   it("returns false for other statuses", () => {
-    assert.equal(shouldCreateCalendarEvent("pending"), false);
-    assert.equal(shouldCreateCalendarEvent("realized"), false);
-    assert.equal(shouldCreateCalendarEvent("cancelled"), false);
-    assert.equal(shouldCreateCalendarEvent("no_show"), false);
-    assert.equal(shouldCreateCalendarEvent("deposit_paid"), false);
+    expect(shouldCreateCalendarEvent("pending")).toBe(false);
+    expect(shouldCreateCalendarEvent("realized")).toBe(false);
+    expect(shouldCreateCalendarEvent("cancelled")).toBe(false);
+    expect(shouldCreateCalendarEvent("no_show")).toBe(false);
+    expect(shouldCreateCalendarEvent("deposit_paid")).toBe(false);
   });
 });
 
 describe("shouldDeleteCalendarEvent", () => {
   it("returns true for 'cancelled' status", () => {
-    assert.equal(shouldDeleteCalendarEvent("cancelled"), true);
+    expect(shouldDeleteCalendarEvent("cancelled")).toBe(true);
   });
 
   it("returns true for 'no_show' status", () => {
-    assert.equal(shouldDeleteCalendarEvent("no_show"), true);
+    expect(shouldDeleteCalendarEvent("no_show")).toBe(true);
   });
 
   it("returns false for other statuses", () => {
-    assert.equal(shouldDeleteCalendarEvent("confirmed"), false);
-    assert.equal(shouldDeleteCalendarEvent("pending"), false);
-    assert.equal(shouldDeleteCalendarEvent("realized"), false);
-    assert.equal(shouldDeleteCalendarEvent("deposit_paid"), false);
+    expect(shouldDeleteCalendarEvent("confirmed")).toBe(false);
+    expect(shouldDeleteCalendarEvent("pending")).toBe(false);
+    expect(shouldDeleteCalendarEvent("realized")).toBe(false);
+    expect(shouldDeleteCalendarEvent("deposit_paid")).toBe(false);
   });
 });
 
 describe("computeNewSessionsUsed", () => {
   it("increments by 1 when status is 'realized' and pack exists", () => {
-    assert.equal(computeNewSessionsUsed("realized", 2), 3);
-    assert.equal(computeNewSessionsUsed("realized", 0), 1);
-    assert.equal(computeNewSessionsUsed("realized", 9), 10);
+    expect(computeNewSessionsUsed("realized", 2)).toBe(3);
+    expect(computeNewSessionsUsed("realized", 0)).toBe(1);
+    expect(computeNewSessionsUsed("realized", 9)).toBe(10);
   });
 
   it("returns null when status is not 'realized'", () => {
-    assert.equal(computeNewSessionsUsed("confirmed", 2), null);
-    assert.equal(computeNewSessionsUsed("cancelled", 2), null);
-    assert.equal(computeNewSessionsUsed("pending", 2), null);
+    expect(computeNewSessionsUsed("confirmed", 2)).toBe(null);
+    expect(computeNewSessionsUsed("cancelled", 2)).toBe(null);
+    expect(computeNewSessionsUsed("pending", 2)).toBe(null);
   });
 
   it("returns null when no pack is associated (currentSessionsUsed is null)", () => {
-    assert.equal(computeNewSessionsUsed("realized", null), null);
+    expect(computeNewSessionsUsed("realized", null)).toBe(null);
   });
 });
 
 describe("shouldNotifyClientCancellation", () => {
   it("returns true when cancelled by admin and client has phone", () => {
-    assert.equal(shouldNotifyClientCancellation("admin", "5491100001111"), true);
+    expect(shouldNotifyClientCancellation("admin", "5491100001111")).toBe(true);
   });
 
   it("returns false when cancelled by client (not admin)", () => {
-    assert.equal(shouldNotifyClientCancellation("client", "5491100001111"), false);
+    expect(shouldNotifyClientCancellation("client", "5491100001111")).toBe(false);
   });
 
   it("returns false when client has no phone", () => {
-    assert.equal(shouldNotifyClientCancellation("admin", null), false);
-    assert.equal(shouldNotifyClientCancellation("admin", undefined), false);
-    assert.equal(shouldNotifyClientCancellation("admin", ""), false);
+    expect(shouldNotifyClientCancellation("admin", null)).toBe(false);
+    expect(shouldNotifyClientCancellation("admin", undefined)).toBe(false);
+    expect(shouldNotifyClientCancellation("admin", "")).toBe(false);
   });
 });
 
 describe("shouldNotifyWaitlist", () => {
   it("returns true when serviceId is provided", () => {
-    assert.equal(shouldNotifyWaitlist("svc-123"), true);
+    expect(shouldNotifyWaitlist("svc-123")).toBe(true);
   });
 
   it("returns false when serviceId is null or undefined", () => {
-    assert.equal(shouldNotifyWaitlist(null), false);
-    assert.equal(shouldNotifyWaitlist(undefined), false);
-    assert.equal(shouldNotifyWaitlist(""), false);
+    expect(shouldNotifyWaitlist(null)).toBe(false);
+    expect(shouldNotifyWaitlist(undefined)).toBe(false);
+    expect(shouldNotifyWaitlist("")).toBe(false);
   });
 });
 
@@ -136,31 +136,31 @@ describe("shouldNotifyWaitlist", () => {
 
 describe("Booking status transition rules", () => {
   it("confirmed booking creates GCal event and does not delete", () => {
-    assert.equal(shouldCreateCalendarEvent("confirmed"), true);
-    assert.equal(shouldDeleteCalendarEvent("confirmed"), false);
+    expect(shouldCreateCalendarEvent("confirmed")).toBe(true);
+    expect(shouldDeleteCalendarEvent("confirmed")).toBe(false);
   });
 
   it("cancelled booking deletes GCal event and does not create", () => {
-    assert.equal(shouldCreateCalendarEvent("cancelled"), false);
-    assert.equal(shouldDeleteCalendarEvent("cancelled"), true);
+    expect(shouldCreateCalendarEvent("cancelled")).toBe(false);
+    expect(shouldDeleteCalendarEvent("cancelled")).toBe(true);
   });
 
   it("no_show booking deletes GCal event and does not create", () => {
-    assert.equal(shouldCreateCalendarEvent("no_show"), false);
-    assert.equal(shouldDeleteCalendarEvent("no_show"), true);
+    expect(shouldCreateCalendarEvent("no_show")).toBe(false);
+    expect(shouldDeleteCalendarEvent("no_show")).toBe(true);
   });
 
   it("realized booking with pack increments sessions and has no GCal side effects", () => {
     const newSessions = computeNewSessionsUsed("realized", 5);
-    assert.equal(newSessions, 6);
-    assert.equal(shouldCreateCalendarEvent("realized"), false);
-    assert.equal(shouldDeleteCalendarEvent("realized"), false);
+    expect(newSessions).toBe(6);
+    expect(shouldCreateCalendarEvent("realized")).toBe(false);
+    expect(shouldDeleteCalendarEvent("realized")).toBe(false);
   });
 
   it("only confirmed and cancelled/no_show trigger GCal operations (not pending/deposit_paid)", () => {
     for (const status of ["pending", "deposit_paid"]) {
-      assert.equal(shouldCreateCalendarEvent(status), false, `${status} should not create`);
-      assert.equal(shouldDeleteCalendarEvent(status), false, `${status} should not delete`);
+      expect(shouldCreateCalendarEvent(status), `${status} should not create`).toBe(false);
+      expect(shouldDeleteCalendarEvent(status), `${status} should not delete`).toBe(false);
     }
   });
 });
