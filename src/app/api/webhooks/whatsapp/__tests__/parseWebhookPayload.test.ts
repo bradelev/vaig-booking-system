@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { parseWebhookPayload } from "../route";
 import type { WhatsAppWebhookPayload } from "../route";
 
@@ -30,11 +30,11 @@ describe("parseWebhookPayload", () => {
       { id: "msg-1", from: "5491100001111", timestamp: "1700000000", type: "text", text: { body: "Hola" } },
     ]);
     const { messages: result } = parseWebhookPayload(payload);
-    expect(result.length).toBe(1);
-    expect(result[0].from).toBe("5491100001111");
-    expect(result[0].type).toBe("text");
+    assert.equal(result.length, 1);
+    assert.equal(result[0].from, "5491100001111");
+    assert.equal(result[0].type, "text");
     if (result[0].type === "text") {
-      expect(result[0].text.body).toBe("Hola");
+      assert.equal(result[0].text.body, "Hola");
     }
   });
 
@@ -52,11 +52,11 @@ describe("parseWebhookPayload", () => {
       },
     ]);
     const { messages: result } = parseWebhookPayload(payload);
-    expect(result.length).toBe(1);
-    expect(result[0].type).toBe("interactive");
+    assert.equal(result.length, 1);
+    assert.equal(result[0].type, "interactive");
     if (result[0].type === "interactive") {
-      expect(result[0].interactive.type).toBe("button_reply");
-      expect(result[0].interactive.button_reply?.id).toBe("book");
+      assert.equal(result[0].interactive.type, "button_reply");
+      assert.equal(result[0].interactive.button_reply?.id, "book");
     }
   });
 
@@ -74,10 +74,10 @@ describe("parseWebhookPayload", () => {
       },
     ]);
     const { messages: result } = parseWebhookPayload(payload);
-    expect(result.length).toBe(1);
+    assert.equal(result.length, 1);
     if (result[0].type === "interactive") {
-      expect(result[0].interactive.type).toBe("list_reply");
-      expect(result[0].interactive.list_reply?.id).toBe("slot_1");
+      assert.equal(result[0].interactive.type, "list_reply");
+      assert.equal(result[0].interactive.list_reply?.id, "slot_1");
     }
   });
 
@@ -103,7 +103,7 @@ describe("parseWebhookPayload", () => {
       ],
     };
     const { messages: result } = parseWebhookPayload(payload);
-    expect(result.length).toBe(0);
+    assert.equal(result.length, 0);
   });
 
   it("returns empty array when entry list is empty", () => {
@@ -112,7 +112,7 @@ describe("parseWebhookPayload", () => {
       entry: [],
     };
     const { messages: result } = parseWebhookPayload(payload);
-    expect(result.length).toBe(0);
+    assert.equal(result.length, 0);
   });
 
   it("returns messages from multiple entries", () => {
@@ -152,7 +152,7 @@ describe("parseWebhookPayload", () => {
       ],
     };
     const { messages: result } = parseWebhookPayload(payload);
-    expect(result.length).toBe(2);
+    assert.equal(result.length, 2);
   });
 
   it("ignores changes with field other than 'messages'", () => {
@@ -177,6 +177,6 @@ describe("parseWebhookPayload", () => {
       ],
     };
     const { messages: result } = parseWebhookPayload(payload);
-    expect(result.length).toBe(0);
+    assert.equal(result.length, 0);
   });
 });

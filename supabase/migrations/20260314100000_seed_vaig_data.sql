@@ -131,11 +131,11 @@ INSERT INTO services (name, duration_minutes, price, deposit_amount, is_active) 
 -- 3. SYSTEM CONFIG adicional
 -- ============================================================
 INSERT INTO system_config (key, value) VALUES
-  ('address',               'Luis Alberto de Herrera 1343/103'),
-  ('phone',                 '099 334 874'),
-  ('access_instructions',   'PIN DE ACCESO FOXYS PARA INGRESAR: 93118. En la puerta de vidrio: 93118#'),
+  ('address',               'REDACTED'),
+  ('phone',                 'REDACTED'),
+  ('access_instructions',   'REDACTED'),
   ('preparation_notes',     'Depilación: venir rasurada del día anterior. Facial/lifting/cejas: venir sin maquillaje.'),
-  ('bank_brou',             '001560507-00001'),
-  ('bank_itau',             '0178049'),
+  ('bank_brou',             'REDACTED'),
+  ('bank_itau',             'REDACTED'),
   ('payment_instructions',  'Transferir a nombre/apellido. Enviar comprobante por WhatsApp. Sin confirmación en 24h se cancela la reserva.')
-ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
+ON CONFLICT (key) DO NOTHING;

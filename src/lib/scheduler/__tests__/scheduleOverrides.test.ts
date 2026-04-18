@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { resolveWorkingHoursForDate } from "../types";
 import { calculateAvailableSlots } from "../index";
 import { artDateTime } from "../../timezone";
@@ -17,21 +17,21 @@ const WEEKLY: WorkingHours[] = [1, 2, 3, 4, 5, 6].map((day) => ({
 describe("resolveWorkingHoursForDate", () => {
   it("returns weekly schedule when no override", () => {
     const result = resolveWorkingHoursForDate(WEEKLY, null, 1); // Monday
-    expect(result.length).toBe(1);
-    expect(result[0].dayOfWeek).toBe(1);
-    expect(result[0].startHour).toBe(9);
-    expect(result[0].endHour).toBe(18);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].dayOfWeek, 1);
+    assert.equal(result[0].startHour, 9);
+    assert.equal(result[0].endHour, 18);
   });
 
   it("returns weekly schedule when override is undefined", () => {
     const result = resolveWorkingHoursForDate(WEEKLY, undefined, 2);
-    expect(result.length).toBe(1);
-    expect(result[0].dayOfWeek).toBe(2);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].dayOfWeek, 2);
   });
 
   it("returns empty for non-working day without override", () => {
     const result = resolveWorkingHoursForDate(WEEKLY, null, 0); // Sunday
-    expect(result.length).toBe(0);
+    assert.equal(result.length, 0);
   });
 
   it("override replaces regular schedule with reduced hours", () => {
@@ -42,12 +42,12 @@ describe("resolveWorkingHoursForDate", () => {
       is_working: true,
     };
     const result = resolveWorkingHoursForDate(WEEKLY, override, 1); // Monday
-    expect(result.length).toBe(1);
-    expect(result[0].startHour).toBe(10);
-    expect(result[0].startMinute).toBe(0);
-    expect(result[0].endHour).toBe(14);
-    expect(result[0].endMinute).toBe(0);
-    expect(result[0].dayOfWeek).toBe(1);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].startHour, 10);
+    assert.equal(result[0].startMinute, 0);
+    assert.equal(result[0].endHour, 14);
+    assert.equal(result[0].endMinute, 0);
+    assert.equal(result[0].dayOfWeek, 1);
   });
 
   it("day-off override returns empty hours", () => {
@@ -58,7 +58,7 @@ describe("resolveWorkingHoursForDate", () => {
       is_working: false,
     };
     const result = resolveWorkingHoursForDate(WEEKLY, override, 1); // Monday
-    expect(result.length).toBe(0);
+    assert.equal(result.length, 0);
   });
 
   it("extra working day override on Sunday", () => {
@@ -69,10 +69,10 @@ describe("resolveWorkingHoursForDate", () => {
       is_working: true,
     };
     const result = resolveWorkingHoursForDate(WEEKLY, override, 0); // Sunday
-    expect(result.length).toBe(1);
-    expect(result[0].dayOfWeek).toBe(0);
-    expect(result[0].startHour).toBe(9);
-    expect(result[0].endHour).toBe(13);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].dayOfWeek, 0);
+    assert.equal(result[0].startHour, 9);
+    assert.equal(result[0].endHour, 13);
   });
 
   it("override with minutes in times", () => {
@@ -83,10 +83,10 @@ describe("resolveWorkingHoursForDate", () => {
       is_working: true,
     };
     const result = resolveWorkingHoursForDate(WEEKLY, override, 1);
-    expect(result[0].startHour).toBe(10);
-    expect(result[0].startMinute).toBe(30);
-    expect(result[0].endHour).toBe(14);
-    expect(result[0].endMinute).toBe(45);
+    assert.equal(result[0].startHour, 10);
+    assert.equal(result[0].startMinute, 30);
+    assert.equal(result[0].endHour, 14);
+    assert.equal(result[0].endMinute, 45);
   });
 });
 
@@ -109,7 +109,7 @@ describe("override integration with calculateAvailableSlots", () => {
       existingBookings: [],
     });
     // 10:00-12:00 with 60min slots => 10:00, 11:00
-    expect(result.availableSlots.length).toBe(2);
+    assert.equal(result.availableSlots.length, 2);
   });
 
   it("day-off override produces zero slots", () => {
@@ -126,7 +126,7 @@ describe("override integration with calculateAvailableSlots", () => {
       workingHours,
       existingBookings: [],
     });
-    expect(result.availableSlots.length).toBe(0);
+    assert.equal(result.availableSlots.length, 0);
   });
 
   it("Sunday override enables booking on normally off day", () => {
@@ -145,7 +145,7 @@ describe("override integration with calculateAvailableSlots", () => {
       existingBookings: [],
     });
     // 9:00-12:00 with 60min slots => 9:00, 10:00, 11:00
-    expect(result.availableSlots.length).toBe(3);
+    assert.equal(result.availableSlots.length, 3);
   });
 
   it("override with existing booking removes conflicting slot", () => {
@@ -167,6 +167,6 @@ describe("override integration with calculateAvailableSlots", () => {
       existingBookings: [booking],
     });
     // 10:00-13:00, 60min slots => 10:00, 11:00, 12:00; minus 11:00 booking => 10:00, 12:00
-    expect(result.availableSlots.length).toBe(2);
+    assert.equal(result.availableSlots.length, 2);
   });
 });

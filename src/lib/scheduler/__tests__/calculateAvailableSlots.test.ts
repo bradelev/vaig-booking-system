@@ -225,3 +225,126 @@ describe("isSlotAvailable — edge cases", () => {
     expect(isSlotAvailable(slot, [booking], 30)).toBe(false);
   });
 });
+
+// ── Edge cases ─────────────────────────────────────────────────────────────────
+
+describe("calculateAvailableSlots — edge cases", () => {
+  it("handles multiple periods in the same day", () => {
+    const TWO_PERIOD_HOURS: WorkingHours[] = [
+      { dayOfWeek: 1, startHour: 9, startMinute: 0, endHour: 12, endMinute: 0 },
+      { dayOfWeek: 1, startHour: 14, startMinute: 0, endHour: 17, endMinute: 0 },
+    ];
+    const date = new Date("2026-03-16T12:00:00.000Z");
+    const result = calculateAvailableSlots({
+      date,
+      durationMinutes: 60,
+      workingHours: TWO_PERIOD_HOURS,
+      existingBookings: [],
+    });
+    // Morning: 9:00, 10:00, 11:00 (3 slots); Afternoon: 14:00, 15:00, 16:00 (3 slots)
+    assert.equal(result.availableSlots.length, 6);
+  });
+
+  it("returns no slots when all are booked in a period", () => {
+    const date = new Date("2026-03-16T12:00:00.000Z");
+    const bookings: TimeSlot[] = [
+      { start: monday(9), end: monday(10) },
+      { start: monday(10), end: monday(11) },
+      { start: monday(11), end: monday(12) },
+    ];
+    const result = calculateAvailableSlots({
+      date,
+      durationMinutes: 60,
+      workingHours: MON_WORKING_HOURS,
+      existingBookings: bookings,
+    });
+    assert.equal(result.availableSlots.length, 0);
+  });
+
+  it("returns slots for 30-minute duration", () => {
+    const date = new Date("2026-03-16T12:00:00.000Z");
+    // Working 9-12 (180 min), 30 min slots => 6 slots
+    const result = calculateAvailableSlots({
+      date,
+      durationMinutes: 30,
+      workingHours: MON_WORKING_HOURS,
+      existingBookings: [],
+    });
+    assert.equal(result.availableSlots.length, 6);
+  });
+
+  it("does not include a slot that starts exactly at period end", () => {
+    // Working 9-10 with 60-min slot: only 9:00 fits. 10:00 would require end at 11:00, outside range.
+    const NARROW_HOURS: WorkingHours[] = [
+      { dayOfWeek: 1, startHour: 9, startMinute: 0, endHour: 10, endMinute: 0 },
+    ];
+    const date = new Date("2026-03-16T12:00:00.000Z");
+    const result = calculateAvailableSlots({
+      date,
+      durationMinutes: 60,
+      workingHours: NARROW_HOURS,
+      existingBookings: [],
+    });
+    assert.equal(result.availableSlots.length, 1);
+  });
+
+  it("buffer blocks slot immediately after booking but leaves later slots free", () => {
+    const date = new Date("2026-03-16T12:00:00.000Z");
+    // Booking at 9-10. With 60-min buffer, buffer extends to 11:00.
+    // Slots: 9:00 blocked (overlaps booking), 10:00 blocked (within buffer), 11:00 free.
+    const booking: TimeSlot = { start: monday(9), end: monday(10) };
+    const result = calculateAvailableSlots({
+      date,
+      durationMinutes: 60,
+      workingHours: MON_WORKING_HOURS,
+      existingBookings: [booking],
+      bufferMinutes: 60,
+    });
+    assert.equal(result.availableSlots.length, 1);
+    // Compare against known ART-anchored time to avoid UTC-vs-local getHours() discrepancy in CI
+    assert.deepEqual(result.availableSlots[0].start, artDateTime(MON_DATE, 11, 0));
+  });
+});
+
+describe("isSlotAvailable — edge cases", () => {
+  it("returns true when booking ends exactly when slot starts (adjacent, no overlap)", () => {
+    // Booking 8:00-9:00, slot 9:00-10:00 → should be available
+    const slot: TimeSlot = { start: monday(9), end: monday(10) };
+    const booking: TimeSlot = { start: monday(8), end: monday(9) };
+    assert.equal(isSlotAvailable(slot, [booking]), true);
+  });
+
+  it("returns false when slot starts exactly when booking starts", () => {
+    const slot: TimeSlot = { start: monday(9), end: monday(10) };
+    const booking: TimeSlot = { start: monday(9), end: monday(10) };
+    assert.equal(isSlotAvailable(slot, [booking]), false);
+  });
+
+  it("returns false for partial overlap at end of slot", () => {
+    // Slot 9:00-10:00, Booking 9:30-10:30
+    const slot: TimeSlot = { start: monday(9), end: monday(10) };
+    const booking: TimeSlot = { start: monday(9, 30), end: monday(10, 30) };
+    assert.equal(isSlotAvailable(slot, [booking]), false);
+  });
+
+  it("returns false for partial overlap at start of slot", () => {
+    // Slot 10:00-11:00, Booking 9:30-10:30
+    const slot: TimeSlot = { start: monday(10), end: monday(11) };
+    const booking: TimeSlot = { start: monday(9, 30), end: monday(10, 30) };
+    assert.equal(isSlotAvailable(slot, [booking]), false);
+  });
+
+  it("returns true with buffer when adjacent booking respects gap", () => {
+    // Booking 8:00-9:00 + 30min buffer = 9:30 boundary. Slot starts at 9:30.
+    const slot: TimeSlot = { start: monday(9, 30), end: monday(10, 30) };
+    const booking: TimeSlot = { start: monday(8), end: monday(9) };
+    assert.equal(isSlotAvailable(slot, [booking], 30), true);
+  });
+
+  it("returns false with buffer when slot starts within buffer window", () => {
+    // Booking 8:00-9:00 + 30min buffer = 9:30 boundary. Slot starting at 9:00 should be blocked.
+    const slot: TimeSlot = { start: monday(9), end: monday(10) };
+    const booking: TimeSlot = { start: monday(8), end: monday(9) };
+    assert.equal(isSlotAvailable(slot, [booking], 30), false);
+  });
+});
