@@ -23,6 +23,10 @@ export default defineConfig({
         "src/lib/bot/session.ts",
         "src/lib/bot/rate-limit.ts",
         "src/lib/bot/campaign-context.ts",
+        "src/lib/gcal/event-parser.ts",
+        "src/lib/gcal/service-abbreviations.ts",
+        "src/lib/utils.ts",
+        "src/lib/templates.ts",
       ],
       exclude: [
         "src/**/*.d.ts",
