@@ -58,7 +58,9 @@ export function getARTComponents(date: Date): {
     })
     .split(":")
     .map(Number);
-  const [hour, minute] = timeParts;
+  // Node.js on Linux returns 24 for midnight in "2-digit" + hour12:false; normalize to 0.
+  const [rawHour, minute] = timeParts;
+  const hour = rawHour === 24 ? 0 : rawHour;
 
   return { year, month, day, hour, minute, dayOfWeek };
 }
