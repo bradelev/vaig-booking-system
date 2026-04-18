@@ -2,6 +2,7 @@
   "name": "vaig-booking-system",
   "version": "0.1.0",
   "private": true,
+  "description": "End-to-end booking SaaS with WhatsApp chatbot (Claude AI), scheduling engine, and backoffice for aesthetic clinics.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
