@@ -35,7 +35,7 @@ export default async function ConfiguracionPage() {
           <input
             name="admin_phone"
             defaultValue={cfg["admin_phone"] ?? ""}
-            placeholder="ej: 59891374904"
+            placeholder="ej: 59800000000"
             className="mt-1 block w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-ring focus:outline-none"
           />
           <p className="mt-1 text-xs text-muted-foreground">Número completo con código de país, sin +.</p>
