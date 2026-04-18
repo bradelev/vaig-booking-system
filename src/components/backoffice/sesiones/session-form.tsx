@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import Combobox, { ComboboxItem } from "@/components/backoffice/agenda/combobox";
 import ClientSearchCombobox from "./client-search-combobox";
@@ -84,14 +84,23 @@ export default function SessionForm({
   const [ncReferidoPor, setNcReferidoPor] = useState("");
   const [creatingClient, setCreatingClient] = useState(false);
 
-  // Auto-compute monto cobrado from lista - descuento
-  useEffect(() => {
-    const lista = parseFloat(montoLista);
-    const pct = parseFloat(descuentoPct);
+  function recomputeCobrado(nextLista: string, nextPct: string) {
+    const lista = parseFloat(nextLista);
+    const pct = parseFloat(nextPct);
     if (!isNaN(lista) && !isNaN(pct)) {
       setMontoCobrado((lista * (1 - pct / 100)).toFixed(2));
     }
-  }, [montoLista, descuentoPct]);
+  }
+
+  function handleListaChange(value: string) {
+    setMontoLista(value);
+    recomputeCobrado(value, descuentoPct);
+  }
+
+  function handleDescuentoChange(value: string) {
+    setDescuentoPct(value);
+    recomputeCobrado(montoLista, value);
+  }
 
   function setDate(d: string) {
     setFecha(d);
@@ -301,7 +310,7 @@ export default function SessionForm({
               min="0"
               step="0.01"
               value={montoLista}
-              onChange={(e) => setMontoLista(e.target.value)}
+              onChange={(e) => handleListaChange(e.target.value)}
               placeholder="0.00"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
             />
@@ -314,7 +323,7 @@ export default function SessionForm({
               max="100"
               step="0.01"
               value={descuentoPct}
-              onChange={(e) => setDescuentoPct(e.target.value)}
+              onChange={(e) => handleDescuentoChange(e.target.value)}
               placeholder="0"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
             />
