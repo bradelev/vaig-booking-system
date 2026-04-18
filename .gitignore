@@ -49,3 +49,26 @@ next-env.d.ts
 
 # Skills lock (local tooling)
 skills-lock.json
+
+# Client data and internal docs — never commit
+docs/*.csv
+docs/*.xlsx
+docs/clients_rows.csv
+docs/PROJECT-CONTEXT.md
+docs/CLAUDE.md
+docs/GUIA-DE-USUARIO.md
+docs/vaig_booking_system_PRD_v1.3.md
+docs/mcp-and-skills-setup.md
+docs/vaig_jira_issues.csv
+scripts/*.csv
+scripts/migration-errors.csv
+
+# Allow the screenshots folder
+!docs/screenshots/
+!docs/screenshots/**
+
+# Loose screenshots at root
+image*.png
+Screenshot*.png
+*.jpeg
+captura-*.jpg

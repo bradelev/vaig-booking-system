@@ -143,6 +143,6 @@ pending → deposit_paid → confirmed → realized
 
 La app está diseñada para deployar en **Vercel**. Los cron jobs se gestionan con `pg_cron` en Supabase, que llama a los endpoints `/api/internal/*` protegidos por `CRON_SECRET`.
 
-## Licencia
+## License
 
-Privado — Todos los derechos reservados.
+[MIT](LICENSE) © 2026 Braulio De Leon
