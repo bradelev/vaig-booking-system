@@ -24,7 +24,7 @@ A production system handling 1,300+ clients and 4,700+ appointments — built wi
 |--------|-------|
 | Clients managed | 1,300+ |
 | Appointments tracked | 4,700+ |
-| Database migrations | 58 |
+| Database migrations | 56 |
 | Admin modules | 14 |
 | Test suites | 8 files across 5 domains |
 | Integrations | WhatsApp, Google Calendar, Mercado Pago, Claude AI, Cloudinary |
@@ -109,9 +109,9 @@ flowchart TB
 | **Inbox** | Real-time WhatsApp conversations (Supabase Realtime), admin reply, handoff controls |
 | **Campaigns** | Bulk WhatsApp messaging with 6-criteria recipient filtering, template preview |
 | **Reminders** | Manual reminder page for next-day bookings |
-| **Metrics** | Conversion funnel, activity charts, client segmentation (Recharts) |
-| **Analytics** | Depilation-specific KPIs, professional performance, demand heatmap |
-| **Templates** | WhatsApp template management |
+| **Metrics** | Conversion funnel, activity charts, depilation KPIs, demand heatmap (Recharts) |
+| **Payments** | Payment tracking and confirmation |
+| **Settings** | System configuration, WhatsApp templates |
 
 <div align="center">
   <img src="docs/screenshots/campaigns-form.png" alt="VAIG Campaigns — Recipient Selection" width="600" />
@@ -198,7 +198,7 @@ src/
     └── whatsapp/         # WhatsApp Business API client (logged send wrappers)
 
 supabase/
-└── migrations/           # 58 SQL migrations (enums → views → RLS policies)
+└── migrations/           # 56 SQL migrations (enums → views → RLS policies)
 
 scripts/                  # Import & migration CLI tools
 ```
@@ -239,15 +239,17 @@ stateDiagram-v2
 <details>
 <summary><strong>Client Segmentation (S1–S5)</strong></summary>
 
-Clients are automatically segmented based on activity:
+Clients are automatically segmented via a SQL view (`clientes_metricas`) using a priority-based CASE expression:
 
-| Segment | Criteria | Description |
-|---------|----------|-------------|
-| S5 | 10+ sessions, active in last 60 days | VIP / Loyal |
-| S4 | 5–9 sessions, active in last 90 days | Regular |
-| S3 | 2–4 sessions, active in last 120 days | Growing |
-| S2 | 1 session or inactive 120+ days | At risk |
-| S1 | 0 sessions | New / Never booked |
+| Segment | Criteria | Intent |
+|---------|----------|--------|
+| S5 | 11+ total sessions AND 30+ days since last visit | High-value clients who may need reactivation |
+| S4 | Exactly 1 session AND 30–90 days inactive | New clients at risk of churn |
+| S3 | Single service type (depilation) AND active/at-risk category | Cross-sell opportunity |
+| S2 | Has 5+ sessions in legacy coupon history (`sesion_n >= 5`) | Advanced coupon users |
+| S1 | 60–120 days inactive | General reactivation candidates |
+
+Segments are evaluated in S5→S1 order (first match wins). Clients matching none remain unsegmented.
 
 Segmentation drives campaign targeting, analytics dashboards, and client list filters.
 
@@ -280,7 +282,7 @@ The bot uses a **campaign-aware** greeting: if the client received a WhatsApp ca
 <details>
 <summary><strong>Database Schema Overview</strong></summary>
 
-**58 migrations** covering:
+**56 migrations** covering:
 
 - **Core tables**: `clients`, `services`, `professionals`, `bookings`, `client_packages`
 - **Bot tables**: `conversation_sessions`, `messages` (with WhatsApp message tracking)
