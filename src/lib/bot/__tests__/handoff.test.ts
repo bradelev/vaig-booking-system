@@ -1,5 +1,31 @@
-import { describe, it, expect } from "vitest";
-import { isHandoffTrigger } from "../handoff";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: vi.fn(),
+}));
+
+vi.mock("@/lib/whatsapp/logged", () => ({
+  sendTextMessage: vi.fn().mockResolvedValue(undefined),
+}));
+
+import { isHandoffTrigger, activateHandoff, releaseHandoff, updateLastInbound } from "../handoff";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { sendTextMessage } from "@/lib/whatsapp/logged";
+
+function makeChain(overrides: Record<string, unknown> = {}) {
+  const chain: Record<string, unknown> = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: null }),
+    update: vi.fn(),
+    insert: vi.fn().mockResolvedValue({ error: null }),
+  };
+  chain.select = vi.fn().mockReturnValue(chain);
+  chain.eq = vi.fn().mockReturnValue(chain);
+  chain.update = vi.fn().mockReturnValue(chain);
+  Object.assign(chain, overrides);
+  return chain;
+}
 
 describe("isHandoffTrigger", () => {
   it("returns true for 'hablar con persona'", () => {
@@ -49,5 +75,114 @@ describe("isHandoffTrigger", () => {
 
   it("handles accented characters", () => {
     expect(isHandoffTrigger("atención humana")).toBe(true);
+  });
+});
+
+describe("activateHandoff", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("updates existing session when session exists", async () => {
+    const chain = makeChain({
+      maybeSingle: vi.fn().mockResolvedValue({ data: { id: "session-1" } }),
+    });
+    chain.select = vi.fn().mockReturnValue(chain);
+    chain.eq = vi.fn().mockReturnValue(chain);
+    chain.update = vi.fn().mockReturnValue({ ...chain, eq: vi.fn().mockResolvedValue({ error: null }) });
+
+    const mockClient = { from: vi.fn().mockReturnValue(chain) };
+    vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
+
+    await activateHandoff("59899000001");
+
+    expect(mockClient.from).toHaveBeenCalledWith("conversation_sessions");
+    expect(sendTextMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "59899000001" }),
+      "bot"
+    );
+  });
+
+  it("inserts new session when no session exists", async () => {
+    const chain = makeChain({
+      maybeSingle: vi.fn().mockResolvedValue({ data: null }),
+    });
+    chain.select = vi.fn().mockReturnValue(chain);
+    chain.eq = vi.fn().mockReturnValue(chain);
+    chain.insert = vi.fn().mockResolvedValue({ error: null });
+
+    const mockClient = { from: vi.fn().mockReturnValue(chain) };
+    vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
+
+    await activateHandoff("59899000002");
+
+    expect(chain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: "59899000002", handoff_active: true })
+    );
+    expect(sendTextMessage).toHaveBeenCalled();
+  });
+});
+
+describe("releaseHandoff", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("updates session to release handoff and sends message", async () => {
+    const chain = makeChain();
+    chain.update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+
+    const mockClient = { from: vi.fn().mockReturnValue(chain) };
+    vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
+
+    await releaseHandoff("59899000003");
+
+    expect(mockClient.from).toHaveBeenCalledWith("conversation_sessions");
+    expect(sendTextMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "59899000003" }),
+      "bot"
+    );
+  });
+});
+
+describe("updateLastInbound", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("updates last_inbound_at when session exists", async () => {
+    const updateEq = vi.fn().mockResolvedValue({ error: null });
+    const updateChain = { eq: updateEq };
+    const chain = makeChain({
+      maybeSingle: vi.fn().mockResolvedValue({ data: { id: "session-1" } }),
+    });
+    chain.select = vi.fn().mockReturnValue(chain);
+    chain.eq = vi.fn().mockReturnValue(chain);
+    chain.update = vi.fn().mockReturnValue(updateChain);
+
+    const mockClient = { from: vi.fn().mockReturnValue(chain) };
+    vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
+
+    await updateLastInbound("59899000004");
+
+    expect(chain.update).toHaveBeenCalledWith(
+      expect.objectContaining({ last_inbound_at: expect.any(String) })
+    );
+  });
+
+  it("does nothing when no session exists", async () => {
+    const chain = makeChain({
+      maybeSingle: vi.fn().mockResolvedValue({ data: null }),
+    });
+    chain.select = vi.fn().mockReturnValue(chain);
+    chain.eq = vi.fn().mockReturnValue(chain);
+    chain.update = vi.fn().mockReturnValue(chain);
+
+    const mockClient = { from: vi.fn().mockReturnValue(chain) };
+    vi.mocked(createAdminClient).mockReturnValue(mockClient as never);
+
+    await updateLastInbound("59899000005");
+
+    expect(chain.update).not.toHaveBeenCalled();
   });
 });
