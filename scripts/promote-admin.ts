@@ -7,6 +7,8 @@
  *
  * Usage: npx tsx scripts/promote-admin.ts <email>
  */
+import { config } from "dotenv";
+config({ path: new URL("../.env", import.meta.url).pathname });
 import { createAdminClient } from "../src/lib/supabase/admin";
 
 const email = process.argv[2];
