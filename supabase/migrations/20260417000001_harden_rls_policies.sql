@@ -97,11 +97,13 @@ CREATE POLICY "admin_all_campaign_recipients"
 -- -----------------------------------------------------------------------------
 
 -- system_config: had RLS enabled but zero policies — fully open to authenticated
+DROP POLICY IF EXISTS "admin_all_system_config" ON system_config;
 CREATE POLICY "admin_all_system_config"
   ON system_config FOR ALL TO authenticated
   USING (is_admin()) WITH CHECK (is_admin());
 
 -- professional_schedule: same situation
+DROP POLICY IF EXISTS "admin_all_professional_schedule" ON professional_schedule;
 CREATE POLICY "admin_all_professional_schedule"
   ON professional_schedule FOR ALL TO authenticated
   USING (is_admin()) WITH CHECK (is_admin());
