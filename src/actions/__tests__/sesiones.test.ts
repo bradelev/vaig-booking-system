@@ -1,7 +1,7 @@
 /**
  * Tests for pure business logic extracted from sesiones.ts.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 
 // --- Pure helpers mirrored from sesiones.ts ---
 
