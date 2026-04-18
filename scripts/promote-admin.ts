@@ -30,7 +30,7 @@ if (!user) {
 }
 
 const { error } = await supabase.auth.admin.updateUserById(user.id, {
-  app_metadata: { role: "admin" },
+  app_metadata: { ...(user.app_metadata ?? {}), role: "admin" },
 });
 
 if (error) {
