@@ -17,6 +17,12 @@ export default defineConfig({
         "src/lib/scheduler/index.ts",
         "src/lib/scheduler/types.ts",
         "src/lib/timezone.ts",
+        "src/lib/bot/date-parser.ts",
+        "src/lib/bot/handoff.ts",
+        "src/lib/bot/intent.ts",
+        "src/lib/bot/session.ts",
+        "src/lib/bot/rate-limit.ts",
+        "src/lib/bot/campaign-context.ts",
       ],
       exclude: [
         "src/**/*.d.ts",
