@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notifyClientCancellation } from "@/lib/bot/notifications";
 import { notifyWaitlistForSlot } from "@/lib/bot/engine";
 import { createBookingCalendarEvent, deleteBookingCalendarEvent } from "@/lib/gcal/bookings";
+import { artLocalInputToISO } from "@/lib/timezone";
 
 export type CancellationReason =
   | "client_request"
@@ -134,7 +135,7 @@ export async function createBooking(formData: FormData) {
       client_id: formData.get("client_id") as string,
       service_id: formData.get("service_id") as string,
       professional_id: (formData.get("professional_id") as string) || null,
-      scheduled_at: formData.get("scheduled_at") as string,
+      scheduled_at: artLocalInputToISO(formData.get("scheduled_at") as string),
       notes: (formData.get("notes") as string) || null,
       status: "confirmed",
     })
@@ -287,7 +288,7 @@ export async function updateBooking(id: string, formData: FormData) {
       client_id: formData.get("client_id") as string,
       service_id: formData.get("service_id") as string,
       professional_id: (formData.get("professional_id") as string) || null,
-      scheduled_at: formData.get("scheduled_at") as string,
+      scheduled_at: artLocalInputToISO(formData.get("scheduled_at") as string),
       notes: (formData.get("notes") as string) || null,
     })
     .eq("id", id);

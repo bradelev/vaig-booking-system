@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createBookingFromAgenda, quickCreateClient, quickCreateService } from "@/actions/citas";
+import { artLocalInputToISO } from "@/lib/timezone";
 import type { Client, Service, Professional } from "./agenda-types";
 import Combobox, { type ComboboxItem } from "./combobox";
 import Modal from "@/components/backoffice/modal";
@@ -14,10 +15,6 @@ interface CreateBookingModalProps {
   services: Service[];
   professionals: Professional[];
   onClose: () => void;
-}
-
-function toLocalISOString(dateStr: string, timeStr: string): string {
-  return `${dateStr}T${timeStr}:00-03:00`;
 }
 
 function formatDateInput(date: Date): string {
@@ -148,7 +145,7 @@ export default function CreateBookingModal({
       return;
     }
     setError(null);
-    const scheduledAt = toLocalISOString(dateInput, timeInput);
+    const scheduledAt = artLocalInputToISO(`${dateInput}T${timeInput}`);
     startTransition(async () => {
       const result = await createBookingFromAgenda({
         client_id: clientId,

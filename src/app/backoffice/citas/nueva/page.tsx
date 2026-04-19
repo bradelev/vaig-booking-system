@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { dateToARTLocalInput } from "@/lib/timezone";
 import NuevaCitaForm from "./nueva-cita-form";
 
 interface Cliente {
@@ -33,11 +34,11 @@ export default async function NuevaCitaPage() {
   const servicios = (serviciosRaw ?? []) as Servicio[];
   const profesionales = (profsRaw ?? []) as Professional[];
 
-  // Default datetime: next hour rounded
-  const now = new Date();
-  now.setMinutes(0, 0, 0);
-  now.setHours(now.getHours() + 1);
-  const defaultDatetime = now.toISOString().slice(0, 16);
+  // Default datetime: next full hour in ART
+  const nextHour = new Date();
+  nextHour.setUTCMinutes(0, 0, 0);
+  nextHour.setUTCHours(nextHour.getUTCHours() + 1);
+  const defaultDatetime = dateToARTLocalInput(nextHour);
 
   return (
     <div className="max-w-2xl space-y-6">
