@@ -8,12 +8,12 @@
  * max_tokens: 200 — intent JSON is always under 150 tokens.
  */
 
-import { getARTComponents } from "@/lib/timezone";
+import { getARTComponents, LOCAL_TIMEZONE } from "@/lib/timezone";
 import type { KnowledgeBase } from "./types";
 
 const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5-20251001";
-const TZ = "America/Argentina/Buenos_Aires";
+const TZ = LOCAL_TIMEZONE;
 
 export type IntentType =
   | "book"

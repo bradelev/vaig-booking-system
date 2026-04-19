@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { CheckCircle2, Clock, Send } from "lucide-react";
 import { sendReminders, type SendRemindersResult } from "@/actions/recordatorios";
 import type { ReminderBooking } from "./page";
@@ -56,7 +57,7 @@ export default function RecordatoriosPageClient({ bookings, tomorrowLabel }: Pro
   }
 
   const now = new Date().toLocaleTimeString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -247,7 +248,7 @@ export default function RecordatoriosPageClient({ bookings, tomorrowLabel }: Pro
 
 function formatHour(scheduledAt: string): string {
   return new Date(scheduledAt).toLocaleTimeString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,

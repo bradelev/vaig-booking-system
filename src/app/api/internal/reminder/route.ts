@@ -5,6 +5,7 @@
  * message, and records confirmation_sent_at.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
 import { sendTextMessage } from "@/lib/whatsapp/logged";
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const date = new Date(booking.scheduled_at);
     const dateLabel = date.toLocaleDateString("es-AR", {
-      timeZone: "America/Argentina/Buenos_Aires",
+      timeZone: LOCAL_TIMEZONE,
       weekday: "long",
       day: "numeric",
       month: "long",
@@ -131,7 +132,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const lines = profBookings.map(
       (b: { scheduled_at: string; clients: { first_name: string } | null; services: { name: string } | null }) => {
         const time = new Date(b.scheduled_at).toLocaleTimeString("es-AR", {
-          timeZone: "America/Argentina/Buenos_Aires",
+          timeZone: LOCAL_TIMEZONE,
           hour: "2-digit",
           minute: "2-digit",
           hour12: false,

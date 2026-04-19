@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 import RecordatoriosPageClient from "./recordatorios-page-client";
 
@@ -7,15 +8,15 @@ export const metadata: Metadata = { title: "Recordatorios" };
 function tomorrowAR(): { dateStr: string; label: string } {
   const now = new Date();
   const todayStr = now.toLocaleDateString("sv-SE", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
   });
   const tomorrow = new Date(todayStr + "T12:00:00");
   tomorrow.setDate(tomorrow.getDate() + 1);
   const dateStr = tomorrow.toLocaleDateString("sv-SE", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
   });
   const label = tomorrow.toLocaleDateString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -42,7 +43,7 @@ export default async function RecordatoriosPage() {
     const d = new Date(dateStr + "T12:00:00");
     d.setDate(d.getDate() + 1);
     return d.toLocaleDateString("sv-SE", {
-      timeZone: "America/Argentina/Buenos_Aires",
+      timeZone: LOCAL_TIMEZONE,
     });
   })();
 

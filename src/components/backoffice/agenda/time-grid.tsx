@@ -1,5 +1,6 @@
 "use client";
 
+import { localInputToISO } from "@/lib/timezone";
 import {
   AgendaEvent,
   HOURS,
@@ -171,7 +172,8 @@ export default function TimeGrid({ days, events, onSlotClick, onEventDrop, onEve
     const minute = Math.floor((totalMinutes % 60) / 5) * 5;
 
     const dayStr = toDateStr(day);
-    const newScheduledAt = `${dayStr}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00-03:00`;
+    const localStr = `${dayStr}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    const newScheduledAt = localInputToISO(localStr);
     onEventDrop(eventId, newScheduledAt);
   }
 

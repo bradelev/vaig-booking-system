@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Modal from "@/components/backoffice/modal";
@@ -19,7 +20,7 @@ interface CitasPageClientProps {
 const DAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 function todayAR(): string {
-  return new Date().toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" });
+  return new Date().toLocaleDateString("sv-SE", { timeZone: LOCAL_TIMEZONE });
 }
 
 function addDays(dateStr: string, n: number): string {

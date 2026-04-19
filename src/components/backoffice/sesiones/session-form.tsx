@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { toast } from "sonner";
 import Combobox, { ComboboxItem } from "@/components/backoffice/agenda/combobox";
 import ClientSearchCombobox from "./client-search-combobox";
@@ -35,7 +36,7 @@ interface SessionFormProps {
 }
 
 function todayAR(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
+  return new Date().toLocaleDateString("en-CA", { timeZone: LOCAL_TIMEZONE });
 }
 
 function addDays(dateStr: string, days: number): string {

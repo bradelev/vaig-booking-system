@@ -1,11 +1,12 @@
 import { type ClassValue, clsx } from "clsx";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const TZ = "America/Argentina/Buenos_Aires";
+const TZ = LOCAL_TIMEZONE;
 
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("es-AR", {

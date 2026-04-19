@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Agenda" };
@@ -33,7 +34,7 @@ export default async function AgendaPage({
 }) {
   const { semana, profesional: filterProfId, vista } = await searchParams;
 
-  const weekParam = semana ?? new Date().toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" });
+  const weekParam = semana ?? new Date().toLocaleDateString("sv-SE", { timeZone: LOCAL_TIMEZONE });
   const monday = getMondayOfWeek(weekParam);
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);

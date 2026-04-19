@@ -4,6 +4,7 @@
  * No OAuth per-professional flow required.
  */
 import { google } from "googleapis";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import type { calendar_v3 } from "googleapis";
 
 function getCalendarClient(): calendar_v3.Calendar {
@@ -53,11 +54,11 @@ export async function createCalendarEvent(params: CalendarEventParams): Promise<
       description: params.description,
       start: {
         dateTime: params.startIso,
-        timeZone: params.timeZone ?? "America/Argentina/Buenos_Aires",
+        timeZone: params.timeZone ?? LOCAL_TIMEZONE,
       },
       end: {
         dateTime: params.endIso,
-        timeZone: params.timeZone ?? "America/Argentina/Buenos_Aires",
+        timeZone: params.timeZone ?? LOCAL_TIMEZONE,
       },
     },
   });
@@ -122,7 +123,7 @@ export async function listCalendarEvents(
       timeMax,
       singleEvents: true,
       orderBy: "startTime",
-      timeZone: "America/Argentina/Buenos_Aires",
+      timeZone: LOCAL_TIMEZONE,
       maxResults: 250,
       pageToken,
     });

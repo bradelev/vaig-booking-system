@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { toast } from "sonner";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { updateSession, confirmBookingAsSession, searchClients, deleteSession } from "@/actions/sesiones";
 import type { Professional } from "@/components/backoffice/sesiones/session-form";
 
@@ -103,7 +104,7 @@ function parseTimeART(isoString: string): string {
   return new Date(isoString).toLocaleTimeString("es-AR", {
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
     hour12: false,
   });
 }
@@ -111,7 +112,7 @@ function parseTimeART(isoString: string): string {
 /** Parse YYYY-MM-DD from an ISO string in ART timezone */
 function parseDateART(isoString: string): string {
   return new Date(isoString).toLocaleDateString("sv-SE", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
   });
 }
 

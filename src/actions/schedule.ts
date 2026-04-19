@@ -90,7 +90,7 @@ export async function saveSystemConfig(formData: FormData) {
   const client = createAdminClient() as AnyClient;
 
   const keys = [
-    "business_name", "admin_phone",
+    "business_name", "admin_phone", "local_timezone",
     // Bot/payment keys hidden from UI in backoffice-only mode — do not save to avoid overwriting with empty:
     // "cbu", "cbu_alias", "mp_enabled", "auto_cancel_hours", "buffer_minutes",
     // "messaging_reminder", "messaging_survey", "messaging_payment_reminder", "messaging_next_session",

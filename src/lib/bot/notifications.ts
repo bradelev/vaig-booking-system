@@ -8,6 +8,7 @@
  * If not set, notifications are silently skipped.
  */
 import { sendTextMessage, sendTemplateMessage } from "@/lib/whatsapp/logged";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { getConfigValue } from "@/lib/config";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
 
@@ -39,7 +40,7 @@ export async function notifyAdminNewBooking(params: NewBookingNotificationParams
 
   const date = new Date(params.scheduledAt);
   const dateLabel = date.toLocaleDateString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -129,7 +130,7 @@ export async function notifyClientCancellation(
 
   const date = new Date(params.scheduledAt);
   const dateLabel = date.toLocaleDateString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -170,7 +171,7 @@ export async function notifyBusinessNewBooking(
 
   const date = new Date(params.scheduledAt);
   const dateLabel = date.toLocaleDateString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -216,7 +217,7 @@ export async function notifyAdminPaymentConfirmed(
 
   const date = new Date(params.scheduledAt);
   const dateLabel = date.toLocaleDateString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
     weekday: "long",
     day: "numeric",
     month: "long",

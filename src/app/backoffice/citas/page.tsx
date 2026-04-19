@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 import CitasPageClient from "./citas-page-client";
 
@@ -9,7 +10,7 @@ interface PageProps {
 }
 
 function todayAR(): string {
-  return new Date().toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" });
+  return new Date().toLocaleDateString("sv-SE", { timeZone: LOCAL_TIMEZONE });
 }
 
 function getMondayOfWeek(dateStr: string): string {
@@ -90,7 +91,7 @@ export default async function CitasPage({ searchParams }: PageProps) {
   const bookingsByDate: Record<string, BookingItem[]> = {};
   for (const b of allBookings) {
     const dateKey = new Date(b.scheduled_at).toLocaleDateString("sv-SE", {
-      timeZone: "America/Argentina/Buenos_Aires",
+      timeZone: LOCAL_TIMEZONE,
     });
     if (!bookingsByDate[dateKey]) bookingsByDate[dateKey] = [];
     bookingsByDate[dateKey].push({

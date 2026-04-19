@@ -1,6 +1,16 @@
 import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { saveSystemConfig } from "@/actions/schedule";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
+
+const TIMEZONE_OPTIONS = [
+  { value: "America/Montevideo", label: "America/Montevideo (UYT, UTC-3)" },
+  { value: "America/Argentina/Buenos_Aires", label: "America/Argentina/Buenos_Aires (ART, UTC-3)" },
+  { value: "America/Santiago", label: "America/Santiago (CLT, UTC-3/-4)" },
+  { value: "America/Sao_Paulo", label: "America/Sao_Paulo (BRT, UTC-3)" },
+  { value: "America/Bogota", label: "America/Bogota (COT, UTC-5)" },
+  { value: "UTC", label: "UTC" },
+];
 
 export const metadata: Metadata = { title: "Configuración" };
 
@@ -39,6 +49,22 @@ export default async function ConfiguracionPage() {
             className="mt-1 block w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-ring focus:outline-none"
           />
           <p className="mt-1 text-xs text-muted-foreground">Número completo con código de país, sin +.</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground">Timezone local</label>
+          <select
+            name="local_timezone"
+            defaultValue={cfg["local_timezone"] ?? LOCAL_TIMEZONE}
+            className="mt-1 block w-full rounded-lg border border-input px-3 py-2 text-sm focus:border-ring focus:outline-none"
+          >
+            {TIMEZONE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Se usa para mostrar horarios y guardar citas correctamente. Cambiar requiere reiniciar el servidor.
+          </p>
         </div>
 
         <div className="flex justify-end pt-2">

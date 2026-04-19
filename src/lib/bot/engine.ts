@@ -7,7 +7,7 @@ import { buildKnowledgeBase } from "./knowledge";
 import { getSession, upsertSession, clearSession, advanceFunnel } from "./session";
 import { getSlotsByWindow, getSlotsByWindowAllProfessionals, getNextAvailableSlots, checkSlotAvailability, getNearbySlots, formatSlotLabel } from "@/lib/scheduler/db";
 import type { TimeWindow, SlotsByDay } from "@/lib/scheduler/db";
-import { getARTComponents } from "@/lib/timezone";
+import { getARTComponents, LOCAL_TIMEZONE, localInputToISO } from "@/lib/timezone";
 import { getConfigValue } from "@/lib/config";
 import { createMPPreference, createPackMPPreference } from "@/lib/payments/mp";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -23,7 +23,7 @@ import type { BotConversationState, BookingFlowContext, ServiceInfo, SlotOption,
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
 
-const TZ = "America/Argentina/Buenos_Aires";
+const TZ = LOCAL_TIMEZONE;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -742,7 +742,7 @@ async function handleWindowSelection(
   for (const [name, dow] of Object.entries(dayNames)) {
     if (t.includes(name)) {
       matchedDay = slotsByDay.find((d) => {
-        const date = new Date(d.date + "T12:00:00-03:00");
+        const date = new Date(localInputToISO(d.date + "T12:00"));
         const { dayOfWeek } = getARTComponents(date);
         return dayOfWeek === dow;
       });
