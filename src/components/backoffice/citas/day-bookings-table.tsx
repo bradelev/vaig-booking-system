@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import Combobox, { type ComboboxItem } from "@/components/backoffice/agenda/combobox";
 import StatusBadge from "@/components/backoffice/status-badge";
 import { updateBookingInline } from "@/actions/citas";
+import { artLocalInputToISO, dateToARTLocalInput } from "@/lib/timezone";
 import type { BookingItem } from "@/app/backoffice/citas/page";
 import CancelModal from "@/components/backoffice/cancel-modal";
 
@@ -27,15 +28,11 @@ interface EditData {
 }
 
 function rowToEditData(row: BookingItem): EditData {
-  const localDt = new Date(row.scheduledAt)
-    .toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" })
-    .replace(" ", "T")
-    .slice(0, 16);
   return {
     clientId: row.clientId,
     serviceId: row.serviceId,
     professionalId: row.professionalId ?? "",
-    scheduledAt: localDt,
+    scheduledAt: dateToARTLocalInput(new Date(row.scheduledAt)),
     status: row.status,
     notes: row.notes ?? "",
   };
@@ -92,7 +89,7 @@ export default function DayBookingsTable({
     if (!editData) return;
     setSaving(true);
     try {
-      const scheduledAtISO = new Date(editData.scheduledAt + ":00-03:00").toISOString();
+      const scheduledAtISO = artLocalInputToISO(editData.scheduledAt);
       const result = await updateBookingInline(row.id, {
         client_id: editData.clientId || undefined,
         service_id: editData.serviceId || undefined,

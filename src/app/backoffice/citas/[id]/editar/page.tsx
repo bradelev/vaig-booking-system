@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateBooking } from "@/actions/citas";
+import { dateToARTLocalInput } from "@/lib/timezone";
 import ValidatedForm from "@/components/backoffice/validated-form";
 
 interface Booking {
@@ -60,8 +61,8 @@ export default async function EditarCitaPage({
 
   const updateAction = updateBooking.bind(null, id);
 
-  // Format datetime for input
-  const scheduledLocal = new Date(booking.scheduled_at).toISOString().slice(0, 16);
+  // Format datetime for input (in ART)
+  const scheduledLocal = dateToARTLocalInput(new Date(booking.scheduled_at));
 
   return (
     <div className="max-w-2xl space-y-6">
