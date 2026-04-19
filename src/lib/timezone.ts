@@ -74,3 +74,25 @@ export function artDateTime(dateInART: Date, hour: number, minute: number): Date
     `${dateStr}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00-03:00`
   );
 }
+
+/**
+ * Converts a datetime-local input string ("YYYY-MM-DDTHH:mm") — interpreted as ART —
+ * to an ISO UTC string safe to store in a Postgres timestamptz column.
+ *
+ * Without this, Postgres interprets the offset-less literal as UTC and shifts
+ * every time by -3h when read back in ART.
+ */
+export function artLocalInputToISO(localInput: string): string {
+  return new Date(`${localInput}:00-03:00`).toISOString();
+}
+
+/**
+ * Formats a Date as a datetime-local input value ("YYYY-MM-DDTHH:mm") in ART.
+ * Counterpart to artLocalInputToISO — use to pre-fill <input type="datetime-local">.
+ */
+export function dateToARTLocalInput(date: Date): string {
+  return date
+    .toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" })
+    .replace(" ", "T")
+    .slice(0, 16);
+}
