@@ -143,9 +143,9 @@ export async function createBooking(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
-  // VBS-42: Create Google Calendar event (booking is confirmed from creation)
+  // VBS-42/185: Await GCal creation before redirect to avoid serverless cutting the detached promise
   if (inserted?.id) {
-    void createBookingCalendarEvent(inserted.id);
+    await createBookingCalendarEvent(inserted.id);
   }
 
   revalidatePath("/backoffice/citas");
