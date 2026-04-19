@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { useRouter } from "next/navigation";
 import SessionForm, { type Professional } from "@/components/backoffice/sesiones/session-form";
 import DaySessionsTable, { type PendingBookingData } from "@/components/backoffice/sesiones/day-sessions-table";
@@ -61,13 +62,13 @@ function formatTime(isoString: string): string {
   return new Date(isoString).toLocaleTimeString("es-AR", {
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
   });
 }
 
 /** Returns YYYY-MM-DD for today in Argentina TZ */
 function todayAR(): string {
-  return new Date().toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" });
+  return new Date().toLocaleDateString("sv-SE", { timeZone: LOCAL_TIMEZONE });
 }
 
 /** Add N days to a YYYY-MM-DD string */

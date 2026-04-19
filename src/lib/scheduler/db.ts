@@ -6,12 +6,12 @@ import { calculateAvailableSlots } from "./index";
 import type { TimeSlot, WorkingHours, ScheduleOverride } from "./types";
 import { resolveWorkingHoursForDate } from "./types";
 import type { SlotOption, MultiProfSlot } from "@/lib/bot/types";
-import { artMidnight, artDateTime, getARTComponents } from "@/lib/timezone";
+import { artMidnight, artDateTime, getARTComponents, LOCAL_TIMEZONE, localInputToISO } from "@/lib/timezone";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
 
-const TZ = "America/Argentina/Buenos_Aires";
+const TZ = LOCAL_TIMEZONE;
 
 /**
  * Formats a Date in Buenos Aires timezone as a human-readable label.
@@ -82,8 +82,8 @@ async function getExistingBookings(
 
   // Day range in UTC based on TZ date
   const dateStr = date.toLocaleDateString("sv-SE", { timeZone: TZ });
-  const dayStart = new Date(`${dateStr}T00:00:00-03:00`);
-  const dayEnd = new Date(`${dateStr}T23:59:59-03:00`);
+  const dayStart = new Date(localInputToISO(`${dateStr}T00:00`));
+  const dayEnd = new Date(localInputToISO(`${dateStr}T23:59`));
 
   const { data } = await client
     .from("bookings")

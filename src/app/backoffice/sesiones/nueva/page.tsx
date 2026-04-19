@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 import SessionsPageClient from "./page-client";
 
@@ -10,7 +11,7 @@ interface PageProps {
 
 /** Returns YYYY-MM-DD for today in Argentina TZ */
 function todayAR(): string {
-  return new Date().toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" });
+  return new Date().toLocaleDateString("sv-SE", { timeZone: LOCAL_TIMEZONE });
 }
 
 /** Given any date string YYYY-MM-DD, return the Monday of that week */
@@ -187,7 +188,7 @@ export default async function SesionesNuevaPage({ searchParams }: PageProps) {
 
   for (const b of allBookings) {
     const dateKey = new Date(b.scheduled_at).toLocaleDateString("sv-SE", {
-      timeZone: "America/Argentina/Buenos_Aires",
+      timeZone: LOCAL_TIMEZONE,
     });
     if (!bookingsByDate[dateKey]) bookingsByDate[dateKey] = [];
     bookingsByDate[dateKey].push({

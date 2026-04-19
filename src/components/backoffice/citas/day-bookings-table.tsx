@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import Combobox, { type ComboboxItem } from "@/components/backoffice/agenda/combobox";
 import StatusBadge from "@/components/backoffice/status-badge";
 import { updateBookingInline } from "@/actions/citas";
-import { artLocalInputToISO, dateToARTLocalInput } from "@/lib/timezone";
+import { artLocalInputToISO, dateToARTLocalInput, LOCAL_TIMEZONE } from "@/lib/timezone";
 import type { BookingItem } from "@/app/backoffice/citas/page";
 import CancelModal from "@/components/backoffice/cancel-modal";
 
@@ -42,7 +42,7 @@ function formatTime(isoString: string): string {
   return new Date(isoString).toLocaleTimeString("es-AR", {
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
   });
 }
 

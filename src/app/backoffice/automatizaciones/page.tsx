@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import ResponsiveTable, { type TableColumn } from "@/components/backoffice/responsive-table";
@@ -68,7 +69,7 @@ export default async function AutomatizacionesPage() {
       accessor: (c) =>
         c.scheduled_at
           ? new Date(c.scheduled_at).toLocaleString("es-AR", {
-              timeZone: "America/Argentina/Buenos_Aires",
+              timeZone: LOCAL_TIMEZONE,
               day: "2-digit",
               month: "2-digit",
               year: "numeric",

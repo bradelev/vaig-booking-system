@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { v2 as cloudinary } from "cloudinary";
+import { localInputToISO } from "@/lib/timezone";
 
 if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
   throw new Error("Missing required Cloudinary environment variables");
@@ -52,7 +53,7 @@ export async function createCampaign(formData: FormData) {
   const body = (formData.get("body") as string) || "";
   const imageUrl = (formData.get("image_url") as string) || null;
   const scheduledAtRaw = formData.get("scheduled_at") as string | null;
-  const scheduledAt = scheduledAtRaw ? new Date(`${scheduledAtRaw}:00-03:00`).toISOString() : null;
+  const scheduledAt = scheduledAtRaw ? localInputToISO(scheduledAtRaw!) : null;
 
   const filterCriteria = parseFilterCriteria(formData);
 
@@ -86,7 +87,7 @@ export async function createAndScheduleCampaign(formData: FormData) {
   const scheduledAtRaw = formData.get("scheduled_at") as string | null;
   if (!scheduledAtRaw) throw new Error("Configurá una fecha/hora de envío antes de programar");
 
-  const scheduledAt = new Date(`${scheduledAtRaw}:00-03:00`).toISOString();
+  const scheduledAt = localInputToISO(scheduledAtRaw!);
 
   const filterCriteria = parseFilterCriteria(formData);
 
@@ -136,7 +137,7 @@ export async function updateCampaign(id: string, formData: FormData) {
   const body = (formData.get("body") as string) || "";
   const imageUrl = (formData.get("image_url") as string) || null;
   const scheduledAtRaw = formData.get("scheduled_at") as string | null;
-  const scheduledAt = scheduledAtRaw ? new Date(`${scheduledAtRaw}:00-03:00`).toISOString() : null;
+  const scheduledAt = scheduledAtRaw ? localInputToISO(scheduledAtRaw!) : null;
 
   const filterCriteria = parseFilterCriteria(formData);
 

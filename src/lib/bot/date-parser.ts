@@ -8,11 +8,11 @@
  *    Only called when regex returns null AND text looks temporal.
  */
 
-import { artDateTime, getARTComponents } from "@/lib/timezone";
+import { artDateTime, getARTComponents, LOCAL_TIMEZONE } from "@/lib/timezone";
 
 const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5-20251001";
-const TZ = "America/Argentina/Buenos_Aires";
+const TZ = LOCAL_TIMEZONE;
 
 export interface ParsedDateTime {
   date: Date;

@@ -1,4 +1,5 @@
 // Types, constants, and helpers for the agenda calendar
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 
 export type CalendarView = "week" | "4days" | "day" | "month";
 
@@ -73,7 +74,7 @@ export const PROFESSIONAL_DOT_COLORS: Record<string, string> = {
 
 export const HOURS = Array.from({ length: 24 }, (_, i) => i); // 00:00 to 23:00
 export const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-export const TZ = "America/Argentina/Buenos_Aires";
+export const TZ = LOCAL_TIMEZONE;
 
 // Grid constants
 export const GRID_START_HOUR = 0;

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { LOCAL_TIMEZONE, localInputToISO } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,7 +109,7 @@ export async function confirmBookingAsSession(
   }
 
   const fecha = overrides.fecha ?? new Date(booking.scheduled_at).toLocaleDateString("sv-SE", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
   });
   const tipoServicio = overrides.tipo_servicio ?? booking.services?.category ?? booking.services?.name ?? "Servicio";
 
@@ -132,9 +133,9 @@ export async function confirmBookingAsSession(
   if (overrides.fecha || overrides.hora) {
     const baseFecha = overrides.fecha ?? fecha;
     const baseHora = overrides.hora ?? new Date(booking.scheduled_at)
-      .toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires", hour12: false });
+      .toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: LOCAL_TIMEZONE, hour12: false });
     // Build as ART datetime → store as UTC
-    newScheduledAt = new Date(`${baseFecha}T${baseHora}:00-03:00`).toISOString();
+    newScheduledAt = localInputToISO(`${baseFecha}T${baseHora}`);
   }
 
   const effectiveClientId = overrides.client_id ?? booking.client_id;

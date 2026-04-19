@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition, useId, useCallback, useEffect } from "react";
+import { LOCAL_TIMEZONE, localInputToISO } from "@/lib/timezone";
 import {
   createCampaign,
   createAndScheduleCampaign,
@@ -42,7 +43,7 @@ function toLocalDatetimeValue(isoString: string | null): string {
   if (!isoString) return "";
   const date = new Date(isoString);
   const parts = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -57,7 +58,7 @@ function toLocalDatetimeValue(isoString: string | null): string {
 function formatTimeART(isoString: string | null): string {
   if (!isoString) return "";
   return new Date(isoString).toLocaleTimeString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
+    timeZone: LOCAL_TIMEZONE,
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -539,7 +540,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
               className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 disabled:bg-gray-50 disabled:text-gray-500"
             />
             <p className="mt-1 text-xs text-gray-400">
-              Timezone: America/Argentina/Buenos_Aires (UTC-3). Si elegís una hora pasada, el envío será inmediato.
+              Timezone: {LOCAL_TIMEZONE} (UTC-3). Si elegís una hora pasada, el envío será inmediato.
             </p>
           </div>
 
@@ -607,9 +608,9 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
                 <div className="mt-1 flex justify-end">
                   <span className="text-xs text-gray-500">
                     {scheduledAt
-                      ? formatTimeART(new Date(`${scheduledAt}:00-03:00`).toISOString())
+                      ? formatTimeART(localInputToISO(scheduledAt))
                       : new Date().toLocaleTimeString("es-AR", {
-                          timeZone: "America/Argentina/Buenos_Aires",
+                          timeZone: LOCAL_TIMEZONE,
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
@@ -630,8 +631,8 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
               <div className="flex justify-between">
                 <span>Programado</span>
                 <span className="font-medium text-gray-700">
-                  {new Date(`${scheduledAt}:00-03:00`).toLocaleString("es-AR", {
-                    timeZone: "America/Argentina/Buenos_Aires",
+                  {new Date(localInputToISO(scheduledAt)).toLocaleString("es-AR", {
+                    timeZone: LOCAL_TIMEZONE,
                     day: "2-digit",
                     month: "2-digit",
                     year: "numeric",

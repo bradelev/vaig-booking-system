@@ -3,12 +3,13 @@
  * Uses a shared Service Account calendar (GOOGLE_CALENDAR_ID).
  */
 import { createAdminClient } from "@/lib/supabase/admin";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { createCalendarEvent, deleteCalendarEvent } from "./index";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
 
-const TZ = "America/Argentina/Buenos_Aires";
+const TZ = LOCAL_TIMEZONE;
 
 /**
  * Creates a Google Calendar event for a confirmed booking.

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -71,7 +72,7 @@ export default async function CampanaDetallePage({
               <span className="text-sm text-gray-500">
                 Programada para{" "}
                 {new Date(campaign.scheduled_at).toLocaleString("es-AR", {
-                  timeZone: "America/Argentina/Buenos_Aires",
+                  timeZone: LOCAL_TIMEZONE,
                   day: "2-digit",
                   month: "long",
                   year: "numeric",
@@ -163,7 +164,7 @@ export default async function CampanaDetallePage({
               <p className="text-xs text-gray-500">Completada</p>
               <p className="mt-1 text-sm font-medium text-gray-700">
                 {new Date(campaign.completed_at).toLocaleString("es-AR", {
-                  timeZone: "America/Argentina/Buenos_Aires",
+                  timeZone: LOCAL_TIMEZONE,
                   day: "2-digit",
                   month: "2-digit",
                   hour: "2-digit",
@@ -240,7 +241,7 @@ export default async function CampanaDetallePage({
                         <span className="inline-flex items-center gap-1 text-green-700 text-xs">
                           ✓ Enviado{" "}
                           {new Date(r.sent_at).toLocaleTimeString("es-AR", {
-                            timeZone: "America/Argentina/Buenos_Aires",
+                            timeZone: LOCAL_TIMEZONE,
                             hour: "2-digit",
                             minute: "2-digit",
                           })}

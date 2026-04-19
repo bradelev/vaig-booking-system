@@ -11,6 +11,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { localInputToISO } from "@/lib/timezone";
 import {
   fetchKoobingAppointments,
   fetchKoobingServices,
@@ -52,7 +53,7 @@ function buildScheduledAt(dateIso: string, startTime: number): string {
   const hh = String(hours).padStart(2, "0");
   const mm = String(minutes).padStart(2, "0");
   // Construct as ART local time (UTC-3)
-  return new Date(`${dateOnly}T${hh}:${mm}:00-03:00`).toISOString();
+  return localInputToISO(`${dateOnly}T${hh}:${mm}`);
 }
 
 /** Normalize phone: strip country code 598 prefix if present, keep digits only */
