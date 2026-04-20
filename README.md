@@ -25,7 +25,7 @@ A production system handling 1,300+ clients and 4,700+ appointments — built wi
 | Clients managed | 1,300+ |
 | Appointments tracked | 4,700+ |
 | Database migrations | 56 |
-| Admin modules | 14 |
+| Admin modules | 15 |
 | Test suites | 8 files across 5 domains |
 | Integrations | WhatsApp, Google Calendar, Mercado Pago, Claude AI, Cloudinary |
 
@@ -55,7 +55,7 @@ flowchart TB
         Bot["Bot Engine\nState Machine + LLM Intent"]
         Crons["Cron Jobs\n/api/internal/*"]
         Actions["Server Actions\nMutations"]
-        Pages["Backoffice UI\n14 Admin Modules"]
+        Pages["Backoffice UI\n15 Admin Modules"]
     end
 
     subgraph Data["Supabase"]
@@ -94,7 +94,7 @@ flowchart TB
 - **State machine with 15+ states** — handles booking, rescheduling, cancellation, waitlist, pack purchase, and session history queries
 - **Human handoff** — keyword detection triggers transfer to a human agent; bot pauses until released
 
-### Admin Backoffice (14 Modules)
+### Admin Backoffice (15 Modules)
 
 | Module | Description |
 |--------|-------------|
@@ -102,6 +102,7 @@ flowchart TB
 | **Agenda** | Multi-view calendar (day / 4-day / week / month) with drag support |
 | **Appointments** | Tab-based weekly view, inline editing, status transitions |
 | **Clients** | Search, segment filters (S1–S5), service categories, duplicate detection & merge |
+| **Segmentation** | 8-criteria client segmentation (segment, activity, service, sessions, inactivity, ticket, source, opportunities) with bulk actions: copy phones, CSV export, campaign handoff. Auto-excludes clients with upcoming appointments. |
 | **Services** | CRUD with inline editing, category grouping |
 | **Professionals** | Schedule management, availability overrides |
 | **Packages** | Multi-session pack management with usage tracking |
@@ -181,7 +182,7 @@ src/
 │   │   ├── internal/     # Cron job endpoints (reminders, surveys, auto-cancel)
 │   │   ├── sesiones/     # Session export (XLSX download)
 │   │   └── webhooks/     # WhatsApp & Mercado Pago webhook handlers
-│   ├── backoffice/       # 14 admin modules (auth-protected)
+│   ├── backoffice/       # 15 admin modules (auth-protected)
 │   └── login/            # Authentication page
 ├── components/
 │   ├── backoffice/       # Domain-specific components (calendar, inbox, forms)

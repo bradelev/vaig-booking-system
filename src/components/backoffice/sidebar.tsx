@@ -15,6 +15,7 @@ import {
   BarChart3,
   Zap,
   Megaphone,
+  Target,
   Settings,
   X,
 } from "lucide-react";
@@ -46,6 +47,7 @@ const navSections = [
       { href: "/backoffice/sesiones/nueva", label: "Sesiones", icon: FileSpreadsheet },
       { href: "/backoffice/metricas/depilacion", label: "Depilación", icon: Zap },
       { href: "/backoffice/metricas", label: "Métricas", icon: BarChart3 },
+      { href: "/backoffice/segmentacion", label: "Segmentación", icon: Target },
       { href: "/backoffice/automatizaciones", label: "Campañas", icon: Megaphone },
     ],
   },
