@@ -5,6 +5,9 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ConfirmDeleteForm } from "@/components/backoffice/confirm-delete-form";
 import { scheduleCampaign, cancelSchedule, deleteCampaign, cloneCampaign } from "@/actions/campaigns";
+import { CopyButton } from "@/components/backoffice/copy-button";
+import { formatFilterCriteria } from "@/lib/campaigns/format-filter-criteria";
+import type { SegmentationFilterCriteria } from "@/actions/segmentacion";
 
 export const metadata: Metadata = { title: "Campaña" };
 
@@ -39,7 +42,7 @@ export default async function CampanaDetallePage({
 
   const [{ data: campaign }, { data: recipientsRaw }] = await Promise.all([
     db.from("campaigns")
-      .select("id, name, body, image_url, status, scheduled_at, target_all, total_recipients, sent_count, failed_count, completed_at, created_at")
+      .select("id, name, body, image_url, status, scheduled_at, target_all, total_recipients, sent_count, failed_count, completed_at, created_at, filter_criteria, notes")
       .eq("id", id)
       .single(),
     db.from("campaign_recipients")
@@ -176,9 +179,41 @@ export default async function CampanaDetallePage({
         </div>
       </div>
 
+      {/* Filter snapshot */}
+      {campaign.filter_criteria && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-gray-700">Filtros aplicados al crear</h2>
+          <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600 space-y-1">
+            {formatFilterCriteria(campaign.filter_criteria as SegmentationFilterCriteria).map((row, i) => (
+              <div key={i} className="flex gap-2">
+                <span className="font-medium text-gray-700 min-w-[110px]">{row.label}:</span>
+                <span>{row.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Operator notes */}
+      {campaign.notes && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-gray-700">Notas internas</h2>
+          <p className="text-sm text-gray-600 whitespace-pre-wrap">{campaign.notes}</p>
+        </div>
+      )}
+
       {/* Message preview */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-gray-700">Mensaje</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold text-gray-700">Mensaje</h2>
+          {campaign.body && (
+            <CopyButton
+              text={`Hola {nombre}, te escribimos desde VAIG Depilación Láser.\n\n${campaign.body}\n\nCualquier consulta estamos a tu disposición.`}
+              label="Copiar mensaje"
+              copiedLabel="Copiado"
+            />
+          )}
+        </div>
         <div
           className="inline-block rounded-2xl p-4 shadow-sm"
           style={{ backgroundColor: "#E5DDD5" }}
@@ -209,9 +244,24 @@ export default async function CampanaDetallePage({
       {/* Recipients list */}
       {recipients.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-700">
-            Destinatarios ({recipients.length})
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-semibold text-gray-700">
+              Destinatarios ({recipients.length})
+            </h2>
+            <CopyButton
+              text={recipients
+                .map((r) => {
+                  const phone = r.clients?.phone ?? "";
+                  const digits = phone.replace(/\D/g, "");
+                  if (digits.startsWith("598")) return `+${digits}`;
+                  if (digits.startsWith("09") || digits.startsWith("0")) return `+598${digits.slice(1)}`;
+                  return `+598${digits}`;
+                })
+                .join("\n")}
+              label="Copiar teléfonos"
+              copiedLabel="Copiados"
+            />
+          </div>
           <div className="rounded-lg border bg-white overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50">

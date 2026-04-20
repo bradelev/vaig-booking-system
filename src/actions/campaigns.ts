@@ -292,6 +292,7 @@ export interface FilteredClient {
   categoria: string | null;
   total_sesiones: number;
   dias_inactivo: number | null;
+  dias_desde_ultima_campana?: number | null;
 }
 
 export async function filterCampaignClients(
@@ -351,6 +352,74 @@ export async function filterCampaignClients(
   if (error) throw new Error(error.message);
 
   return { clients: (data ?? []) as FilteredClient[], count: count ?? 0 };
+}
+
+// --- Segmentation-specific campaign creation ---
+
+export async function createCampaignFromSegmentation(data: {
+  name: string;
+  body: string;
+  notes?: string;
+  clientIds: string[];
+  filterCriteria: Record<string, unknown>;
+}): Promise<{ id: string }> {
+  const db = await getDb();
+
+  const { data: campaign, error } = await db
+    .from("campaigns")
+    .insert({
+      name: data.name,
+      body: data.body,
+      notes: data.notes ?? null,
+      status: "draft",
+      target_all: false,
+      filter_criteria: data.filterCriteria,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  if (data.clientIds.length > 0) {
+    await db.from("campaign_recipients").insert(
+      data.clientIds.map((clientId) => ({ campaign_id: campaign.id, client_id: clientId }))
+    );
+    await db.from("campaigns").update({ total_recipients: data.clientIds.length }).eq("id", campaign.id);
+  }
+
+  revalidatePath("/backoffice/automatizaciones");
+  return { id: campaign.id };
+}
+
+export async function checkDuplicateCampaignName(
+  name: string
+): Promise<{ exists: boolean; createdAt?: string }> {
+  if (!name.trim()) return { exists: false };
+  const db = await getDb();
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const { data } = await db
+    .from("campaigns")
+    .select("id, created_at")
+    .eq("name", name.trim())
+    .gte("created_at", cutoff)
+    .limit(1)
+    .maybeSingle();
+  if (data) return { exists: true, createdAt: data.created_at };
+  return { exists: false };
+}
+
+export async function getCooldownOverlapCount(clientIds: string[]): Promise<number> {
+  if (clientIds.length === 0) return 0;
+  const db = await getDb();
+  const cutoff = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString();
+  const { data } = await db
+    .from("campaign_recipients")
+    .select("client_id")
+    .in("client_id", clientIds)
+    .gte("sent_at", cutoff)
+    .not("sent_at", "is", null);
+  const unique = new Set((data ?? []).map((r: { client_id: string }) => r.client_id));
+  return unique.size;
 }
 
 export async function updateClientPhone(clientId: string, phone: string): Promise<void> {

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { DEFAULT_COOLDOWN_DAYS } from "@/lib/campaigns/constants";
 
 async function getDb() {
   const supabase = await createClient();
@@ -21,6 +22,8 @@ export interface SegmentationFilterCriteria {
   sources?: string[];
   soloOportunidadCrossSell?: boolean;
   soloCandidataReactivacion?: boolean;
+  excluirContactadasRecientemente?: boolean;
+  cooldownDias?: number;
 }
 
 export interface SegmentationClient {
@@ -36,12 +39,16 @@ export interface SegmentationClient {
   source: string | null;
   oportunidad_cross_sell: boolean;
   candidata_reactivacion: boolean;
+  dias_desde_ultima_campana?: number | null;
 }
 
 export async function filterSegmentationClients(
   criteria: SegmentationFilterCriteria
 ): Promise<{ clients: SegmentationClient[]; count: number }> {
   const db = await getDb();
+
+  const cooldownDays = criteria.cooldownDias ?? DEFAULT_COOLDOWN_DAYS;
+  const shouldExcludeCooldown = criteria.excluirContactadasRecientemente !== false;
 
   // Exclude clients with a booking in the next 14 days
   const { data: upcomingBookings } = await db
@@ -54,6 +61,40 @@ export async function filterSegmentationClients(
   const excludedIds: string[] = upcomingBookings
     ? [...new Set((upcomingBookings as { client_id: string }[]).map((b) => b.client_id))]
     : [];
+
+  // Cooldown: fetch recent campaign sends to compute dias_desde_ultima_campana
+  // Always fetch so the column can be shown even when cooldown filter is OFF
+  const cooldownMap: Record<string, number> = {};
+  const cooldownCutoff = new Date(Date.now() - cooldownDays * 24 * 60 * 60 * 1000).toISOString();
+  const { data: recentRecipients } = await db
+    .from("campaign_recipients")
+    .select("client_id, sent_at")
+    .not("sent_at", "is", null);
+
+  if (recentRecipients) {
+    // Build a map of client_id -> most recent sent_at (all time)
+    const latestSentMap: Record<string, string> = {};
+    for (const r of recentRecipients as { client_id: string; sent_at: string }[]) {
+      if (!latestSentMap[r.client_id] || r.sent_at > latestSentMap[r.client_id]) {
+        latestSentMap[r.client_id] = r.sent_at;
+      }
+    }
+    const now = Date.now();
+    for (const [clientId, sentAt] of Object.entries(latestSentMap)) {
+      const days = Math.floor((now - new Date(sentAt).getTime()) / (1000 * 60 * 60 * 24));
+      cooldownMap[clientId] = days;
+    }
+
+    if (shouldExcludeCooldown) {
+      for (const r of recentRecipients as { client_id: string; sent_at: string }[]) {
+        if (r.sent_at >= cooldownCutoff) {
+          if (!excludedIds.includes(r.client_id)) {
+            excludedIds.push(r.client_id);
+          }
+        }
+      }
+    }
+  }
 
   let query = db
     .from("clientes_metricas")
@@ -125,5 +166,11 @@ export async function filterSegmentationClients(
   const { data, count, error } = await query.order("first_name").limit(500);
   if (error) throw new Error(error.message);
 
-  return { clients: (data ?? []) as SegmentationClient[], count: count ?? 0 };
+  // Augment results with cooldown data
+  const clients = (data ?? []).map((c: SegmentationClient) => ({
+    ...c,
+    dias_desde_ultima_campana: cooldownMap[c.id] ?? null,
+  }));
+
+  return { clients, count: count ?? 0 };
 }

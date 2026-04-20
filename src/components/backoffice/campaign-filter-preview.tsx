@@ -180,6 +180,7 @@ export default function CampaignFilterPreview({
                 <th className="px-3 py-2 text-left font-medium text-gray-600 hidden md:table-cell">Categoría</th>
                 <th className="px-3 py-2 text-right font-medium text-gray-600">Sesiones</th>
                 <th className="px-3 py-2 text-right font-medium text-gray-600 hidden md:table-cell">Días inact.</th>
+                <th className="px-3 py-2 text-right font-medium text-gray-600 hidden lg:table-cell">Ult. campaña</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -228,6 +229,19 @@ export default function CampaignFilterPreview({
                     <td className="px-3 py-1.5 text-right text-gray-600">{c.total_sesiones}</td>
                     <td className="px-3 py-1.5 text-right text-gray-500 hidden md:table-cell">
                       {c.dias_inactivo ?? "—"}
+                    </td>
+                    <td className="px-3 py-1.5 text-right hidden lg:table-cell">
+                      {c.dias_desde_ultima_campana == null ? (
+                        <span className="text-gray-400">—</span>
+                      ) : c.dias_desde_ultima_campana < 21 ? (
+                        <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                          {c.dias_desde_ultima_campana}d
+                        </span>
+                      ) : c.dias_desde_ultima_campana <= 60 ? (
+                        <span className="text-gray-600 text-xs">{c.dias_desde_ultima_campana}d</span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">{c.dias_desde_ultima_campana}d</span>
+                      )}
                     </td>
                   </tr>
                 );
