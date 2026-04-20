@@ -98,5 +98,21 @@ describe("sanitizeTemplateParam", () => {
     expect(sanitizeTemplateParam("")).toBe("");
     expect(sanitizeTemplateParam("\n\n\n")).toBe("");
     expect(sanitizeTemplateParam("   \n  \t  \n   ")).toBe("");
+    expect(sanitizeTemplateParam("\t\t\t")).toBe("");
+  });
+
+  it("is idempotent: sanitize(sanitize(x)) === sanitize(x)", () => {
+    const inputs = [
+      "A\nB\nC",
+      "   A  \n\n  B   ",
+      "A\tB\nC\n\n\nD",
+      "Recordatorio · Mañana a las *15:00*",
+      "Hola     mundo",
+    ];
+    for (const input of inputs) {
+      const once = sanitizeTemplateParam(input);
+      const twice = sanitizeTemplateParam(once);
+      expect(twice).toBe(once);
+    }
   });
 });
