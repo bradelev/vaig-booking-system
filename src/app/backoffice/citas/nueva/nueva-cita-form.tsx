@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import Combobox, { type ComboboxItem } from "@/components/backoffice/agenda/combobox";
 import ValidatedForm from "@/components/backoffice/validated-form";
 import { createBooking, quickCreateClient } from "@/actions/citas";
@@ -10,6 +11,7 @@ interface Cliente {
   id: string;
   first_name: string;
   last_name: string;
+  phone?: string | null;
 }
 
 interface Servicio {
@@ -27,6 +29,18 @@ interface NuevaCitaFormProps {
   servicios: Servicio[];
   profesionales: Profesional[];
   defaultDatetime: string;
+}
+
+function buildClientLabel(c: Cliente): { label: string; searchText: string } {
+  const fullName = `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim();
+  const phone = c.phone ?? "";
+  const nameIsPhone = phone && fullName === phone;
+  const label = nameIsPhone
+    ? phone
+    : fullName
+    ? (phone ? `${fullName} · ${phone}` : fullName)
+    : (phone || "Sin nombre");
+  return { label, searchText: phone };
 }
 
 export default function NuevaCitaForm({
@@ -47,10 +61,10 @@ export default function NuevaCitaForm({
   const [newClientPhone, setNewClientPhone] = useState("");
   const [clientCreating, setClientCreating] = useState(false);
 
-  const clientItems: ComboboxItem[] = allClients.map((c) => ({
-    id: c.id,
-    label: `${c.first_name} ${c.last_name}`,
-  }));
+  const clientItems: ComboboxItem[] = allClients.map((c) => {
+    const { label, searchText } = buildClientLabel(c);
+    return { id: c.id, label, searchText };
+  });
 
   const serviceItems: ComboboxItem[] = servicios.map((s) => ({
     id: s.id,
@@ -75,15 +89,24 @@ export default function NuevaCitaForm({
       setError(result.error);
       return;
     }
-    setAllClients((prev) => [
-      ...prev,
-      { id: result.id, first_name: result.first_name, last_name: result.last_name },
-    ]);
+    const newClient: Cliente = {
+      id: result.id,
+      first_name: result.first_name,
+      last_name: result.last_name,
+      phone: result.phone,
+    };
+    setAllClients((prev) => {
+      const without = prev.filter((p) => p.id !== result.id);
+      return [...without, newClient];
+    });
     setClientId(result.id);
     setShowNewClient(false);
     setNewClientFirst("");
     setNewClientLast("");
     setNewClientPhone("");
+    if (result.reused) {
+      toast.info(`Ya existía un cliente con ese teléfono: ${result.first_name} ${result.last_name}. Lo seleccioné automáticamente.`);
+    }
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -118,7 +141,7 @@ export default function NuevaCitaForm({
               setNewClientLast("");
               setShowNewClient(true);
             }}
-            placeholder="Buscar cliente..."
+            placeholder="Buscar por nombre o teléfono..."
           />
           {showNewClient && (
             <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
@@ -143,7 +166,7 @@ export default function NuevaCitaForm({
                 type="tel"
                 value={newClientPhone}
                 onChange={(e) => setNewClientPhone(e.target.value)}
-                placeholder="Teléfono (ej: 5491112345678)"
+                placeholder="Teléfono (ej: 094020096)"
                 className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none"
               />
               <div className="flex gap-2 justify-end">

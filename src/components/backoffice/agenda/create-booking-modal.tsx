@@ -65,10 +65,17 @@ export default function CreateBookingModal({
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const clientItems: ComboboxItem[] = allClients.map((c) => ({
-    id: c.id,
-    label: `${c.first_name} ${c.last_name}`,
-  }));
+  const clientItems: ComboboxItem[] = allClients.map((c) => {
+    const fullName = `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim();
+    const phone = c.phone ?? "";
+    const nameIsPhone = phone && fullName === phone;
+    const label = nameIsPhone
+      ? phone
+      : fullName
+      ? (phone ? `${fullName} · ${phone}` : fullName)
+      : (phone || "Sin nombre");
+    return { id: c.id, label, searchText: phone };
+  });
 
   const serviceItems: ComboboxItem[] = allServices.map((s) => ({
     id: s.id,
@@ -97,13 +104,20 @@ export default function CreateBookingModal({
       id: result.id,
       first_name: result.first_name,
       last_name: result.last_name,
+      phone: result.phone,
     };
-    setAllClients((prev) => [...prev, newClient]);
+    setAllClients((prev) => {
+      const without = prev.filter((p) => p.id !== result.id);
+      return [...without, newClient];
+    });
     setClientId(result.id);
     setShowNewClient(false);
     setNewClientFirst("");
     setNewClientLast("");
     setNewClientPhone("");
+    if (result.reused) {
+      toast.info(`Ya existía un cliente con ese teléfono: ${result.first_name} ${result.last_name}. Lo seleccioné automáticamente.`);
+    }
   }
 
   async function handleCreateService() {
@@ -203,7 +217,7 @@ export default function CreateBookingModal({
                 setNewClientLast("");
                 setShowNewClient(true);
               }}
-              placeholder="Buscar cliente..."
+              placeholder="Buscar por nombre o teléfono..."
             />
             {showNewClient && (
               <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
@@ -228,7 +242,7 @@ export default function CreateBookingModal({
                   type="tel"
                   value={newClientPhone}
                   onChange={(e) => setNewClientPhone(e.target.value)}
-                  placeholder="Teléfono (ej: 5491112345678)"
+                  placeholder="Teléfono (ej: 094020096)"
                   className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none"
                 />
                 <div className="flex gap-2 justify-end">

@@ -7,6 +7,7 @@ import { notifyClientCancellation } from "@/lib/bot/notifications";
 import { notifyWaitlistForSlot } from "@/lib/bot/engine";
 import { createBookingCalendarEvent, deleteBookingCalendarEvent } from "@/lib/gcal/bookings";
 import { artLocalInputToISO } from "@/lib/timezone";
+import { normalizePhone } from "@/lib/phone";
 
 export type CancellationReason =
   | "client_request"
@@ -193,23 +194,60 @@ export async function quickCreateClient(data: {
   first_name: string;
   last_name: string;
   phone: string;
-}): Promise<{ id: string; first_name: string; last_name: string } | { error: string }> {
+}): Promise<
+  | { id: string; first_name: string; last_name: string; phone: string; reused: boolean }
+  | { error: string }
+> {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
+
+  const normalized = normalizePhone(data.phone);
+  if (normalized.length < 6) return { error: "Teléfono inválido." };
+
+  // Look up by phone first — tolerant of stored variants (with/without 598 prefix)
+  const { data: existing } = await client
+    .from("clients")
+    .select("id, first_name, last_name, phone")
+    .or(`phone.eq.${normalized},phone.ilike.%${normalized}`)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    return {
+      id: existing.id,
+      first_name: existing.first_name,
+      last_name: existing.last_name,
+      phone: existing.phone,
+      reused: true,
+    };
+  }
 
   const { data: row, error } = await client
     .from("clients")
     .insert({
       first_name: data.first_name.trim(),
       last_name: data.last_name.trim(),
-      phone: data.phone.trim(),
+      phone: normalized,
     })
-    .select("id, first_name, last_name")
+    .select("id, first_name, last_name, phone")
     .single();
 
-  if (error) return { error: error.message };
-  return { id: row.id, first_name: row.first_name, last_name: row.last_name };
+  // Race condition / undetected variant → re-lookup
+  if (error) {
+    if ((error as { code?: string }).code === "23505") {
+      const { data: fallback } = await client
+        .from("clients")
+        .select("id, first_name, last_name, phone")
+        .or(`phone.eq.${normalized},phone.ilike.%${normalized}`)
+        .limit(1)
+        .maybeSingle();
+      if (fallback) return { ...fallback, reused: true };
+    }
+    return { error: error.message };
+  }
+
+  return { id: row.id, first_name: row.first_name, last_name: row.last_name, phone: row.phone, reused: false };
 }
 
 export async function quickCreateService(data: {
