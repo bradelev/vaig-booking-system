@@ -27,6 +27,7 @@ export default defineConfig({
         "src/lib/gcal/service-abbreviations.ts",
         "src/lib/utils.ts",
         "src/lib/templates.ts",
+        "src/lib/whatsapp/sanitize.ts",
       ],
       exclude: [
         "src/**/*.d.ts",
