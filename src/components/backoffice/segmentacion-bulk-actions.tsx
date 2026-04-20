@@ -69,8 +69,10 @@ export default function SegmentacionBulkActions({
     const a = document.createElement("a");
     a.href = url;
     a.download = `segmentacion-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   }
 
   function handleCreateCampaign() {
