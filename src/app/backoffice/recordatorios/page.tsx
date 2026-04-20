@@ -32,6 +32,7 @@ export type ReminderBooking = {
   clientFirstName: string;
   clientPhone: string;
   serviceName: string;
+  serviceCategory: string | null;
   professionalName: string | null;
   confirmationSentAt: string | null;
   clientConfirmedAt: string | null;
@@ -56,7 +57,7 @@ export default async function RecordatoriosPage() {
     .select(
       `id, scheduled_at, confirmation_sent_at, client_confirmed_at,
        clients(id, first_name, last_name, phone),
-       services(name),
+       services(name, category),
        professionals(name)`
     )
     .in("status", ["confirmed", "deposit_paid", "pending"])
@@ -74,7 +75,7 @@ export default async function RecordatoriosPage() {
     confirmation_sent_at: string | null;
     client_confirmed_at: string | null;
     clients: { id: string; first_name: string; last_name: string; phone: string } | null;
-    services: { name: string } | null;
+    services: { name: string; category: string | null } | null;
     professionals: { name: string } | null;
   };
 
@@ -88,12 +89,23 @@ export default async function RecordatoriosPage() {
     clientFirstName: b.clients?.first_name ?? "Cliente",
     clientPhone: b.clients?.phone ?? "",
     serviceName: b.services?.name ?? "—",
+    serviceCategory: b.services?.category ?? null,
     professionalName: b.professionals?.name ?? null,
     confirmationSentAt: b.confirmation_sent_at,
     clientConfirmedAt: b.client_confirmed_at,
   }));
 
+  const contactPhone = process.env.VAIG_CONTACT_PHONE ?? "";
+  const address = process.env.VAIG_ADDRESS ?? "";
+  const accessInstructions = process.env.VAIG_ACCESS_INSTRUCTIONS ?? "";
+
   return (
-    <RecordatoriosPageClient bookings={bookings} tomorrowLabel={label} />
+    <RecordatoriosPageClient
+      bookings={bookings}
+      tomorrowLabel={label}
+      contactPhone={contactPhone}
+      address={address}
+      accessInstructions={accessInstructions}
+    />
   );
 }

@@ -7,14 +7,32 @@ import { sendReminders, type SendRemindersResult } from "@/actions/recordatorios
 import type { ReminderBooking } from "./page";
 
 const DEFAULT_MESSAGE =
-  "Te recordamos tu turno de mañana. Respondé *confirmo* para confirmar o *cancelar* si necesitás cancelarlo.";
+  "Recordatorio de reserva\n\nTe recordamos tu turno de *{servicio}* mañana a las *{hora}*.\n\nLa dirección es:\n{direccion}\n{acceso}\n\n{instrucciones_precita}\n\nEste es un mensaje automático, NO responder a este número.\nComunicarse al {telefono}.\n\nRespondé *confirmo* para confirmar o *cancelar* si necesitás cancelarlo.";
 
 interface Props {
   bookings: ReminderBooking[];
   tomorrowLabel: string;
+  contactPhone: string;
+  address: string;
+  accessInstructions: string;
 }
 
-export default function RecordatoriosPageClient({ bookings, tomorrowLabel }: Props) {
+function getPreCitaPreview(category: string | null): string {
+  const cat = (category ?? "").toLowerCase();
+  if (cat.includes("depilacion") || cat.includes("laser"))
+    return "En caso de que su cita sea para depilación, venir rasurado/a del día anterior.";
+  if (cat.includes("facial") || cat.includes("cejas") || cat.includes("pestana"))
+    return "En caso de que su cita sea limpieza facial, lifting o perfilado de cejas, venir sin maquillaje.";
+  return "";
+}
+
+export default function RecordatoriosPageClient({
+  bookings,
+  tomorrowLabel,
+  contactPhone,
+  address,
+  accessInstructions,
+}: Props) {
   const [message, setMessage] = useState(DEFAULT_MESSAGE);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(bookings.filter((b) => !b.confirmationSentAt).map((b) => b.id))
@@ -49,7 +67,6 @@ export default function RecordatoriosPageClient({ bookings, tomorrowLabel }: Pro
     startTransition(async () => {
       const res = await sendReminders(ids, message.trim());
       setResult(res);
-      // Deselect all that were sent (optimistic)
       if (res.sent > 0) {
         setSelectedIds(new Set());
       }
@@ -61,6 +78,19 @@ export default function RecordatoriosPageClient({ bookings, tomorrowLabel }: Pro
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  // Preview: substitute placeholders with real data from the first selected booking
+  const previewBookingId = selectedIds.size > 0 ? Array.from(selectedIds)[0] : null;
+  const previewBooking = previewBookingId
+    ? bookings.find((b) => b.id === previewBookingId)
+    : bookings[0];
+  const previewMessage = message
+    .replace(/\{hora\}/g, previewBooking ? formatHour(previewBooking.scheduledAt) : "10:00")
+    .replace(/\{servicio\}/g, previewBooking?.serviceName ?? "Depilación Láser")
+    .replace(/\{direccion\}/g, address || "(configurar VAIG_ADDRESS)")
+    .replace(/\{acceso\}/g, accessInstructions || "(configurar VAIG_ACCESS_INSTRUCTIONS)")
+    .replace(/\{instrucciones_precita\}/g, previewBooking ? getPreCitaPreview(previewBooking.serviceCategory) : "")
+    .replace(/\{telefono\}/g, contactPhone || "(configurar VAIG_CONTACT_PHONE)");
 
   return (
     <div className="space-y-6">
@@ -83,12 +113,15 @@ export default function RecordatoriosPageClient({ bookings, tomorrowLabel }: Pro
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              rows={4}
+              rows={10}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand/40 resize-none"
               placeholder="Escribí el mensaje de recordatorio..."
             />
             <p className="text-xs text-gray-400">
               Se envía usando el template <code>campana_general</code>. El nombre del cliente se agrega automáticamente.
+            </p>
+            <p className="text-xs text-gray-400">
+              Placeholders: <code>{"{hora}"}</code> <code>{"{servicio}"}</code> <code>{"{direccion}"}</code> <code>{"{acceso}"}</code> <code>{"{instrucciones_precita}"}</code> <code>{"{telefono}"}</code>
             </p>
           </div>
 
@@ -217,7 +250,7 @@ export default function RecordatoriosPageClient({ bookings, tomorrowLabel }: Pro
                 {message.trim() ? (
                   <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-snug">
                     {"Hola María, te escribimos desde VAIG Depilación Láser.\n\n"}
-                    {message}
+                    {previewMessage}
                     {"\n\nCualquier consulta estamos a tu disposición."}
                   </p>
                 ) : (
