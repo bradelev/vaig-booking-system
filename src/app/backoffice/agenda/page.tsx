@@ -64,14 +64,14 @@ export default async function AgendaPage({
       .not("status", "in", '("cancelled","no_show")')
       .order("scheduled_at"),
     client.from("professionals").select("id, name").eq("is_active", true).order("name"),
-    client.from("clients").select("id, first_name, last_name").order("first_name"),
+    client.from("clients").select("id, first_name, last_name, phone").order("first_name"),
     client.from("services").select("id, name, duration_minutes").eq("is_active", true).order("name"),
     listCalendarEvents(monday.toISOString(), sunday.toISOString()),
   ]);
 
   const allBookings = (bookingsRaw ?? []) as AgendaBooking[];
   const professionals = (profsRaw ?? []) as { id: string; name: string }[];
-  const clients = (clientsRaw ?? []) as { id: string; first_name: string; last_name: string }[];
+  const clients = (clientsRaw ?? []) as { id: string; first_name: string; last_name: string; phone?: string | null }[];
   const services = (servicesRaw ?? []) as { id: string; name: string; duration_minutes: number }[];
   const calEvents = gcalEvents as CalendarEvent[];
 

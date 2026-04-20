@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useCallback, useId } from "react";
 export interface ComboboxItem {
   id: string;
   label: string;
+  searchText?: string; // extra text for filtering (not displayed)
 }
 
 interface ComboboxProps {
@@ -38,11 +39,16 @@ export default function Combobox({
   const filterQuery = value ? "" : inputText;
 
   const filtered = filterQuery
-    ? items.filter((i) => i.label.toLowerCase().includes(filterQuery.toLowerCase()))
+    ? items.filter((i) => {
+        const haystack = `${i.label} ${i.searchText ?? ""}`.toLowerCase();
+        return haystack.includes(filterQuery.toLowerCase());
+      })
     : items;
 
   const hasExactMatch = filtered.some(
-    (i) => i.label.toLowerCase() === filterQuery.toLowerCase()
+    (i) =>
+      i.label.toLowerCase() === filterQuery.toLowerCase() ||
+      (i.searchText ?? "").toLowerCase() === filterQuery.toLowerCase()
   );
   const showCreate = onCreateNew && filterQuery.trim().length > 0 && !hasExactMatch;
   const options: ComboboxItem[] = showCreate
