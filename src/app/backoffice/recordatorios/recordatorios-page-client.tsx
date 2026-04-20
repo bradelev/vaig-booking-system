@@ -4,10 +4,14 @@ import { useState, useTransition } from "react";
 import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { CheckCircle2, Clock, Send } from "lucide-react";
 import { sendReminders, type SendRemindersResult } from "@/actions/recordatorios";
+import { sanitizeTemplateParam } from "@/lib/whatsapp/sanitize";
 import type { ReminderBooking } from "./page";
 
+// Meta rejects template parameters with newlines or tabs (error 132018).
+// The message must be a single line; " · " is used as paragraph separator
+// and empty segments are dropped server-side by sanitizeTemplateParam.
 const DEFAULT_MESSAGE =
-  "Recordatorio de reserva\n\nTe recordamos tu turno de *{servicio}* mañana a las *{hora}*.\n\nLa dirección es:\n{direccion}\n{acceso}\n\n{instrucciones_precita}\n\nEste es un mensaje automático, NO responder a este número.\nComunicarse al {telefono}.\n\nRespondé *confirmo* para confirmar o *cancelar* si necesitás cancelarlo.";
+  "Recordatorio de reserva · Mañana a las *{hora}* tenés *{servicio}* · Dirección: {direccion} · {acceso} · {instrucciones_precita} · Mensaje automático, NO responder a este número · Consultas al {telefono}";
 
 interface Props {
   bookings: ReminderBooking[];
@@ -84,13 +88,15 @@ export default function RecordatoriosPageClient({
   const previewBooking = previewBookingId
     ? bookings.find((b) => b.id === previewBookingId)
     : bookings[0];
-  const previewMessage = message
-    .replace(/\{hora\}/g, previewBooking ? formatHour(previewBooking.scheduledAt) : "10:00")
-    .replace(/\{servicio\}/g, previewBooking?.serviceName ?? "Depilación Láser")
-    .replace(/\{direccion\}/g, address || "(configurar VAIG_ADDRESS)")
-    .replace(/\{acceso\}/g, accessInstructions || "(configurar VAIG_ACCESS_INSTRUCTIONS)")
-    .replace(/\{instrucciones_precita\}/g, previewBooking ? getPreCitaPreview(previewBooking.serviceCategory) : "")
-    .replace(/\{telefono\}/g, contactPhone || "(configurar VAIG_CONTACT_PHONE)");
+  const previewMessage = sanitizeTemplateParam(
+    message
+      .replace(/\{hora\}/g, previewBooking ? formatHour(previewBooking.scheduledAt) : "10:00")
+      .replace(/\{servicio\}/g, previewBooking?.serviceName ?? "Depilación Láser")
+      .replace(/\{direccion\}/g, address || "(configurar VAIG_ADDRESS)")
+      .replace(/\{acceso\}/g, accessInstructions || "(configurar VAIG_ACCESS_INSTRUCTIONS)")
+      .replace(/\{instrucciones_precita\}/g, previewBooking ? getPreCitaPreview(previewBooking.serviceCategory) : "")
+      .replace(/\{telefono\}/g, contactPhone || "(configurar VAIG_CONTACT_PHONE)")
+  );
 
   return (
     <div className="space-y-6">
@@ -118,7 +124,7 @@ export default function RecordatoriosPageClient({
               placeholder="Escribí el mensaje de recordatorio..."
             />
             <p className="text-xs text-gray-400">
-              Se envía usando el template <code>campana_general</code>. El nombre del cliente se agrega automáticamente.
+              Se envía usando el template <code>campana_general</code>. El nombre del cliente se agrega automáticamente. Los saltos de línea se convierten en <code> · </code> (WhatsApp no los permite en plantillas).
             </p>
             <p className="text-xs text-gray-400">
               Placeholders: <code>{"{hora}"}</code> <code>{"{servicio}"}</code> <code>{"{direccion}"}</code> <code>{"{acceso}"}</code> <code>{"{instrucciones_precita}"}</code> <code>{"{telefono}"}</code>

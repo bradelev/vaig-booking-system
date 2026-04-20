@@ -5,6 +5,7 @@ import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplateMessage } from "@/lib/whatsapp/logged";
+import { sanitizeTemplateParam } from "@/lib/whatsapp/sanitize";
 import { upsertSession } from "@/lib/bot/session";
 
 const DELAY_MS = 100;
@@ -91,13 +92,15 @@ export async function sendReminders(
     });
     const instrucciones = getPreCitaInstructions(booking.services?.category ?? null);
 
-    const personalizedMessage = message
-      .replace(/\{hora\}/g, hora)
-      .replace(/\{servicio\}/g, serviceName)
-      .replace(/\{direccion\}/g, address)
-      .replace(/\{acceso\}/g, accessInstructions)
-      .replace(/\{instrucciones_precita\}/g, instrucciones)
-      .replace(/\{telefono\}/g, contactPhone);
+    const personalizedMessage = sanitizeTemplateParam(
+      message
+        .replace(/\{hora\}/g, hora)
+        .replace(/\{servicio\}/g, serviceName)
+        .replace(/\{direccion\}/g, address)
+        .replace(/\{acceso\}/g, accessInstructions)
+        .replace(/\{instrucciones_precita\}/g, instrucciones)
+        .replace(/\{telefono\}/g, contactPhone)
+    );
 
     try {
       await sendTemplateMessage(
