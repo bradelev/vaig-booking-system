@@ -125,6 +125,32 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Read segmentation handoff from sessionStorage (one-shot, from /segmentacion page)
+  useEffect(() => {
+    if (typeof window === "undefined" || isEdit) return;
+    const raw = sessionStorage.getItem("segmentacion_handoff");
+    if (!raw) return;
+    sessionStorage.removeItem("segmentacion_handoff");
+    try {
+      const { criteria, selectedIds: ids } = JSON.parse(raw) as {
+        criteria: CampaignFilterCriteria;
+        selectedIds: string[];
+      };
+      setRecipientMode("filter");
+      setFilterCriteria(criteria);
+      startFilterTransition(async () => {
+        const result = await filterCampaignClients(criteria);
+        setFilteredClients(result.clients);
+        setFilteredCount(result.count);
+        setFilterApplied(true);
+        setFilterSelectedIds(new Set(ids));
+      });
+    } catch {
+      // Malformed handoff — ignore silently
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const dropdownClients = clients.filter((c) => {
     if (selectedIds.has(c.id)) return false;
     const q = comboboxQuery.toLowerCase();
