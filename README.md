@@ -336,6 +336,7 @@ See [`.env.example`](.env.example) for the full list. Key groups:
 | Mercado Pago | `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` |
 | Claude AI | `ANTHROPIC_API_KEY` |
 | Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` |
+| Business | `VAIG_CONTACT_PHONE`, `VAIG_ADDRESS`, `VAIG_ACCESS_INSTRUCTIONS` |
 | App | `NEXT_PUBLIC_APP_URL`, `CRON_SECRET` |
 
 ---
