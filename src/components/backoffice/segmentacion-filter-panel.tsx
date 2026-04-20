@@ -270,6 +270,35 @@ export default function SegmentacionFilterPanel({
             />
           </div>
         </fieldset>
+
+        <fieldset className="sm:col-span-2 space-y-2">
+          <legend className="text-sm font-medium text-gray-700">Cooldown de contacto</legend>
+          <div className="flex flex-wrap items-center gap-3">
+            <ToggleFlag
+              label="Excluir contactadas recientemente"
+              checked={criteria.excluirContactadasRecientemente !== false}
+              onChange={(v) => update({ excluirContactadasRecientemente: v })}
+              disabled={disabled}
+            />
+            {criteria.excluirContactadasRecientemente !== false && (
+              <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                <Input
+                  type="number"
+                  min={1}
+                  max={90}
+                  value={criteria.cooldownDias ?? 21}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    update({ cooldownDias: isNaN(v) ? 21 : Math.min(90, Math.max(1, v)) });
+                  }}
+                  disabled={disabled}
+                  className="h-7 w-16 text-xs px-2"
+                />
+                <span>días</span>
+              </div>
+            )}
+          </div>
+        </fieldset>
       </div>
 
       <div className="flex items-center gap-2 border-t border-gray-200 pt-3">
