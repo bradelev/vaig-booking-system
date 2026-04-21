@@ -10,6 +10,7 @@ import { artLocalInputToISO } from "@/lib/timezone";
 import { normalizePhone } from "@/lib/phone";
 import { checkAdminRateLimit } from "@/lib/admin-rate-limit";
 import { logger } from "@/lib/logger";
+import { withRetry } from "@/lib/whatsapp/retry";
 
 export type CancellationReason =
   | "client_request"
@@ -58,25 +59,38 @@ export async function cancelBooking(
   if (error) throw new Error(error.message);
 
   if (cancelledBy === "admin" && booking?.clients?.phone) {
-    void notifyClientCancellation({
-      clientPhone: booking.clients.phone,
-      clientName: `${booking.clients.first_name ?? ""} ${booking.clients.last_name ?? ""}`.trim(),
-      serviceName: booking.services?.name ?? "el servicio",
-      scheduledAt: booking.scheduled_at,
-      reason,
-    });
+    withRetry(
+      () =>
+        notifyClientCancellation({
+          clientPhone: booking.clients.phone,
+          clientName: `${booking.clients.first_name ?? ""} ${booking.clients.last_name ?? ""}`.trim(),
+          serviceName: booking.services?.name ?? "el servicio",
+          scheduledAt: booking.scheduled_at,
+          reason,
+        }),
+      { label: "notifyClientCancellation" }
+    ).catch(() => {});
   }
 
   // VBS-43: Delete Google Calendar event if exists
-  void deleteBookingCalendarEvent(id);
+  deleteBookingCalendarEvent(id).catch((err: unknown) => {
+    logger.error("Failed to delete GCal event on cancellation", {
+      booking_id: id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
 
   // VBS-72: Notify waitlist if slot freed
   if (booking?.service_id && booking?.scheduled_at) {
-    void notifyWaitlistForSlot(
-      booking.service_id,
-      booking.professional_id ?? null,
-      booking.scheduled_at
-    );
+    withRetry(
+      () =>
+        notifyWaitlistForSlot(
+          booking.service_id,
+          booking.professional_id ?? null,
+          booking.scheduled_at
+        ),
+      { label: "notifyWaitlistForSlot" }
+    ).catch(() => {});
   }
 
   revalidatePath("/backoffice/citas");
@@ -129,12 +143,23 @@ export async function updateBookingStatus(id: string, status: string) {
 
   // VBS-42: Create Google Calendar event when booking is confirmed
   if (status === "confirmed") {
-    void createBookingCalendarEvent(id);
+    createBookingCalendarEvent(id).catch((err: unknown) => {
+      logger.error("Failed to create GCal event on confirm", {
+        booking_id: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
   }
 
   // VBS-43: Delete Google Calendar event when booking is cancelled or no_show
   if (status === "cancelled" || status === "no_show") {
-    void deleteBookingCalendarEvent(id);
+    deleteBookingCalendarEvent(id).catch((err: unknown) => {
+      logger.error("Failed to delete GCal event on status change", {
+        booking_id: id,
+        status,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
   }
 
   revalidatePath("/backoffice/citas");
@@ -204,7 +229,12 @@ export async function createBookingFromAgenda(data: {
   if (error) return { success: false, error: error.message };
 
   if (inserted?.id) {
-    void createBookingCalendarEvent(inserted.id);
+    createBookingCalendarEvent(inserted.id).catch((err: unknown) => {
+      logger.error("Failed to create GCal event from agenda", {
+        booking_id: inserted.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
   }
 
   revalidatePath("/backoffice/agenda");
@@ -330,7 +360,14 @@ export async function moveBooking(
 
   // Recreate GCal event
   if (booking.gcal_event_id) {
-    void deleteBookingCalendarEvent(id).then(() => createBookingCalendarEvent(id));
+    deleteBookingCalendarEvent(id)
+      .then(() => createBookingCalendarEvent(id))
+      .catch((err: unknown) => {
+        logger.error("Failed to recreate GCal event on move", {
+          booking_id: id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
   }
 
   revalidatePath("/backoffice/agenda");
@@ -405,14 +442,32 @@ export async function updateBookingInline(
 
   if (newStatus && newStatus !== oldStatus) {
     if (newStatus === "confirmed") {
-      void createBookingCalendarEvent(id);
+      createBookingCalendarEvent(id).catch((err: unknown) => {
+        logger.error("Failed to create GCal event on inline confirm", {
+          booking_id: id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
     } else if (newStatus === "cancelled" || newStatus === "no_show") {
-      void deleteBookingCalendarEvent(id);
+      deleteBookingCalendarEvent(id).catch((err: unknown) => {
+        logger.error("Failed to delete GCal event on inline status change", {
+          booking_id: id,
+          status: newStatus,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
     }
   }
 
   if (data.scheduled_at && data.scheduled_at !== current.scheduled_at && current.gcal_event_id) {
-    void deleteBookingCalendarEvent(id).then(() => createBookingCalendarEvent(id));
+    deleteBookingCalendarEvent(id)
+      .then(() => createBookingCalendarEvent(id))
+      .catch((err: unknown) => {
+        logger.error("Failed to recreate GCal event on inline reschedule", {
+          booking_id: id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
   }
 
   if (newStatus === "realized" && oldStatus !== "realized" && current.client_package_id) {
