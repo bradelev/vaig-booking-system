@@ -11,8 +11,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = createAdminClient() as any;
+  const client = createAdminClient();
 
   const autoHours = parseInt(await getConfigValue("auto_cancel_hours", "24"));
   const cutoff = new Date(Date.now() - autoHours * 3600_000).toISOString();
@@ -28,7 +27,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: fetchError.message }, { status: 500 });
   }
 
-  const ids = (expiredBookings ?? []).map((b: { id: string }) => b.id);
+  const ids = (expiredBookings ?? []).map((b) => (b as { id: string }).id);
 
   if (ids.length === 0) {
     return NextResponse.json({ cancelled: 0 });

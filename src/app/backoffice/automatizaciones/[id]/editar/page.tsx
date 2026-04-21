@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import CampaignForm from "@/components/backoffice/campaign-form";
+import type { CampaignFilterCriteria } from "@/actions/campaigns";
 
 export const metadata: Metadata = { title: "Editar campaña" };
 
@@ -20,22 +21,33 @@ export default async function EditarCampanaPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
-  const [{ data: campaignRaw }, { data: recipientsRaw }, { data: clientsRaw }] = await Promise.all([
-    db.from("campaigns")
+  type CampaignRaw = {
+    id: string;
+    name: string;
+    body: string;
+    image_url: string | null;
+    scheduled_at: string | null;
+    target_all: boolean;
+    status: string;
+    filter_criteria: CampaignFilterCriteria | null;
+  };
+
+  const [{ data: rawCampaign }, { data: rawRecipients }, { data: clientsRaw }] = await Promise.all([
+    supabase.from("campaigns")
       .select("id, name, body, image_url, scheduled_at, target_all, status, filter_criteria")
       .eq("id", id)
       .single(),
-    db.from("campaign_recipients")
+    supabase.from("campaign_recipients")
       .select("client_id")
       .eq("campaign_id", id),
-    db.from("clients")
+    supabase.from("clients")
       .select("id, first_name, last_name, phone")
       .eq("is_blocked", false)
       .order("first_name"),
   ]);
+
+  const campaignRaw = rawCampaign as unknown as CampaignRaw | null;
 
   if (!campaignRaw) notFound();
   if (campaignRaw.status !== "draft") {
@@ -55,8 +67,8 @@ export default async function EditarCampanaPage({
     );
   }
 
-  const recipientIds = (recipientsRaw ?? []).map((r: { client_id: string }) => r.client_id);
-  const clients = (clientsRaw ?? []) as Client[];
+  const recipientIds = (rawRecipients ?? []).map((r: { client_id: unknown }) => r.client_id as string);
+  const clients = (clientsRaw ?? []) as unknown as Client[];
 
   const campaign = {
     ...campaignRaw,

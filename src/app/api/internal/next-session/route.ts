@@ -24,14 +24,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = createAdminClient() as any;
+  const client = createAdminClient();
 
   const now = new Date();
   const windowEnd = new Date(now.getTime() + 7 * 86_400_000); // 7 days ahead
 
+  type NextSessionRow = {
+    id: string;
+    scheduled_at: string;
+    service_id: string;
+    clients: { id: string; phone: string; first_name: string | null } | null;
+    services: { id: string; name: string } | null;
+  };
+
   // Load all realized bookings (latest per client+service)
-  const { data: bookings, error } = await client
+  const { data: rawBookings, error } = await client
     .from("bookings")
     .select(
       `id, scheduled_at, service_id,
@@ -45,6 +52,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     logger.error("Next-session cron failed to fetch bookings", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  const bookings = (rawBookings ?? []) as unknown as NextSessionRow[];
 
   const businessName = await getConfigValue("business_name", "VAIG");
   const defaultInterval = parseInt(await getConfigValue("next_session_interval_days", "30"));
@@ -52,8 +60,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // Deduplicate: keep latest realized booking per client+service
   const seen = new Set<string>();
-  const candidates: typeof bookings = [];
-  for (const b of bookings ?? []) {
+  const candidates: NextSessionRow[] = [];
+  for (const b of bookings) {
     const key = `${b.clients?.id}:${b.service_id}`;
     if (!seen.has(key) && b.clients?.phone) {
       seen.add(key);
@@ -66,8 +74,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   let failed = 0;
 
   for (const booking of candidates) {
-    const phone = booking.clients.phone;
-    const clientId = booking.clients.id;
+    const phone = booking.clients!.phone;
+    const clientId = booking.clients!.id;
     const serviceId = booking.service_id;
 
     // Per-service interval override
@@ -99,7 +107,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       continue;
     }
 
-    const firstName = booking.clients.first_name ?? "Cliente";
+    const firstName = booking.clients!.first_name ?? "Cliente";
     const serviceName = booking.services?.name ?? "tu servicio";
     const dateLabel = suggestedDate.toLocaleDateString("es-AR", {
       timeZone: "America/Argentina/Buenos_Aires",

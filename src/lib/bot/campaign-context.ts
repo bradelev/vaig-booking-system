@@ -26,8 +26,7 @@ export async function getRecentCampaignForPhone(
   phone: string
 ): Promise<RecentCampaign | null> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = createAdminClient() as any;
+    const db = createAdminClient();
 
     const windowStart = new Date(Date.now() - CAMPAIGN_WINDOW_MS).toISOString();
 
@@ -46,13 +45,14 @@ export async function getRecentCampaignForPhone(
 
     if (error || !data) return null;
 
-    const campaign = data.campaigns as { name: string; body: string };
+    const rawData = data as unknown as { campaigns: { name: string; body: string } | null; sent_at: string | null };
+    const campaign = rawData.campaigns;
     if (!campaign?.name) return null;
 
     return {
       name: campaign.name,
       body: campaign.body ?? "",
-      sentAt: data.sent_at as string,
+      sentAt: rawData.sent_at ?? "",
     };
   } catch {
     // Never block the bot on a campaign lookup failure

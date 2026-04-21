@@ -42,18 +42,16 @@ export default async function HorarioProfesionalPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const today = new Date().toISOString().split("T")[0];
 
   const [{ data: profRaw }, { data: scheduleRaw }, { data: overridesRaw }] = await Promise.all([
-    client.from("professionals").select("id, name").eq("id", id).single(),
-    client
+    supabase.from("professionals").select("id, name").eq("id", id).single(),
+    supabase
       .from("professional_schedule")
       .select("day_of_week, start_time, end_time, is_working")
       .eq("professional_id", id),
-    client
+    supabase
       .from("professional_schedule_overrides")
       .select("id, override_date, start_time, end_time, is_working, reason")
       .eq("professional_id", id)

@@ -34,23 +34,38 @@ export default async function CampanaDetallePage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
-  const [{ data: campaign }, { data: recipientsRaw }] = await Promise.all([
-    db.from("campaigns")
+  type CampaignData = {
+    id: string;
+    name: string;
+    body: string | null;
+    image_url: string | null;
+    status: string;
+    scheduled_at: string | null;
+    target_all: boolean;
+    total_recipients: number | null;
+    sent_count: number | null;
+    failed_count: number | null;
+    completed_at: string | null;
+    created_at: string;
+  };
+
+  const [{ data: rawCampaign }, { data: recipientsRaw }] = await Promise.all([
+    supabase.from("campaigns")
       .select("id, name, body, image_url, status, scheduled_at, target_all, total_recipients, sent_count, failed_count, completed_at, created_at")
       .eq("id", id)
       .single(),
-    db.from("campaign_recipients")
+    supabase.from("campaign_recipients")
       .select("client_id, sent_at, error, clients(first_name, last_name, phone)")
       .eq("campaign_id", id)
       .order("sent_at", { ascending: false }),
   ]);
 
+  const campaign = rawCampaign as unknown as CampaignData | null;
+
   if (!campaign) notFound();
 
-  const recipients = (recipientsRaw ?? []) as Recipient[];
+  const recipients = (recipientsRaw ?? []) as unknown as Recipient[];
   const badge = STATUS_BADGE[campaign.status];
 
   return (

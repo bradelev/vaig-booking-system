@@ -31,16 +31,14 @@ export default async function DepilacionMetricasPage({
   const heatmapStart = getPeriodStart(180); // always 6 months for heatmap
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   // Q1: Get depilación service IDs
-  const { data: depServices } = await client
+  const { data: depServices } = await supabase
     .from("services")
     .select("id")
     .eq("category", "Depilacion Laser");
 
-  const serviceIds: string[] = (depServices ?? []).map((s: { id: string }) => s.id);
+  const serviceIds: string[] = (depServices ?? []).map((s) => (s as { id: string }).id);
 
   if (serviceIds.length === 0) {
     return (
@@ -63,14 +61,14 @@ export default async function DepilacionMetricasPage({
     { data: futureBookingClients },
   ] = await Promise.all([
     // Q2: KPI bookings (period)
-    client
+    supabase
       .from("bookings")
       .select("status")
       .in("service_id", serviceIds)
       .gte("scheduled_at", periodStart),
 
     // Q3: Ticket promedio — payments for realized depilación bookings
-    client
+    supabase
       .from("payments")
       .select("amount, bookings!inner(service_id, status, scheduled_at)")
       .in("bookings.service_id", serviceIds)
@@ -78,7 +76,7 @@ export default async function DepilacionMetricasPage({
       .gte("bookings.scheduled_at", periodStart),
 
     // Q4: Professional distribution
-    client
+    supabase
       .from("bookings")
       .select("status, professionals(name)")
       .in("service_id", serviceIds)
@@ -86,7 +84,7 @@ export default async function DepilacionMetricasPage({
       .not("professional_id", "is", null),
 
     // Q5: Heatmap — all non-cancelled depilación bookings last 6 months
-    client
+    supabase
       .from("bookings")
       .select("scheduled_at")
       .in("service_id", serviceIds)
@@ -94,7 +92,7 @@ export default async function DepilacionMetricasPage({
       .gte("scheduled_at", heatmapStart),
 
     // Q6: Reactivación — clients with realized depilación bookings
-    client
+    supabase
       .from("bookings")
       .select("client_id, scheduled_at, clients!inner(id, first_name, last_name, phone)")
       .in("service_id", serviceIds)
@@ -102,7 +100,7 @@ export default async function DepilacionMetricasPage({
       .order("scheduled_at", { ascending: false }),
 
     // Q7: Clients with future depilación bookings (to exclude from reactivation)
-    client
+    supabase
       .from("bookings")
       .select("client_id")
       .in("service_id", serviceIds)
@@ -137,7 +135,7 @@ export default async function DepilacionMetricasPage({
     string,
     { lastVisit: Date }
   >();
-  for (const row of (reactivacionRows ?? []) as {
+  for (const row of (reactivacionRows ?? []) as unknown as {
     client_id: string;
     scheduled_at: string;
   }[]) {
@@ -154,7 +152,7 @@ export default async function DepilacionMetricasPage({
 
   // === Professional distribution ===
   const profMap = new Map<string, { realizados: number; cancelados: number }>();
-  for (const row of (professionalRows ?? []) as {
+  for (const row of (professionalRows ?? []) as unknown as {
     status: string;
     professionals: { name: string } | null;
   }[]) {
@@ -198,7 +196,7 @@ export default async function DepilacionMetricasPage({
       totalSesiones: number;
     }
   >();
-  for (const row of (reactivacionRows ?? []) as {
+  for (const row of (reactivacionRows ?? []) as unknown as {
     client_id: string;
     scheduled_at: string;
     clients: { id: string; first_name: string; last_name: string; phone: string };

@@ -18,15 +18,13 @@ interface Paquete {
 
 export default async function PaquetesPage() {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: raw } = await client
+  const { data: raw } = await supabase
     .from("service_packages")
     .select("id, name, session_count, price, is_active, services(name)")
     .order("name");
 
-  const paquetes = (raw ?? []) as Paquete[];
+  const paquetes = (raw ?? []) as unknown as Paquete[];
 
   const columns: TableColumn<Paquete>[] = [
     {

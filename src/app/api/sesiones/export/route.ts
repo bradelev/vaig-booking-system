@@ -8,10 +8,8 @@ export async function GET(request: NextRequest) {
   const to = searchParams.get("to") ?? "2026-12-31";
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: rows, error } = await client
+  const { data: rows, error } = await supabase
     .from("sesiones_historicas")
     .select(
       `id, fecha, tipo_servicio, descripcion, operadora, monto_cobrado, metodo_pago,
@@ -76,7 +74,7 @@ export async function GET(request: NextRequest) {
   };
   headerRow.alignment = { vertical: "middle" };
 
-  for (const row of (rows ?? []) as SesionRow[]) {
+  for (const row of (rows ?? []) as unknown as SesionRow[]) {
     const clientName = row.clients
       ? `${row.clients.first_name} ${row.clients.last_name}`
       : "—";

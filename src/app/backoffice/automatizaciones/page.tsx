@@ -29,10 +29,8 @@ interface Campaign {
 
 export default async function AutomatizacionesPage() {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
-  const { data: raw } = await db
+  const { data: raw } = await supabase
     .from("campaigns")
     .select("id, name, status, scheduled_at, total_recipients, sent_count, failed_count, created_at")
     .order("created_at", { ascending: false });

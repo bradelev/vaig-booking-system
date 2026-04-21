@@ -48,25 +48,23 @@ export async function GET(request: NextRequest) {
   const busqueda = searchParams.get("busqueda") ?? "";
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
   const { start, end } = getDateRange(filtro, desde, hasta);
 
   // Resolve search by client name/phone
   let clientIds: string[] | undefined;
   if (busqueda) {
-    const { data: matchedClients } = await db
+    const { data: matchedClients } = await supabase
       .from("clients")
       .select("id")
       .or(
         `first_name.ilike.%${busqueda}%,last_name.ilike.%${busqueda}%,phone.ilike.%${busqueda}%`
       );
-    const ids: string[] = (matchedClients ?? []).map((c: { id: string }) => c.id);
+    const ids: string[] = (matchedClients ?? []).map((c) => (c as { id: string }).id);
     clientIds = ids.length === 0 ? ["00000000-0000-0000-0000-000000000000"] : ids;
   }
 
-  let query = db
+  let query = supabase
     .from("bookings")
     .select(
       `scheduled_at, status,
@@ -84,18 +82,20 @@ export async function GET(request: NextRequest) {
   if (servicioId) query = query.eq("service_id", servicioId);
   if (clientIds !== undefined) query = query.in("client_id", clientIds);
 
+  type CsvBooking = {
+    scheduled_at: string;
+    status: string;
+    clients: { first_name: string; last_name: string; phone: string } | null;
+    services: { name: string } | null;
+    professionals: { name: string } | null;
+  };
+
   const { data: raw } = await query;
-  const bookings = raw ?? [];
+  const bookings = (raw ?? []) as unknown as CsvBooking[];
 
   const header = ["Fecha", "Hora", "Cliente", "Teléfono", "Servicio", "Profesional", "Estado"];
   const rows = bookings.map(
-    (b: {
-      scheduled_at: string;
-      status: string;
-      clients: { first_name: string; last_name: string; phone: string } | null;
-      services: { name: string } | null;
-      professionals: { name: string } | null;
-    }) => {
+    (b) => {
       const clientName = b.clients
         ? `${b.clients.first_name} ${b.clients.last_name}`.trim()
         : "";

@@ -5,10 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function createContacto(clientId: string, formData: FormData) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { error } = await client.from("contactos").insert({
+  const { error } = await supabase.from("contactos").insert({
     client_id: clientId,
     fecha: formData.get("fecha") as string,
     canal: formData.get("canal") as string,

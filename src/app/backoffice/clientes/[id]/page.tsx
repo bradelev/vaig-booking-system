@@ -89,8 +89,6 @@ export default async function ClienteDetailPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
   const [
     { data: metricaRaw },
@@ -99,23 +97,23 @@ export default async function ClienteDetailPage({
     { data: contactosRaw },
     { data: membresiasRaw },
   ] = await Promise.all([
-    db.from("clientes_metricas").select("*").eq("id", id).single(),
-    db
+    supabase.from("clientes_metricas").select("*").eq("id", id).single(),
+    supabase
       .from("bookings")
       .select("id, scheduled_at, status, amount, service:services(name), professional:professionals(name)")
       .eq("client_id", id)
       .order("scheduled_at", { ascending: false }),
-    db
+    supabase
       .from("sesiones_historicas")
       .select("id, fecha, servicio, profesional, monto, estado, fuente")
       .eq("client_id", id)
       .order("fecha", { ascending: false }),
-    db
+    supabase
       .from("contactos")
       .select("id, fecha, canal, motivo, resultado, notas")
       .eq("client_id", id)
       .order("fecha", { ascending: false }),
-    db
+    supabase
       .from("membresias")
       .select("id, plan_nombre, servicios_incluidos, precio, fecha_inicio, fecha_fin, estado")
       .eq("client_id", id)
@@ -125,7 +123,7 @@ export default async function ClienteDetailPage({
   const metrica = metricaRaw as ClienteMetrica | null;
   if (!metrica) notFound();
 
-  const bookings = (bookingsRaw ?? []) as Booking[];
+  const bookings = (bookingsRaw ?? []) as unknown as Booking[];
   const sesiones = (sesionesRaw ?? []) as SesionHistorica[];
   const contactos = (contactosRaw ?? []) as Contacto[];
   const membresias = (membresiasRaw ?? []) as Membresia[];

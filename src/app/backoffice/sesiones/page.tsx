@@ -41,16 +41,14 @@ export default async function SesionesPage({ searchParams }: PageProps) {
   const weekEnd = addDays(weekMonday, 7);
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: professionals } = await client
+  const { data: professionals } = await supabase
     .from("professionals")
     .select("id, name")
     .eq("is_active", true)
     .order("name");
 
-  const { data: servicesRaw } = await client
+  const { data: servicesRaw } = await supabase
     .from("services")
     .select("id, name, category, price")
     .eq("is_active", true)
@@ -68,7 +66,7 @@ export default async function SesionesPage({ searchParams }: PageProps) {
     "Otros",
   ];
 
-  const { data: servicesData } = await client
+  const { data: servicesData } = await supabase
     .from("services")
     .select("category")
     .not("category", "is", null)
@@ -77,13 +75,13 @@ export default async function SesionesPage({ searchParams }: PageProps) {
   const dbCategories: string[] = Array.from(
     new Set(
       (servicesData ?? [])
-        .map((s: { category: string }) => s.category)
+        .map((s) => (s as { category: string }).category)
         .filter(Boolean)
     )
   );
   const categories = dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES;
 
-  const { data: bookingsRaw } = await client
+  const { data: bookingsRaw } = await supabase
     .from("bookings")
     .select(
       `id, scheduled_at, status,
@@ -96,7 +94,7 @@ export default async function SesionesPage({ searchParams }: PageProps) {
     .in("status", ["confirmed", "deposit_paid", "realized"])
     .order("scheduled_at");
 
-  const { data: sesionesRaw } = await client
+  const { data: sesionesRaw } = await supabase
     .from("sesiones_historicas")
     .select(
       `id, fecha, tipo_servicio, descripcion, operadora, monto_cobrado, metodo_pago, fuente,
@@ -137,8 +135,8 @@ export default async function SesionesPage({ searchParams }: PageProps) {
     booking_id: string | null;
   };
 
-  const allBookings = (bookingsRaw ?? []) as RawBooking[];
-  const allSesiones = (sesionesRaw ?? []) as RawSesion[];
+  const allBookings = (bookingsRaw ?? []) as unknown as RawBooking[];
+  const allSesiones = (sesionesRaw ?? []) as unknown as RawSesion[];
 
   const confirmedBookingIdsByDate: Record<string, Set<string>> = {};
   for (const s of allSesiones) {
@@ -231,11 +229,14 @@ export default async function SesionesPage({ searchParams }: PageProps) {
   }
 
   type RawService = { id: string; name: string; category: string | null; price: number };
-  const services = (servicesRaw ?? []) as RawService[];
+  const services = (servicesRaw ?? []) as unknown as RawService[];
+
+  type ProfItem = { id: string; name: string };
+  const profList = (professionals ?? []) as unknown as ProfItem[];
 
   return (
     <SessionsPageClient
-      professionals={professionals ?? []}
+      professionals={profList}
       serviceCategories={categories}
       services={services}
       weekDates={weekDates}

@@ -52,8 +52,7 @@ export async function handlePaymentNotification(paymentId: string, _payload?: st
     }
 
     const clientPackageId = externalRef.slice(5);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = createAdminClient() as any;
+    const db = createAdminClient();
 
     const { error } = await db
       .from("client_packages")
@@ -69,11 +68,17 @@ export async function handlePaymentNotification(paymentId: string, _payload?: st
     logger.info("MP webhook: pack activated", { client_package_id: clientPackageId });
 
     // Notify client
-    const { data: cpData } = await db
+    type CpData = {
+      sessions_total: number;
+      service_packages: { name: string; services: { name: string } | null } | null;
+      clients: { phone: string; first_name: string | null; last_name: string | null } | null;
+    };
+    const { data: rawCpData } = await db
       .from("client_packages")
       .select("sessions_total, service_packages(name, services(name)), clients(phone, first_name, last_name)")
       .eq("id", clientPackageId)
       .single();
+    const cpData = rawCpData as unknown as CpData | null;
 
     if (cpData?.clients?.phone) {
       void notifyClientPackPurchased({
@@ -96,8 +101,7 @@ export async function handlePaymentNotification(paymentId: string, _payload?: st
   // MP payment id is a number; store as string for idempotency index
   const mpPaymentId = String(payment.id);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = createAdminClient() as any;
+  const db = createAdminClient();
 
   // Idempotency guard: if this payment_id is already recorded on any booking, it was already processed
   const { data: existing } = await db
@@ -111,8 +115,14 @@ export async function handlePaymentNotification(paymentId: string, _payload?: st
     return;
   }
 
+  type BookingUpdateData = {
+    scheduled_at: string;
+    clients: { first_name: string | null; last_name: string | null; phone: string } | null;
+    services: { name: string; deposit_amount: number } | null;
+  };
+
   // Atomic update: only transitions pending → deposit_paid; no rows matched = race condition or already updated
-  const { data: bookingData, error } = await db
+  const { data: rawBookingData, error } = await db
     .from("bookings")
     .update({
       status: "deposit_paid",
@@ -123,6 +133,7 @@ export async function handlePaymentNotification(paymentId: string, _payload?: st
     .eq("status", "pending")
     .select("scheduled_at, clients(first_name, last_name, phone), services(name, deposit_amount)")
     .single();
+  const bookingData = rawBookingData as unknown as BookingUpdateData | null;
 
   if (error) {
     // PGRST116 = no rows matched: booking was already transitioned by a concurrent webhook delivery

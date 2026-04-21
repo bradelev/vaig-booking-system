@@ -15,10 +15,8 @@ interface Professional {
 
 export default async function ProfesionalesPage() {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: raw } = await client
+  const { data: raw } = await supabase
     .from("professionals")
     .select("id, name, specialties, is_active")
     .order("name");

@@ -42,12 +42,16 @@ export async function sendReminders(
   const accessInstructions = process.env.VAIG_ACCESS_INSTRUCTIONS ?? "";
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const adminClient = createAdminClient() as any;
+  const adminClient = createAdminClient();
 
-  const { data: bookings, error } = await client
+  type RawBooking = {
+    id: string;
+    scheduled_at: string;
+    clients: { id: string; phone: string; first_name: string } | null;
+    services: { name: string; category: string | null } | null;
+  };
+
+  const { data: rawBookings, error } = await supabase
     .from("bookings")
     .select("id, scheduled_at, clients(id, phone, first_name), services(name, category)")
     .in("id", bookingIds)
@@ -57,19 +61,13 @@ export async function sendReminders(
   if (error) {
     return { sent: 0, failed: 0, errors: [`Error al obtener citas: ${error.message}`] };
   }
+  const bookings = (rawBookings ?? []) as unknown as RawBooking[];
 
   let sent = 0;
   let failed = 0;
   const errors: string[] = [];
 
-  type RawBooking = {
-    id: string;
-    scheduled_at: string;
-    clients: { id: string; phone: string; first_name: string } | null;
-    services: { name: string; category: string | null } | null;
-  };
-
-  for (const booking of (bookings ?? []) as RawBooking[]) {
+  for (const booking of bookings) {
     const phone = booking.clients?.phone;
     const firstName = booking.clients?.first_name || "cliente";
 

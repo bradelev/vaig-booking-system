@@ -33,14 +33,13 @@ interface LogInboundParams {
 /** Look up client_id by phone number. Returns null if not found. */
 export async function resolveClientId(phone: string): Promise<string | null> {
   const db = createAdminClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (db as any)
+  const { data } = await db
     .from("clients")
     .select("id")
     .eq("phone", phone)
     .limit(1)
     .single();
-  return data?.id ?? null;
+  return (data as { id: string } | null)?.id ?? null;
 }
 
 /** Insert a pending outbound message row. Returns the row id. */
@@ -52,8 +51,7 @@ export async function logOutboundMessage({
 }: LogOutboundParams): Promise<string> {
   const clientId = await resolveClientId(phone);
   const db = createAdminClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (db as any)
+  const { data, error } = await db
     .from("messages")
     .insert({
       phone,
@@ -71,14 +69,13 @@ export async function logOutboundMessage({
     logger.error("Failed to log outbound message", { error: error.message, phone });
     throw new Error(error.message);
   }
-  return data.id;
+  return (data as { id: string }).id;
 }
 
 /** Update a message row with the WhatsApp message ID after successful send. */
 export async function markMessageSent(rowId: string, waMessageId: string): Promise<void> {
   const db = createAdminClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db as any)
+  await db
     .from("messages")
     .update({ wa_message_id: waMessageId, status: "sent" })
     .eq("id", rowId);
@@ -87,8 +84,7 @@ export async function markMessageSent(rowId: string, waMessageId: string): Promi
 /** Mark a message as failed. */
 export async function markMessageFailed(rowId: string, errorMessage: string): Promise<void> {
   const db = createAdminClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db as any)
+  await db
     .from("messages")
     .update({ status: "failed", error_message: errorMessage })
     .eq("id", rowId);
@@ -103,8 +99,7 @@ export async function logInboundMessage({
 }: LogInboundParams): Promise<void> {
   const clientId = await resolveClientId(phone);
   const db = createAdminClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (db as any)
+  const { error } = await db
     .from("messages")
     .upsert(
       {
@@ -147,8 +142,7 @@ export async function updateMessageStatus(
     if (errorMessage) update.error_message = errorMessage;
     if (errorCode != null) update.error_code = errorCode;
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (db as any)
+  const { data } = await db
     .from("messages")
     .update(update)
     .eq("wa_message_id", waMessageId)

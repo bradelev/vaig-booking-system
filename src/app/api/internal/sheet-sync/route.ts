@@ -16,8 +16,7 @@ export async function POST(): Promise<NextResponse> {
   const supabase = await createClient();
   const {
     data: { user },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } = await (supabase as any).auth.getUser();
+  } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

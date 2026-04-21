@@ -22,13 +22,11 @@ interface Professional {
 
 export default async function NuevaCitaPage() {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const [{ data: clientesRaw }, { data: serviciosRaw }, { data: profsRaw }] = await Promise.all([
-    client.from("clients").select("id, first_name, last_name, phone").order("last_name"),
-    client.from("services").select("id, name").eq("is_active", true).order("name"),
-    client.from("professionals").select("id, name").eq("is_active", true).order("name"),
+    supabase.from("clients").select("id, first_name, last_name, phone").order("last_name"),
+    supabase.from("services").select("id, name").eq("is_active", true).order("name"),
+    supabase.from("professionals").select("id, name").eq("is_active", true).order("name"),
   ]);
 
   const clientes = (clientesRaw ?? []) as Cliente[];

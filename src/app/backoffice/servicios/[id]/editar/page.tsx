@@ -27,12 +27,10 @@ export default async function EditarServicioPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const [{ data: raw }, { data: profsRaw }] = await Promise.all([
-    client.from("services").select("*").eq("id", id).single(),
-    client.from("professionals").select("id, name").eq("is_active", true).order("name"),
+    supabase.from("services").select("*").eq("id", id).single(),
+    supabase.from("professionals").select("id, name").eq("is_active", true).order("name"),
   ]);
 
   const servicio = raw as Servicio | null;

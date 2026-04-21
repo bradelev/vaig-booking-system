@@ -5,15 +5,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { invalidateKnowledgeCache } from "@/lib/bot/knowledge";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyRecord = Record<string, any>;
-
 export async function createService(formData: FormData) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { error } = await (client.from("services") as { insert: (v: AnyRecord) => Promise<{ error: Error | null }> }).insert({
+  const { error } = await supabase.from("services").insert({
     name: formData.get("name") as string,
     description: (formData.get("description") as string) || null,
     duration_minutes: Number(formData.get("duration_minutes")),
@@ -32,10 +27,8 @@ export async function createService(formData: FormData) {
 
 export async function updateService(id: string, formData: FormData) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { error } = await client
+  const { error } = await supabase
     .from("services")
     .update({
       name: formData.get("name") as string,
@@ -66,10 +59,8 @@ export async function updateServiceInline(
   }
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { error } = await client
+  const { error } = await supabase
     .from("services")
     .update({ name: data.name.trim(), price: data.price })
     .eq("id", id);
@@ -83,10 +74,8 @@ export async function updateServiceInline(
 
 export async function toggleServiceActive(id: string, isActive: boolean) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { error } = await client
+  const { error } = await supabase
     .from("services")
     .update({ is_active: !isActive })
     .eq("id", id);

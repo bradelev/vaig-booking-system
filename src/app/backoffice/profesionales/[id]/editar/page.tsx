@@ -19,10 +19,8 @@ export default async function EditarProfesionalPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: raw } = await client
+  const { data: raw } = await supabase
     .from("professionals")
     .select("id, name, phone, specialties, is_active")
     .eq("id", id)

@@ -39,11 +39,9 @@ export interface ParDuplicado {
 
 export async function getDuplicadosCandidatos(): Promise<ParDuplicado[]> {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = supabase as any;
 
   // Fetch all clients with session count from the view
-  const { data: rawClientes } = await sb
+  const { data: rawClientes } = await supabase
     .from("clientes_metricas")
     .select("id, first_name, last_name, phone, nombre_normalizado, total_sesiones")
     .order("first_name", { ascending: true })
@@ -146,37 +144,36 @@ export async function mergeClients(keepId: string, deleteId: string): Promise<vo
   }
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = supabase as any;
+
+  type SesionRow = { id: string; fecha: string; tipo_servicio: string; descripcion: string | null };
 
   // 1. Reasignar sesiones_historicas — ignorar conflictos de unicidad (ON CONFLICT DO NOTHING via upsert skip)
-  const { data: sesiones } = await sb
+  const { data: rawSesiones } = await supabase
     .from("sesiones_historicas")
     .select("id, fecha, tipo_servicio, descripcion")
     .eq("client_id", deleteId);
+  const sesiones = (rawSesiones ?? []) as SesionRow[];
 
-  if (sesiones && sesiones.length > 0) {
+  if (sesiones.length > 0) {
     // Get existing sessions for keepId to avoid duplicates
-    const { data: existentes } = await sb
+    const { data: rawExistentes } = await supabase
       .from("sesiones_historicas")
       .select("fecha, tipo_servicio, descripcion")
       .eq("client_id", keepId);
+    const existentes = (rawExistentes ?? []) as Pick<SesionRow, "fecha" | "tipo_servicio" | "descripcion">[];
 
     const existenteSet = new Set(
-      (existentes ?? []).map(
-        (s: { fecha: string; tipo_servicio: string; descripcion: string | null }) =>
-          `${s.fecha}|${s.tipo_servicio}|${s.descripcion ?? ""}`
+      existentes.map(
+        (s) => `${s.fecha}|${s.tipo_servicio}|${s.descripcion ?? ""}`
       )
     );
 
     const idsAMover = sesiones
-      .filter((s: { id: string; fecha: string; tipo_servicio: string; descripcion: string | null }) =>
-        !existenteSet.has(`${s.fecha}|${s.tipo_servicio}|${s.descripcion ?? ""}`)
-      )
-      .map((s: { id: string }) => s.id);
+      .filter((s) => !existenteSet.has(`${s.fecha}|${s.tipo_servicio}|${s.descripcion ?? ""}`))
+      .map((s) => s.id);
 
     if (idsAMover.length > 0) {
-      const { error: errSes } = await sb
+      const { error: errSes } = await supabase
         .from("sesiones_historicas")
         .update({ client_id: keepId })
         .in("id", idsAMover);
@@ -185,28 +182,28 @@ export async function mergeClients(keepId: string, deleteId: string): Promise<vo
   }
 
   // 2. Reasignar client_packages (ON DELETE RESTRICT — debe moverse antes de borrar)
-  const { error: errPkg } = await sb
+  const { error: errPkg } = await supabase
     .from("client_packages")
     .update({ client_id: keepId })
     .eq("client_id", deleteId);
   if (errPkg) throw new Error(`Error reasignando paquetes: ${errPkg.message}`);
 
   // 3. Reasignar bookings
-  const { error: errBook } = await sb
+  const { error: errBook } = await supabase
     .from("bookings")
     .update({ client_id: keepId })
     .eq("client_id", deleteId);
   if (errBook) throw new Error(`Error reasignando bookings: ${errBook.message}`);
 
   // 4. Reasignar conversation_sessions del bot
-  const { error: errSess } = await sb
+  const { error: errSess } = await supabase
     .from("conversation_sessions")
     .update({ client_id: keepId })
     .eq("client_id", deleteId);
   if (errSess) throw new Error(`Error reasignando sesiones bot: ${errSess.message}`);
 
   // 5. Eliminar el cliente duplicado
-  const { error: errDel } = await sb.from("clients").delete().eq("id", deleteId);
+  const { error: errDel } = await supabase.from("clients").delete().eq("id", deleteId);
   if (errDel) throw new Error(`Error eliminando cliente: ${errDel.message}`);
 
   revalidatePath("/backoffice/clientes");
@@ -215,10 +212,8 @@ export async function mergeClients(keepId: string, deleteId: string): Promise<vo
 
 export async function createClient_(formData: FormData) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { error } = await client.from("clients").insert({
+  const { error } = await supabase.from("clients").insert({
     first_name: formData.get("first_name") as string,
     last_name: formData.get("last_name") as string,
     phone: formData.get("phone") as string,
@@ -235,10 +230,8 @@ export async function createClient_(formData: FormData) {
 
 export async function toggleClientBlocked(id: string, blocked: boolean) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { error } = await client
+  const { error } = await supabase
     .from("clients")
     .update({ is_blocked: blocked })
     .eq("id", id);
@@ -251,10 +244,8 @@ export async function toggleClientBlocked(id: string, blocked: boolean) {
 
 export async function updateClient_(id: string, formData: FormData) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { error } = await client
+  const { error } = await supabase
     .from("clients")
     .update({
       first_name: formData.get("first_name") as string,
