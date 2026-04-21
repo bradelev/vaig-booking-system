@@ -142,8 +142,9 @@ export async function updateMessageStatus(
 ): Promise<MessageRow | null> {
   const db = createAdminClient();
   const update: Record<string, unknown> = { status };
-  if (status === "failed" && errorMessage) {
-    update.error_message = errorMessage;
+  if (status === "failed") {
+    if (errorMessage) update.error_message = errorMessage;
+    if (errorCode != null) update.error_code = errorCode;
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data } = await (db as any)
