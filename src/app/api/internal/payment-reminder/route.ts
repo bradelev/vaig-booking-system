@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
+import { logger } from "@/lib/logger";
 import { sendTextMessage } from "@/lib/whatsapp/logged";
 import { createMPPreference } from "@/lib/payments/mp";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     .gt("created_at", cancelCutoff);
 
   if (error) {
-    console.error("[PaymentReminder] Failed to fetch bookings:", error);
+    logger.error("Payment reminder cron failed to fetch bookings", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -95,7 +96,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         });
         paymentLine = `\n${pref.initPoint}`;
       } catch (e) {
-        console.error(`[PaymentReminder] MP preference error for booking ${booking.id}:`, e);
+        logger.error("MP preference creation failed for payment reminder", { booking_id: booking.id, error: e instanceof Error ? e.message : String(e) });
       }
     }
 
@@ -115,11 +116,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         .eq("id", booking.id);
       sent++;
     } catch (err) {
-      console.error(`[PaymentReminder] Failed for booking ${booking.id}:`, err);
+      logger.error("Payment reminder send failed", { booking_id: booking.id, error: err instanceof Error ? err.message : String(err) });
       failed++;
     }
   }
 
-  console.log(`[PaymentReminder] Sent: ${sent}, Failed: ${failed}`);
+  logger.info("Payment reminders sent", { sent, failed });
   return NextResponse.json({ sent, failed });
 }

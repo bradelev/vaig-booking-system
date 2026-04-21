@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue, getConfig } from "@/lib/config";
+import { logger } from "@/lib/logger";
 import { sendTextMessage } from "@/lib/whatsapp/logged";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
 
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     .order("scheduled_at", { ascending: false });
 
   if (error) {
-    console.error("[NextSession] Failed to fetch bookings:", error);
+    logger.error("Next-session cron failed to fetch bookings", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -125,11 +126,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       await sendTextMessage({ to: targetPhone, body: msg }, "cron_next_session");
       sent++;
     } catch (err) {
-      console.error(`[NextSession] Failed for client ${clientId}:`, err);
+      logger.error("Next-session suggestion send failed", { client_id: clientId, error: err instanceof Error ? err.message : String(err) });
       failed++;
     }
   }
 
-  console.log(`[NextSession] Sent: ${sent}, Skipped: ${skipped}, Failed: ${failed}`);
+  logger.info("Next-session suggestions sent", { sent, skipped, failed });
   return NextResponse.json({ sent, skipped, failed });
 }

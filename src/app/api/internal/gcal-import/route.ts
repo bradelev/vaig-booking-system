@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 import { importGCalEvents } from "@/lib/gcal/import-engine";
 
 /**
@@ -49,7 +50,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(result);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[GCal Import] Error:", message);
+    logger.error("GCal import failed", { error: message });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

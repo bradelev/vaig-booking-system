@@ -20,6 +20,7 @@ import {
   markMessageFailed,
   type MessageSource,
 } from "./log";
+import { logger } from "@/lib/logger";
 
 export type { MessageSource };
 
@@ -36,7 +37,7 @@ export async function sendTextMessage(
       source,
     });
   } catch (logErr) {
-    console.error("[WA Log] logOutboundMessage failed (non-fatal):", logErr instanceof Error ? logErr.message : String(logErr));
+    logger.error("logOutboundMessage failed (non-fatal)", { error: logErr instanceof Error ? logErr.message : String(logErr) });
   }
   try {
     const waId = await rawSendText(params);
@@ -61,7 +62,7 @@ export async function sendInteractiveButtons(
       source,
     });
   } catch (logErr) {
-    console.error("[WA Log] logOutboundMessage failed (non-fatal):", logErr instanceof Error ? logErr.message : String(logErr));
+    logger.error("logOutboundMessage failed (non-fatal)", { error: logErr instanceof Error ? logErr.message : String(logErr) });
   }
   try {
     const waId = await rawSendButtons(params);
@@ -86,7 +87,7 @@ export async function sendTemplateMessage(
       source,
     });
   } catch (logErr) {
-    console.error("[WA Log] logOutboundMessage failed (non-fatal):", logErr instanceof Error ? logErr.message : String(logErr));
+    logger.error("logOutboundMessage failed (non-fatal)", { error: logErr instanceof Error ? logErr.message : String(logErr) });
   }
   try {
     const waId = await rawSendTemplate(params);
@@ -111,7 +112,7 @@ export async function sendImageMessage(
       source,
     });
   } catch (logErr) {
-    console.error("[WA Log] logOutboundMessage failed (non-fatal):", logErr instanceof Error ? logErr.message : String(logErr));
+    logger.error("logOutboundMessage failed (non-fatal)", { error: logErr instanceof Error ? logErr.message : String(logErr) });
   }
   try {
     const waId = await rawSendImage(params);
@@ -136,7 +137,7 @@ export async function sendListMessage(
       source,
     });
   } catch (logErr) {
-    console.error("[WA Log] logOutboundMessage failed (non-fatal):", logErr instanceof Error ? logErr.message : String(logErr));
+    logger.error("logOutboundMessage failed (non-fatal)", { error: logErr instanceof Error ? logErr.message : String(logErr) });
   }
   try {
     const waId = await rawSendList(params);

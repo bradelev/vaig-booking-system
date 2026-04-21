@@ -42,9 +42,7 @@ describe("withRetry", () => {
     expect(result).toBeUndefined();
     expect(fn).toHaveBeenCalledTimes(3);
     expect(consoleSpy).toHaveBeenCalledWith(
-      "[Retry] Final failure after 3 attempts:",
-      "notifyAdmin",
-      expect.any(Error)
+      expect.stringContaining("Final failure after max retry attempts")
     );
     consoleSpy.mockRestore();
   });
@@ -73,9 +71,7 @@ describe("withRetry", () => {
 
     expect(fn).toHaveBeenCalledTimes(3);
     expect(consoleSpy).toHaveBeenCalledWith(
-      "[Retry] Final failure after 3 attempts:",
-      "unknown",
-      expect.any(Error)
+      expect.stringContaining("Final failure after max retry attempts")
     );
     consoleSpy.mockRestore();
   });

@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logger } from "@/lib/logger";
 
 export type MessageDirection = "inbound" | "outbound";
 export type MessageType = "text" | "interactive" | "template" | "image" | "list";
@@ -67,7 +68,7 @@ export async function logOutboundMessage({
     .single();
 
   if (error) {
-    console.error("[WA Log] Failed to log outbound message:", error.message);
+    logger.error("Failed to log outbound message", { error: error.message, phone });
     throw new Error(error.message);
   }
   return data.id;
@@ -119,7 +120,7 @@ export async function logInboundMessage({
       { onConflict: "wa_message_id" }
     );
   if (error) {
-    console.error("[WA Log] Failed to log inbound message:", error.message);
+    logger.error("Failed to log inbound message", { error: error.message, phone, wa_message_id: waMessageId });
   }
 }
 

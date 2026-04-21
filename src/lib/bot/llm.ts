@@ -4,6 +4,7 @@
  * Uses the knowledge base as grounding context.
  */
 import { buildKnowledgeBase, formatKnowledgeForLLM } from "./knowledge";
+import { logger } from "@/lib/logger";
 
 const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5-20251001";
@@ -65,7 +66,7 @@ export async function answerWithLLM(userMessage: string): Promise<string> {
     return text.trim();
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      console.error("[LLM] Request timed out after 8s");
+      logger.error("LLM request timed out", { timeout_ms: 8000 });
       throw new Error("LLM_TIMEOUT");
     }
     throw err;
