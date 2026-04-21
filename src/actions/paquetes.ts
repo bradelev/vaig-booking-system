@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { invalidateKnowledgeCache } from "@/lib/bot/knowledge";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRecord = Record<string, any>;
@@ -22,6 +23,7 @@ export async function createPackage(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  invalidateKnowledgeCache();
   revalidatePath("/backoffice/paquetes");
   redirect("/backoffice/paquetes");
 }
@@ -43,6 +45,7 @@ export async function updatePackage(id: string, formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  invalidateKnowledgeCache();
   revalidatePath("/backoffice/paquetes");
   redirect("/backoffice/paquetes");
 }
@@ -59,5 +62,6 @@ export async function togglePackageActive(id: string, isActive: boolean) {
 
   if (error) throw new Error(error.message);
 
+  invalidateKnowledgeCache();
   revalidatePath("/backoffice/paquetes");
 }

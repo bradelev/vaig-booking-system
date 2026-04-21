@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { invalidateKnowledgeCache } from "@/lib/bot/knowledge";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRecord = Record<string, any>;
@@ -24,6 +25,7 @@ export async function createService(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  invalidateKnowledgeCache();
   revalidatePath("/backoffice/servicios");
   redirect("/backoffice/servicios");
 }
@@ -47,6 +49,7 @@ export async function updateService(id: string, formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  invalidateKnowledgeCache();
   revalidatePath("/backoffice/servicios");
   redirect("/backoffice/servicios");
 }
@@ -73,6 +76,7 @@ export async function updateServiceInline(
 
   if (error) return { success: false, error: error.message };
 
+  invalidateKnowledgeCache();
   revalidatePath("/backoffice/servicios");
   return { success: true };
 }
@@ -89,5 +93,6 @@ export async function toggleServiceActive(id: string, isActive: boolean) {
 
   if (error) throw new Error(error.message);
 
+  invalidateKnowledgeCache();
   revalidatePath("/backoffice/servicios");
 }
