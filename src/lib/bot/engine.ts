@@ -19,6 +19,7 @@ import { notifyAdminNewBooking, notifyBusinessNewBooking } from "./notifications
 import { isHandoffTrigger, activateHandoff } from "./handoff";
 import { getRecentCampaignForPhone, type RecentCampaign } from "./campaign-context";
 import type { BotConversationState, BookingFlowContext, ServiceInfo, SlotOption, MultiProfSlot } from "./types";
+import { logger } from "@/lib/logger";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
@@ -167,7 +168,7 @@ export async function handleIncomingMessage(phone: string, messageText: string, 
   try {
     await route(phone, messageText, state, context, recentCampaign, waMessageId);
   } catch (err) {
-    console.error("[Bot] Error in state machine:", err);
+    logger.error("Bot state machine error", { phone, state, error: err instanceof Error ? err.message : String(err) });
     await reply(phone, "Ocurrió un error. Por favor intentá nuevamente o escribí *hola* para empezar. 🙏");
   }
 }
@@ -495,7 +496,7 @@ async function handleInfoFlow(phone: string, text: string): Promise<void> {
         await reply(phone, "Estoy teniendo dificultades técnicas en este momento. Escribí *agendar* para reservar o *mis turnos* para ver tus citas.");
         return;
       }
-      console.error("[Bot] LLM error:", err);
+      logger.error("Bot LLM error", { phone, error: err instanceof Error ? err.message : String(err) });
       // Fall through to menu
     }
   }
@@ -1237,7 +1238,7 @@ async function handleBookingConfirm(
       });
       paymentMsg += `💳 *Pagar con Mercado Pago:*\n${pref.initPoint}\n\n`;
     } catch (e) {
-      console.error("[Bot] MP preference error:", e);
+      logger.error("Bot MP preference error", { phone, booking_id: bookingId, error: e instanceof Error ? e.message : String(e) });
     }
   }
 
@@ -1581,7 +1582,7 @@ export async function notifyWaitlistForSlot(
       .update({ notified_at: new Date().toISOString() })
       .eq("id", entry.id);
   } catch (err) {
-    console.error("[Waitlist] Failed to notify:", err);
+    logger.error("Waitlist notification failed", { phone: targetPhone, service_id: serviceId, slot_start: slotStart, error: err instanceof Error ? err.message : String(err) });
   }
 }
 
@@ -1806,7 +1807,7 @@ async function handlePackSelection(
     .single();
 
   if (cpError || !cp) {
-    console.error("[Bot] Failed to create client_package:", cpError);
+    logger.error("Bot failed to create client_package", { phone, client_id: clientId, package_id: pack.id as string, error: cpError?.message ?? "unknown" });
     await reply(phone, "Hubo un error al procesar tu solicitud. Por favor intentá más tarde.");
     return;
   }
@@ -1831,7 +1832,7 @@ async function handlePackSelection(
 
     await reply(phone, msg);
   } catch (err) {
-    console.error("[Bot] Pack MP preference error:", err);
+    logger.error("Bot pack MP preference error", { phone, client_package_id: cp.id as string, error: err instanceof Error ? err.message : String(err) });
     // Rollback: delete the unpaid client_package
     await dbClient.from("client_packages").delete().eq("id", cp.id);
     await reply(phone, "Hubo un error al generar el link de pago. Por favor intentá más tarde.");
@@ -1930,7 +1931,7 @@ async function handleSurveyResponse(
         .replace(/\{googleReviewUrl\}/g, googleReviewUrl);
 
       await reply(phone, msg);
-      console.log(`[Survey] Google review sent to ${phone} (score: ${score})`);
+      logger.info("Survey Google review sent", { phone, score });
       return;
     }
   }
