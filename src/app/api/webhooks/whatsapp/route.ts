@@ -4,6 +4,7 @@ import { logInboundMessage, updateMessageStatus } from "@/lib/whatsapp/log";
 import { formatWebhookError } from "@/lib/whatsapp/meta-errors";
 import { reconcileCampaignRecipientFromMessage } from "@/lib/campaigns/reconcile";
 import { logger } from "@/lib/logger";
+import { isValidMessage, isValidStatusUpdate } from "@/lib/whatsapp/payload-guards";
 
 // GET — webhook verification (Meta challenge)
 export function GET(request: NextRequest) {
@@ -95,8 +96,20 @@ export function parseWebhookPayload(payload: WhatsAppWebhookPayload): {
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
       if (change.field === "messages") {
-        if (change.value.messages) messages.push(...change.value.messages);
-        if (change.value.statuses) statuses.push(...change.value.statuses);
+        for (const item of change.value.messages ?? []) {
+          if (isValidMessage(item)) {
+            messages.push(item);
+          } else {
+            logger.warn("WhatsApp webhook: dropped malformed message", { raw: JSON.stringify(item).slice(0, 200) });
+          }
+        }
+        for (const item of change.value.statuses ?? []) {
+          if (isValidStatusUpdate(item)) {
+            statuses.push(item);
+          } else {
+            logger.warn("WhatsApp webhook: dropped malformed status", { raw: JSON.stringify(item).slice(0, 200) });
+          }
+        }
       }
     }
   }
@@ -178,7 +191,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (payload.object !== "whatsapp_business_account") {
+    logger.warn("WhatsApp webhook: unexpected object type", { object: payload.object });
     return NextResponse.json({ status: "ignored" }, { status: 200 });
+  }
+
+  if (!Array.isArray(payload.entry)) {
+    logger.warn("WhatsApp webhook: payload.entry is not an array", { raw: rawBody.slice(0, 200) });
+    return NextResponse.json({ status: "ok" }, { status: 200 });
   }
 
   const { messages, statuses } = parseWebhookPayload(payload);
