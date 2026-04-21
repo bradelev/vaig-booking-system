@@ -255,7 +255,7 @@ export default function RecordatoriosPageClient({
               <div className="px-3 py-2">
                 {message.trim() ? (
                   <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-snug">
-                    {"Hola María, te escribimos desde VAIG Depilación Láser.\n\n"}
+                    {"Hola {nombre}, te escribimos desde VAIG Depilación Láser.\n\n"}
                     {previewMessage}
                     {"\n\nCualquier consulta estamos a tu disposición."}
                   </p>
