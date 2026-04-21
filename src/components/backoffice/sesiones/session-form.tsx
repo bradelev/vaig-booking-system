@@ -7,19 +7,7 @@ import Combobox, { ComboboxItem } from "@/components/backoffice/agenda/combobox"
 import ClientSearchCombobox from "./client-search-combobox";
 import { createSession, quickCreateClientForSession } from "@/actions/sesiones";
 import Modal from "@/components/backoffice/modal";
-
-const METODOS_PAGO = [
-  "Transferencia",
-  "Efectivo",
-  "Mercado_Pago",
-  "Pos_débito",
-  "Pos_crédito",
-  "Cuponera",
-  "Canje",
-  "Regalo",
-] as const;
-
-const METODOS_CON_BANCO = new Set(["Transferencia", "Pos_débito", "Pos_crédito"]);
+import { METODOS_PAGO, METODOS_CON_BANCO } from "@/lib/constants/payment-methods";
 
 const SOURCES = ["Instagram", "Referido", "Enfoque", "WeFitness", "Google", "Ruleta", "Otro"] as const;
 
@@ -189,7 +177,7 @@ export default function SessionForm({
     label: p.name,
   }));
 
-  const showBanco = METODOS_CON_BANCO.has(metodoPago as typeof METODOS_PAGO[number]);
+  const showBanco = METODOS_CON_BANCO.includes(metodoPago);
 
   return (
     <>
@@ -351,13 +339,13 @@ export default function SessionForm({
               value={metodoPago}
               onChange={(e) => {
                 setMetodoPago(e.target.value);
-                if (!METODOS_CON_BANCO.has(e.target.value as typeof METODOS_PAGO[number])) setBanco("");
+                if (!METODOS_CON_BANCO.includes(e.target.value)) setBanco("");
               }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
             >
               <option value="">Seleccionar...</option>
-              {METODOS_PAGO.map((m) => (
-                <option key={m} value={m}>{m.replace(/_/g, " ")}</option>
+              {METODOS_PAGO.filter((m) => m.value !== "").map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
               ))}
             </select>
           </div>

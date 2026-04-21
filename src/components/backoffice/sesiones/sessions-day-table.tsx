@@ -13,6 +13,7 @@ import {
   quickCreateClientForSession,
 } from "@/actions/sesiones";
 import Modal from "@/components/backoffice/modal";
+import { METODOS_PAGO, METODOS_CON_BANCO } from "@/lib/constants/payment-methods";
 
 export interface PendingBookingData {
   id: string;
@@ -104,19 +105,6 @@ interface SessionsDayTableProps {
   activeDate: string; // YYYY-MM-DD
 }
 
-const METODOS_PAGO = [
-  { value: "", label: "— Método —" },
-  { value: "Transferencia", label: "Transferencia" },
-  { value: "Efectivo", label: "Efectivo" },
-  { value: "Mercado_Pago", label: "Mercado Pago" },
-  { value: "Pos_débito", label: "Pos débito" },
-  { value: "Pos_crédito", label: "Pos crédito" },
-  { value: "Cuponera", label: "Cuponera" },
-  { value: "Canje", label: "Canje" },
-  { value: "Regalo", label: "Regalo" },
-];
-
-const METODOS_CON_BANCO = ["Transferencia", "Pos_débito", "Pos_crédito"];
 
 const SOURCES = ["Instagram", "Referido", "Enfoque", "WeFitness", "Google", "Ruleta", "Otro"] as const;
 

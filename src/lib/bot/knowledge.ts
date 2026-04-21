@@ -165,3 +165,11 @@ export function formatKnowledgeForLLM(knowledge: KnowledgeBase): string {
 export function clearKnowledgeCache(): void {
   cache = null;
 }
+
+/**
+ * Invalidates the in-memory knowledge base cache so the next call to
+ * buildKnowledgeBase() fetches fresh data from the DB.
+ */
+export function invalidateKnowledgeCache(): void {
+  cache = null;
+}

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { updateSession, confirmBookingAsSession, searchClients, deleteSession } from "@/actions/sesiones";
 import type { Professional } from "@/components/backoffice/sesiones/session-form";
+import { METODOS_PAGO, METODOS_CON_BANCO } from "@/lib/constants/payment-methods";
 
 export interface PendingBookingData {
   id: string;
@@ -80,19 +81,6 @@ interface DaySessionsTableProps {
   professionals: Professional[];
 }
 
-const METODOS_PAGO = [
-  { value: "", label: "— Sin método —" },
-  { value: "Transferencia", label: "Transferencia" },
-  { value: "Efectivo", label: "Efectivo" },
-  { value: "Mercado_Pago", label: "Mercado Pago" },
-  { value: "Pos_débito", label: "Pos débito" },
-  { value: "Pos_crédito", label: "Pos crédito" },
-  { value: "Cuponera", label: "Cuponera" },
-  { value: "Canje", label: "Canje" },
-  { value: "Regalo", label: "Regalo" },
-];
-
-const METODOS_CON_BANCO = ["Transferencia", "Pos_débito", "Pos_crédito"];
 
 function formatCurrency(n?: number): string {
   if (n == null) return "—";
