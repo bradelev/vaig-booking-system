@@ -65,7 +65,6 @@ export async function createSession(data: {
   if (error) return { success: false, error: error.message };
 
   revalidatePath("/backoffice/sesiones");
-  revalidatePath("/backoffice/sesiones/nueva");
   return { success: true };
 }
 
@@ -230,7 +229,6 @@ export async function updateSession(
   if (error) return { success: false, error: error.message };
 
   revalidatePath("/backoffice/sesiones");
-  revalidatePath("/backoffice/sesiones/nueva");
   return { success: true };
 }
 
@@ -248,7 +246,6 @@ export async function deleteSession(
   if (error) return { success: false, error: error.message };
 
   revalidatePath("/backoffice/sesiones");
-  revalidatePath("/backoffice/sesiones/nueva");
   return { success: true };
 }
 
