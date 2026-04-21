@@ -99,6 +99,37 @@ describe("sanitizeTemplateParam", () => {
     expect(sanitizeTemplateParam("\n\n\n")).toBe("");
     expect(sanitizeTemplateParam("   \n  \t  \n   ")).toBe("");
     expect(sanitizeTemplateParam("\t\t\t")).toBe("");
+    expect(sanitizeTemplateParam("\r\n\r\n")).toBe("");
+    expect(sanitizeTemplateParam("\r\r")).toBe("");
+  });
+
+  it("normalizes CRLF line endings (editor-pasted content)", () => {
+    expect(sanitizeTemplateParam("Línea 1\r\nLínea 2")).toBe("Línea 1 · Línea 2");
+    expect(sanitizeTemplateParam("A\r\n\r\nB")).toBe("A · B");
+  });
+
+  it("normalizes solo CR line endings", () => {
+    expect(sanitizeTemplateParam("A\rB")).toBe("A · B");
+    expect(sanitizeTemplateParam("A\r\rB")).toBe("A · B");
+  });
+
+  it("handles mixed EOL styles in the same input", () => {
+    expect(sanitizeTemplateParam("A\r\nB\nC\rD")).toBe("A · B · C · D");
+  });
+
+  it("handles the real campaign body that failed with Meta #132018", () => {
+    const body =
+      "Hace un tiempo viniste a hacerte tu limpieza facial y seguramente notaste ese efecto glow en la piel 😌\r\n\r\nLa realidad es que la piel necesita mantenimiento para seguir viéndose luminosa, hidratada y sana, y por eso este mes abrimos una agenda especial para clientas que ya pasaron por la experiencia 💆🏻‍♀️\r\n\r\nArmamos un espacio pensado para vos:✨ Limpieza facial + hidratación profunda✨ Evaluación personalizada de tu piel hoy✨ Ajuste de rutina según cómo esté actualmente✨ Beneficio exclusivo en Dermapen y productos seleccionados\r\n\r\nSon pocos lugares porque trabajamos de forma personalizada 🤍\r\n\r\nSi sentís que tu piel ya no está igual o querés volver a ese glow, escribime y te paso los horarios disponible";
+    const result = sanitizeTemplateParam(body);
+
+    expect(result).not.toContain("\n");
+    expect(result).not.toContain("\r");
+    expect(result).not.toContain("\t");
+    expect(result).not.toMatch(/ {5,}/);
+    expect(result).toContain("efecto glow");
+    expect(result).toContain("😌");
+    expect(result).toContain("💆🏻‍♀️");
+    expect(result).toContain("🤍");
   });
 
   it("is idempotent: sanitize(sanitize(x)) === sanitize(x)", () => {

@@ -4,6 +4,7 @@
 // empty placeholders don't leave dangling separators.
 export function sanitizeTemplateParam(text: string): string {
   const parts = text
+    .replace(/\r\n?/g, "\n")
     .replace(/\t/g, " ")
     .split(/\n+/)
     .map((s) => s.trim())
