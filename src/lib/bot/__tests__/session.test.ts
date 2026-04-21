@@ -16,6 +16,7 @@ function makeSupabaseMock(overrides: Record<string, unknown> = {}) {
     maybeSingle: vi.fn().mockResolvedValue({ data: null }),
     update: vi.fn().mockReturnThis(),
     insert: vi.fn().mockResolvedValue({ error: null }),
+    upsert: vi.fn().mockResolvedValue({ error: null }),
     delete: vi.fn().mockReturnThis(),
     ...overrides,
   };
@@ -109,25 +110,25 @@ describe("getSession", () => {
 });
 
 describe("upsertSession", () => {
-  it("updates existing session when session exists", async () => {
+  it("calls upsert with correct payload", async () => {
     const { chain } = makeSupabaseMock();
-    chain.maybeSingle.mockResolvedValue({ data: { id: "sess-1" } });
 
     await upsertSession("598099999999", "booking_service", { serviceId: "s1" });
 
-    expect(chain.update).toHaveBeenCalledWith(
-      expect.objectContaining({ state: "booking_service", context_json: { serviceId: "s1" } })
+    expect(chain.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: "598099999999", state: "booking_service", context_json: { serviceId: "s1" } }),
+      { onConflict: "phone" }
     );
   });
 
-  it("inserts new session when none exists", async () => {
+  it("upserts with correct phone for new session", async () => {
     const { chain } = makeSupabaseMock();
-    chain.maybeSingle.mockResolvedValue({ data: null });
 
     await upsertSession("598011111111", "idle", {});
 
-    expect(chain.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ phone: "598011111111", state: "idle" })
+    expect(chain.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: "598011111111", state: "idle" }),
+      { onConflict: "phone" }
     );
   });
 });

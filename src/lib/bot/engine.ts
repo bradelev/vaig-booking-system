@@ -89,7 +89,7 @@ async function replyButtons(
 
 // ── State machine ─────────────────────────────────────────────────────────────
 
-export async function handleIncomingMessage(phone: string, messageText: string): Promise<void> {
+export async function handleIncomingMessage(phone: string, messageText: string, waMessageId: string): Promise<void> {
   // VBS-75: Blacklist check — silently ignore blocked clients
   const dbCheck = createAdminClient() as AnyClient;
   const { data: clientCheck } = await dbCheck
@@ -165,7 +165,7 @@ export async function handleIncomingMessage(phone: string, messageText: string):
   }
 
   try {
-    await route(phone, messageText, state, context, recentCampaign);
+    await route(phone, messageText, state, context, recentCampaign, waMessageId);
   } catch (err) {
     console.error("[Bot] Error in state machine:", err);
     await reply(phone, "Ocurrió un error. Por favor intentá nuevamente o escribí *hola* para empezar. 🙏");
@@ -187,7 +187,8 @@ async function route(
   text: string,
   state: BotConversationState,
   context: BookingFlowContext,
-  campaignCtx: RecentCampaign | null = null
+  campaignCtx: RecentCampaign | null = null,
+  waMessageId: string = ""
 ): Promise<void> {
   // Intercept "0" as back navigation when inside the booking flow
   if (isBackTrigger(text) && state in BOOKING_BACK_MAP) {
@@ -279,7 +280,7 @@ async function route(
     case "booking_client_email":
       return handleClientEmail(phone, text, context);
     case "booking_confirm":
-      return handleBookingConfirm(phone, text, context);
+      return handleBookingConfirm(phone, text, context, waMessageId);
     case "awaiting_reminder_confirm":
       return handleReminderConfirm(phone, text, context);
     case "pack_service":
@@ -1074,7 +1075,8 @@ async function showBookingConfirm(phone: string, context: BookingFlowContext): P
 async function handleBookingConfirm(
   phone: string,
   text: string,
-  context: BookingFlowContext
+  context: BookingFlowContext,
+  waMessageId: string = ""
 ): Promise<void> {
   const t = normalize(text);
 
@@ -1153,7 +1155,9 @@ async function handleBookingConfirm(
     }
   }
 
-  // Create booking
+  // Create booking — trigger_message_id makes the insert idempotent:
+  // a Meta webhook retry with the same wa_message_id hits the UNIQUE constraint
+  // (error 23505) and is silently ignored.
   const { data: booking, error: bookingError } = await dbClient
     .from("bookings")
     .insert({
@@ -1163,11 +1167,17 @@ async function handleBookingConfirm(
       scheduled_at: slot.start,
       status: "pending",
       client_package_id: clientPackageId,
+      ...(waMessageId ? { trigger_message_id: waMessageId } : {}),
     })
     .select("id")
     .single();
 
-  if (bookingError || !booking) {
+  if (bookingError) {
+    if ((bookingError as { code?: string }).code === "23505") return;
+    await reply(phone, "Hubo un error al crear la reserva. Por favor intentá más tarde. 😔");
+    return;
+  }
+  if (!booking) {
     await reply(phone, "Hubo un error al crear la reserva. Por favor intentá más tarde. 😔");
     return;
   }

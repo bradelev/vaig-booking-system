@@ -29,7 +29,8 @@ export default defineConfig({
         "src/lib/templates.ts",
         "src/lib/whatsapp/sanitize.ts",
         "src/lib/bot/llm.ts",
-        "src/lib/bot/intent.ts",
+        "src/lib/logger.ts",
+        "src/lib/whatsapp/retry.ts",
       ],
       exclude: [
         "src/**/*.d.ts",
