@@ -96,6 +96,9 @@ Para "time" usá formato 24h: "15:00", "10:30". Si no hay hora explícita, null.
 
 Mensaje: "${text.replace(/"/g, "'")}"`;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
   try {
     const response = await fetch(CLAUDE_API_URL, {
       method: "POST",
@@ -109,6 +112,7 @@ Mensaje: "${text.replace(/"/g, "'")}"`;
         max_tokens: 200,
         messages: [{ role: "user", content: prompt }],
       }),
+      signal: controller.signal,
     });
 
     if (!response.ok) return null;
@@ -145,7 +149,12 @@ Mensaje: "${text.replace(/"/g, "'")}"`;
       },
       confidence: Math.min(1, Math.max(0, parsed.confidence)),
     };
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      console.error("[Intent] LLM request timed out after 8s");
+    }
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

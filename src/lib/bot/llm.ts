@@ -24,36 +24,52 @@ function getApiKey(): string {
   return key;
 }
 
+const LLM_TIMEOUT_MS = 8000;
+
 export async function answerWithLLM(userMessage: string): Promise<string> {
   const knowledge = await buildKnowledgeBase();
   const context = formatKnowledgeForLLM(knowledge);
 
   const userContent = `Contexto del negocio:\n${context}\n\nPregunta del cliente:\n${userMessage}`;
 
-  const response = await fetch(CLAUDE_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": getApiKey(),
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userContent }],
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Claude API error ${response.status}: ${errorText}`);
+  try {
+    const response = await fetch(CLAUDE_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": getApiKey(),
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userContent }],
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Claude API error ${response.status}: ${errorText}`);
+    }
+
+    const data = (await response.json()) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    const text = data.content.find((c) => c.type === "text")?.text ?? "";
+    return text.trim();
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      console.error("[LLM] Request timed out after 8s");
+      throw new Error("LLM_TIMEOUT");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const data = (await response.json()) as {
-    content: Array<{ type: string; text: string }>;
-  };
-
-  const text = data.content.find((c) => c.type === "text")?.text ?? "";
-  return text.trim();
 }
