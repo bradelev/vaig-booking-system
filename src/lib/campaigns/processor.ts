@@ -80,6 +80,7 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
           await db.from("campaign_recipients").upsert({
             campaign_id: campaign.id,
             client_id: recipient.id,
+            status: "failed",
             error: "Placeholder phone — no real number",
           });
           continue;
