@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { logInboundMessage, updateMessageStatus } from "@/lib/whatsapp/log";
+import { formatWebhookError } from "@/lib/whatsapp/meta-errors";
+import { reconcileCampaignRecipientFromMessage } from "@/lib/campaigns/reconcile";
 
 // GET — webhook verification (Meta challenge)
 export function GET(request: NextRequest) {
@@ -67,6 +69,7 @@ export type WhatsAppWebhookPayload = {
           status: "sent" | "delivered" | "read" | "failed";
           timestamp: string;
           recipient_id: string;
+          errors?: Array<{ code: number; title?: string; message?: string; error_data?: { details?: string } }>;
         }>;
       };
       field: string;
@@ -79,6 +82,7 @@ export type WhatsAppStatusUpdate = {
   status: "sent" | "delivered" | "read" | "failed";
   timestamp: string;
   recipient_id: string;
+  errors?: Array<{ code: number; title?: string; message?: string; error_data?: { details?: string } }>;
 };
 
 export function parseWebhookPayload(payload: WhatsAppWebhookPayload): {
@@ -140,7 +144,15 @@ async function processMessages(messages: WhatsAppMessage[]): Promise<void> {
 async function processStatuses(statuses: WhatsAppStatusUpdate[]): Promise<void> {
   for (const s of statuses) {
     try {
-      await updateMessageStatus(s.id, s.status);
+      const { errorCode, errorMessage } = s.status === "failed"
+        ? formatWebhookError(s.errors)
+        : { errorCode: null, errorMessage: null };
+
+      const row = await updateMessageStatus(s.id, s.status, errorCode, errorMessage);
+
+      if (row) {
+        await reconcileCampaignRecipientFromMessage(row, s.status, errorCode, errorMessage);
+      }
     } catch (err) {
       console.error(`[WA Webhook] Failed to update status for ${s.id}:`, err);
     }

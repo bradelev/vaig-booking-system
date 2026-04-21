@@ -103,7 +103,7 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
             ],
           });
 
-          await sendTemplateMessage({
+          const waMessageId = await sendTemplateMessage({
             to: recipient.phone,
             templateName: campaign.image_url ? "campana_general_con_imagen" : "campana_general",
             languageCode: "es_UY",
@@ -114,6 +114,8 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
           await db.from("campaign_recipients").upsert({
             campaign_id: campaign.id,
             client_id: recipient.id,
+            wa_message_id: waMessageId,
+            status: "sent",
             sent_at: new Date().toISOString(),
             error: null,
           });
