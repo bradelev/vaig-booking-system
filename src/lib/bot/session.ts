@@ -51,29 +51,14 @@ export async function upsertSession(
   context: BookingFlowContext
 ): Promise<void> {
   const client = createAdminClient() as AnyClient;
-
-  // Check if session exists
-  const { data: existing } = await client
-    .from("conversation_sessions")
-    .select("id")
-    .eq("phone", phone)
-    .maybeSingle();
-
   const now = new Date().toISOString();
 
-  if (existing?.id) {
-    await client
-      .from("conversation_sessions")
-      .update({ state, context_json: context, last_message_at: now })
-      .eq("id", existing.id);
-  } else {
-    await client.from("conversation_sessions").insert({
-      phone,
-      state,
-      context_json: context,
-      last_message_at: now,
-    });
-  }
+  await client
+    .from("conversation_sessions")
+    .upsert(
+      { phone, state, context_json: context, last_message_at: now },
+      { onConflict: "phone" }
+    );
 }
 
 export async function clearSession(phone: string): Promise<void> {

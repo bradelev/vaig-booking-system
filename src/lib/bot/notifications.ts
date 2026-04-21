@@ -9,6 +9,7 @@
  */
 import { sendTextMessage, sendTemplateMessage } from "@/lib/whatsapp/logged";
 import { sanitizeTemplateParam } from "@/lib/whatsapp/sanitize";
+import { withRetry } from "@/lib/whatsapp/retry";
 import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { getConfigValue } from "@/lib/config";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
@@ -65,16 +66,19 @@ export async function notifyAdminNewBooking(params: NewBookingNotificationParams
     bookingId: `${params.bookingId.slice(0, 8)}...`,
   });
 
-  try {
-    await sendTemplateMessage({
-      to: adminPhone,
-      templateName: "campana_general",
-      languageCode: "es_UY",
-      components: [{ type: "body", parameters: [{ type: "text", text: "Admin" }, { type: "text", text: sanitizeTemplateParam(msg) }] }],
-    }, "admin_notification");
-  } catch (err) {
-    logger.error("notification: failed to send new booking to admin", { booking_id: params.bookingId, admin_phone: adminPhone, error: err instanceof Error ? err.message : String(err) });
-  }
+  await withRetry(
+    () =>
+      sendTemplateMessage(
+        {
+          to: adminPhone,
+          templateName: "campana_general",
+          languageCode: "es_UY",
+          components: [{ type: "body", parameters: [{ type: "text", text: "Admin" }, { type: "text", text: sanitizeTemplateParam(msg) }] }],
+        },
+        "admin_notification"
+      ),
+    { label: "notifyAdminNewBooking" }
+  );
 }
 
 export interface PackPurchasedNotificationParams {
@@ -189,16 +193,19 @@ export async function notifyBusinessNewBooking(
     (params.professionalName ? ` — ${params.professionalName}` : "") +
     `\n🕐 ${dateLabel}`;
 
-  try {
-    await sendTemplateMessage({
-      to: businessPhone,
-      templateName: "campana_general",
-      languageCode: "es_UY",
-      components: [{ type: "body", parameters: [{ type: "text", text: "VAIG" }, { type: "text", text: sanitizeTemplateParam(msg) }] }],
-    }, "admin_notification");
-  } catch (err) {
-    logger.error("notification: failed to send booking to business phone", { booking_id: params.bookingId, error: err instanceof Error ? err.message : String(err) });
-  }
+  await withRetry(
+    () =>
+      sendTemplateMessage(
+        {
+          to: businessPhone,
+          templateName: "campana_general",
+          languageCode: "es_UY",
+          components: [{ type: "body", parameters: [{ type: "text", text: "VAIG" }, { type: "text", text: sanitizeTemplateParam(msg) }] }],
+        },
+        "admin_notification"
+      ),
+    { label: "notifyBusinessNewBooking" }
+  );
 }
 
 export interface PaymentConfirmedNotificationParams {
@@ -244,14 +251,17 @@ export async function notifyAdminPaymentConfirmed(
     bookingId: `${params.bookingId.slice(0, 8)}...`,
   });
 
-  try {
-    await sendTemplateMessage({
-      to: adminPhone,
-      templateName: "campana_general",
-      languageCode: "es_UY",
-      components: [{ type: "body", parameters: [{ type: "text", text: "Admin" }, { type: "text", text: sanitizeTemplateParam(msg) }] }],
-    }, "admin_notification");
-  } catch (err) {
-    logger.error("notification: failed to send payment confirmation to admin", { booking_id: params.bookingId, error: err instanceof Error ? err.message : String(err) });
-  }
+  await withRetry(
+    () =>
+      sendTemplateMessage(
+        {
+          to: adminPhone,
+          templateName: "campana_general",
+          languageCode: "es_UY",
+          components: [{ type: "body", parameters: [{ type: "text", text: "Admin" }, { type: "text", text: sanitizeTemplateParam(msg) }] }],
+        },
+        "admin_notification"
+      ),
+    { label: "notifyAdminPaymentConfirmed" }
+  );
 }
