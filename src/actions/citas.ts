@@ -8,6 +8,7 @@ import { notifyWaitlistForSlot } from "@/lib/bot/engine";
 import { createBookingCalendarEvent, deleteBookingCalendarEvent } from "@/lib/gcal/bookings";
 import { artLocalInputToISO } from "@/lib/timezone";
 import { normalizePhone } from "@/lib/phone";
+import { checkAdminRateLimit } from "@/lib/admin-rate-limit";
 
 export type CancellationReason =
   | "client_request"
@@ -24,6 +25,12 @@ export async function cancelBooking(
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const rl = await checkAdminRateLimit(user.id);
+    if (!rl.allowed) throw new Error("Demasiadas solicitudes. Esperá un momento antes de continuar.");
+  }
 
   const { data: booking, error: fetchError } = await client
     .from("bookings")
@@ -129,6 +136,12 @@ export async function createBooking(formData: FormData) {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const rl = await checkAdminRateLimit(user.id);
+    if (!rl.allowed) throw new Error("Demasiadas solicitudes. Esperá un momento antes de continuar.");
+  }
 
   const { data: inserted, error } = await client
     .from("bookings")
@@ -319,6 +332,12 @@ export async function updateBooking(id: string, formData: FormData) {
   const supabase = await createClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const rl = await checkAdminRateLimit(user.id);
+    if (!rl.allowed) throw new Error("Demasiadas solicitudes. Esperá un momento antes de continuar.");
+  }
 
   const { error } = await client
     .from("bookings")

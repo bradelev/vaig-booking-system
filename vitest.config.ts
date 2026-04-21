@@ -31,6 +31,7 @@ export default defineConfig({
         "src/lib/bot/llm.ts",
         "src/lib/logger.ts",
         "src/lib/whatsapp/retry.ts",
+        "src/lib/admin-rate-limit.ts",
       ],
       exclude: [
         "src/**/*.d.ts",
