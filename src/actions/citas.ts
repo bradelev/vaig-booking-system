@@ -120,15 +120,23 @@ export async function updateBookingStatus(id: string, status: string) {
     if (booking?.client_package_id) {
       const { data: cp } = await client
         .from("client_packages")
-        .select("sessions_used")
+        .select("sessions_used, sessions_total")
         .eq("id", booking.client_package_id)
         .single();
 
       if (cp) {
-        await client
-          .from("client_packages")
-          .update({ sessions_used: cp.sessions_used + 1 })
-          .eq("id", booking.client_package_id);
+        if (cp.sessions_used >= cp.sessions_total) {
+          logger.warn("sessions_used at cap, skipping increment", {
+            client_package_id: booking.client_package_id,
+            sessions_used: cp.sessions_used,
+            sessions_total: cp.sessions_total,
+          });
+        } else {
+          await client
+            .from("client_packages")
+            .update({ sessions_used: cp.sessions_used + 1 })
+            .eq("id", booking.client_package_id);
+        }
       }
     }
   }
@@ -465,14 +473,22 @@ export async function updateBookingInline(
   if (newStatus === "realized" && oldStatus !== "realized" && current.client_package_id) {
     const { data: cp } = await client
       .from("client_packages")
-      .select("sessions_used")
+      .select("sessions_used, sessions_total")
       .eq("id", current.client_package_id)
       .single();
     if (cp) {
-      await client
-        .from("client_packages")
-        .update({ sessions_used: cp.sessions_used + 1 })
-        .eq("id", current.client_package_id);
+      if (cp.sessions_used >= cp.sessions_total) {
+        logger.warn("sessions_used at cap, skipping increment", {
+          client_package_id: current.client_package_id,
+          sessions_used: cp.sessions_used,
+          sessions_total: cp.sessions_total,
+        });
+      } else {
+        await client
+          .from("client_packages")
+          .update({ sessions_used: cp.sessions_used + 1 })
+          .eq("id", current.client_package_id);
+      }
     }
   }
 
