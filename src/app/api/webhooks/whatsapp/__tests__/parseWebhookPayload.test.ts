@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { parseWebhookPayload } from "../route";
 import type { WhatsAppWebhookPayload } from "../route";
+import { isValidMessage, isValidStatusUpdate, isValidWebhookEntry } from "@/lib/whatsapp/payload-guards";
 
 function makePayload(messages?: WhatsAppWebhookPayload["entry"][0]["changes"][0]["value"]["messages"]): WhatsAppWebhookPayload {
   return {
@@ -220,5 +221,154 @@ describe("parseWebhookPayload", () => {
     };
     const { messages: result } = parseWebhookPayload(payload);
     expect(result.length).toBe(0);
+  });
+});
+
+describe("isValidMessage", () => {
+  it("returns true for a valid text message", () => {
+    expect(isValidMessage({ id: "msg-1", from: "5491100001111", timestamp: "1700000000", type: "text", text: { body: "Hi" } })).toBe(true);
+  });
+
+  it("returns false when id is missing", () => {
+    expect(isValidMessage({ from: "5491100001111", timestamp: "1700000000", type: "text" })).toBe(false);
+  });
+
+  it("returns false when id is an empty string", () => {
+    expect(isValidMessage({ id: "", from: "5491100001111", timestamp: "1700000000", type: "text" })).toBe(false);
+  });
+
+  it("returns false when from is missing", () => {
+    expect(isValidMessage({ id: "msg-1", timestamp: "1700000000", type: "text" })).toBe(false);
+  });
+
+  it("returns false when from is an empty string", () => {
+    expect(isValidMessage({ id: "msg-1", from: "", timestamp: "1700000000", type: "text" })).toBe(false);
+  });
+
+  it("returns false when type is missing", () => {
+    expect(isValidMessage({ id: "msg-1", from: "5491100001111", timestamp: "1700000000" })).toBe(false);
+  });
+
+  it("returns false when timestamp is missing", () => {
+    expect(isValidMessage({ id: "msg-1", from: "5491100001111", type: "text" })).toBe(false);
+  });
+
+  it("returns false for null", () => {
+    expect(isValidMessage(null)).toBe(false);
+  });
+
+  it("returns false for a primitive", () => {
+    expect(isValidMessage("not-an-object")).toBe(false);
+  });
+});
+
+describe("isValidStatusUpdate", () => {
+  it("returns true for a valid status update", () => {
+    expect(isValidStatusUpdate({ id: "wamid-1", status: "delivered", timestamp: "1700000000", recipient_id: "5491100001111" })).toBe(true);
+  });
+
+  it("returns false when id is missing", () => {
+    expect(isValidStatusUpdate({ status: "delivered", timestamp: "1700000000", recipient_id: "5491100001111" })).toBe(false);
+  });
+
+  it("returns false when recipient_id is missing", () => {
+    expect(isValidStatusUpdate({ id: "wamid-1", status: "delivered", timestamp: "1700000000" })).toBe(false);
+  });
+
+  it("returns false when recipient_id is empty", () => {
+    expect(isValidStatusUpdate({ id: "wamid-1", status: "delivered", timestamp: "1700000000", recipient_id: "" })).toBe(false);
+  });
+
+  it("returns false for null", () => {
+    expect(isValidStatusUpdate(null)).toBe(false);
+  });
+});
+
+describe("isValidWebhookEntry", () => {
+  it("returns true for a valid entry", () => {
+    expect(isValidWebhookEntry({ id: "entry-1", changes: [] })).toBe(true);
+  });
+
+  it("returns false when id is missing", () => {
+    expect(isValidWebhookEntry({ changes: [] })).toBe(false);
+  });
+
+  it("returns false when changes is not an array", () => {
+    expect(isValidWebhookEntry({ id: "entry-1", changes: "nope" })).toBe(false);
+  });
+
+  it("returns false for null", () => {
+    expect(isValidWebhookEntry(null)).toBe(false);
+  });
+});
+
+describe("parseWebhookPayload — guard integration", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("drops a message missing id and logs a warning", () => {
+    const warnSpy = vi.spyOn(console, "warn");
+    const payload: WhatsAppWebhookPayload = {
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          id: "entry-1",
+          changes: [
+            {
+              field: "messages",
+              value: {
+                messaging_product: "whatsapp",
+                metadata: { display_phone_number: "1234567890", phone_number_id: "phone-1" },
+                messages: [
+                  { id: "msg-ok", from: "111", timestamp: "1700000000", type: "text", text: { body: "Good" } },
+                  // Cast so TS lets us pass a malformed object to test the guard
+                  { from: "222", timestamp: "1700000001", type: "text", text: { body: "Bad" } } as unknown as WhatsAppWebhookPayload["entry"][0]["changes"][0]["value"]["messages"] extends (infer T)[] ? T : never,
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const { messages } = parseWebhookPayload(payload);
+    expect(messages.length).toBe(1);
+    expect(messages[0].id).toBe("msg-ok");
+    const warnArg = warnSpy.mock.calls.map((c) => c.join(" ")).find((s) => s.includes("dropped malformed message"));
+    expect(warnArg).toBeDefined();
+  });
+
+  it("drops a status update missing recipient_id and logs a warning", () => {
+    const warnSpy = vi.spyOn(console, "warn");
+    const payload: WhatsAppWebhookPayload = {
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          id: "entry-1",
+          changes: [
+            {
+              field: "messages",
+              value: {
+                messaging_product: "whatsapp",
+                metadata: { display_phone_number: "1234567890", phone_number_id: "phone-1" },
+                statuses: [
+                  { id: "wamid-ok", status: "delivered", timestamp: "1700000000", recipient_id: "5491100001111" },
+                  { id: "wamid-bad", status: "delivered", timestamp: "1700000001", recipient_id: "" } as unknown as WhatsAppWebhookPayload["entry"][0]["changes"][0]["value"]["statuses"] extends (infer T)[] | undefined ? T : never,
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const { statuses } = parseWebhookPayload(payload);
+    expect(statuses.length).toBe(1);
+    expect(statuses[0].id).toBe("wamid-ok");
+    const warnArg = warnSpy.mock.calls.map((c) => c.join(" ")).find((s) => s.includes("dropped malformed status"));
+    expect(warnArg).toBeDefined();
   });
 });
