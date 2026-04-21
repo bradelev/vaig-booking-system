@@ -123,15 +123,34 @@ export async function logInboundMessage({
   }
 }
 
-/** Update message delivery status from webhook status callback. */
+export type MessageRow = {
+  id: string;
+  client_id: string | null;
+  source: MessageSource;
+  wa_message_id: string | null;
+};
+
+/** Update message delivery status from webhook status callback.
+ *  When status is "failed", errorCode and errorMessage are persisted.
+ *  Returns the updated row (for downstream reconciliation), or null if not found.
+ */
 export async function updateMessageStatus(
   waMessageId: string,
-  status: MessageStatus
-): Promise<void> {
+  status: MessageStatus,
+  errorCode?: number | null,
+  errorMessage?: string | null
+): Promise<MessageRow | null> {
   const db = createAdminClient();
+  const update: Record<string, unknown> = { status };
+  if (status === "failed" && errorMessage) {
+    update.error_message = errorMessage;
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db as any)
+  const { data } = await (db as any)
     .from("messages")
-    .update({ status })
-    .eq("wa_message_id", waMessageId);
+    .update(update)
+    .eq("wa_message_id", waMessageId)
+    .select("id, client_id, source, wa_message_id")
+    .maybeSingle();
+  return (data as MessageRow | null) ?? null;
 }

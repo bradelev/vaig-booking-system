@@ -155,6 +155,48 @@ describe("parseWebhookPayload", () => {
     expect(result.length).toBe(2);
   });
 
+  it("propagates errors[] from a failed status update", () => {
+    const payload: WhatsAppWebhookPayload = {
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          id: "entry-1",
+          changes: [
+            {
+              field: "messages",
+              value: {
+                messaging_product: "whatsapp",
+                metadata: { display_phone_number: "1234567890", phone_number_id: "phone-1" },
+                statuses: [
+                  {
+                    id: "wamid.abc123",
+                    status: "failed",
+                    timestamp: "1700000005",
+                    recipient_id: "59898626616",
+                    errors: [
+                      {
+                        code: 131026,
+                        title: "Message undeliverable",
+                        message: "Number is not on WhatsApp",
+                        error_data: { details: "Not a valid WA number" },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const { statuses } = parseWebhookPayload(payload);
+    expect(statuses.length).toBe(1);
+    expect(statuses[0].status).toBe("failed");
+    expect(statuses[0].errors).toHaveLength(1);
+    expect(statuses[0].errors![0].code).toBe(131026);
+    expect(statuses[0].errors![0].error_data?.details).toBe("Not a valid WA number");
+  });
+
   it("ignores changes with field other than 'messages'", () => {
     const payload: WhatsAppWebhookPayload = {
       object: "whatsapp_business_account",
