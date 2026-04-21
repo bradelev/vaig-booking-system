@@ -134,7 +134,7 @@ async function processMessages(messages: WhatsAppMessage[]): Promise<void> {
     }
 
     try {
-      await handleIncomingMessage(msg.from, text);
+      await handleIncomingMessage(msg.from, text, msg.id);
     } catch (err) {
       console.error(`[WA Webhook] Error processing message from ${msg.from}:`, err);
     }
