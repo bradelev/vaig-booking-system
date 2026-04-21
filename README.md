@@ -24,9 +24,9 @@ A production system handling 1,300+ clients and 4,700+ appointments — built wi
 |--------|-------|
 | Clients managed | 1,300+ |
 | Appointments tracked | 4,700+ |
-| Database migrations | 56 |
+| Database migrations | 58 |
 | Admin modules | 15 |
-| Test suites | 8 files across 5 domains |
+| Unit + integration tests | 400+ across 25 test files |
 | Integrations | WhatsApp, Google Calendar, Mercado Pago, Claude AI, Cloudinary |
 
 <div align="center">
@@ -80,6 +80,19 @@ flowchart TB
     Auth --> Pages
     PGCron -->|"triggers"| Crons
 ```
+
+### Reliability Patterns
+
+| Pattern | Implementation |
+|---------|---------------|
+| **Webhook idempotency** | `trigger_message_id UNIQUE` on bookings (WA); `mp_payment_id UNIQUE` on bookings (MP) |
+| **Retry with backoff** | `withRetry()` in `src/lib/whatsapp/retry.ts` — exponential backoff on critical WA notifications |
+| **Claude API circuit breaker** | 8-second `AbortController` timeout on all LLM calls; user-friendly fallback on timeout |
+| **Atomic payment confirmation** | MP webhook uses a single `UPDATE … WHERE status = 'pending'` to eliminate race conditions |
+| **Structured logging** | `src/lib/logger.ts` — JSON to stdout in production, readable prefixed output in development |
+| **Admin rate limiting** | 60 requests/min per authenticated user on all booking mutation server actions |
+| **Service health check** | `GET /api/health` — Supabase connectivity probe; returns `200` or `503` for uptime monitors |
+| **Data cleanup cron** | `GET /api/internal/cleanup` — daily at 3 AM UTC, deletes sessions >30 days and messages >90 days |
 
 ---
 
@@ -179,7 +192,8 @@ src/
 ├── actions/              # Server Actions (booking, client, service mutations)
 ├── app/
 │   ├── api/
-│   │   ├── internal/     # Cron job endpoints (reminders, surveys, auto-cancel)
+│   │   ├── health/       # GET — Supabase connectivity probe (200/503)
+│   │   ├── internal/     # Cron job endpoints (reminders, surveys, cleanup)
 │   │   ├── sesiones/     # Session export (XLSX download)
 │   │   └── webhooks/     # WhatsApp & Mercado Pago webhook handlers
 │   ├── backoffice/       # 15 admin modules (auth-protected)
@@ -190,16 +204,17 @@ src/
 └── lib/
     ├── bot/              # Chatbot engine (state machine, intent, date parser)
     ├── campaigns/        # Bulk WhatsApp message processor
+    ├── logger.ts         # Structured JSON logger (prod: JSON stdout, dev: readable prefix)
     ├── constants/        # Segment definitions, service categories
     ├── gcal/             # Google Calendar client & import engine
     ├── koobing/          # Koobing legacy system import
     ├── payments/         # Mercado Pago client
     ├── scheduler/        # Availability calculator (pure functions)
     ├── supabase/         # Supabase clients (server, admin, middleware)
-    └── whatsapp/         # WhatsApp Business API client (logged send wrappers)
+    └── whatsapp/         # WhatsApp Business API client (logged send wrappers, retry logic)
 
 supabase/
-└── migrations/           # 56 SQL migrations (enums → views → RLS policies)
+└── migrations/           # 58 SQL migrations (enums → views → RLS policies → unique constraints)
 
 scripts/                  # Import & migration CLI tools
 ```
@@ -283,7 +298,7 @@ The bot uses a **campaign-aware** greeting: if the client received a WhatsApp ca
 <details>
 <summary><strong>Database Schema Overview</strong></summary>
 
-**56 migrations** covering:
+**58 migrations** covering:
 
 - **Core tables**: `clients`, `services`, `professionals`, `bookings`, `client_packages`
 - **Bot tables**: `conversation_sessions`, `messages` (with WhatsApp message tracking)
@@ -292,7 +307,8 @@ The bot uses a **campaign-aware** greeting: if the client received a WhatsApp ca
 - **Views**: `clientes_metricas` (complex CTE with segmentation), `inbox_conversations` (joins for inbox UI)
 - **Enums**: `booking_status`, `payment_method`, `client_source`
 - **RLS**: Row-level security enabled on all tables
-- **Indexes**: Optimized for common query patterns (phone lookup, date ranges, status filters)
+- **Indexes**: Optimized for common query patterns (phone lookup, date ranges, status filters); `clients_phone_idx` for bot lookups
+- **Unique constraints**: `conversation_sessions.phone` (upsert race-free), `bookings.trigger_message_id` (WA idempotency), `bookings.mp_payment_id` (MP idempotency)
 
 </details>
 
@@ -350,15 +366,17 @@ npm run lint      # ESLint
 npx tsc --noEmit  # Type checking
 ```
 
-Test coverage spans 5 domains:
+Test coverage spans 5 domains with 400+ assertions across 25 test files:
 
 | Domain | What's tested |
 |--------|---------------|
 | Scheduler | Slot availability, time formatting, schedule overrides |
-| Bot | Engine routing, state transitions, helper functions |
+| Bot | Engine routing, state transitions, date parser, intent detection, handoff, rate-limit |
 | Webhooks | WhatsApp signature verification, payload parsing |
 | Payments | Mercado Pago webhook processing |
-| Actions | Booking CRUD operations |
+| Actions | Booking CRUD operations, client and session mutations |
+
+An **E2E bot integration test** (12 scenarios) covers the full booking flow end-to-end: idle → service selection → professional selection → slot selection → confirmation → payment link generation.
 
 ---
 
