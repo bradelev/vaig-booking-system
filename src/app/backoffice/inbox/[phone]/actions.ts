@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { sendTextMessage } from "@/lib/whatsapp/logged";
 import { activateHandoff, releaseHandoff } from "@/lib/bot/handoff";
+import { logger } from "@/lib/logger";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
@@ -22,7 +23,7 @@ export async function sendAdminReply(
     await sendTextMessage({ to: phone, body: body.trim() }, "admin_manual");
     return { success: true };
   } catch (err) {
-    console.error("[Inbox] Failed to send admin reply:", err);
+    logger.error("[Inbox] Failed to send admin reply", { phone, error: err instanceof Error ? err.message : String(err) });
     return { success: false, error: err instanceof Error ? err.message : "Error al enviar" };
   }
 }
@@ -38,7 +39,7 @@ export async function activateHandoffAction(
     await activateHandoff(phone);
     return { success: true };
   } catch (err) {
-    console.error("[Inbox] Failed to activate handoff:", err);
+    logger.error("[Inbox] Failed to activate handoff", { phone, error: err instanceof Error ? err.message : String(err) });
     return { success: false, error: err instanceof Error ? err.message : "Error" };
   }
 }
@@ -54,7 +55,7 @@ export async function releaseHandoffAction(
     await releaseHandoff(phone);
     return { success: true };
   } catch (err) {
-    console.error("[Inbox] Failed to release handoff:", err);
+    logger.error("[Inbox] Failed to release handoff", { phone, error: err instanceof Error ? err.message : String(err) });
     return { success: false, error: err instanceof Error ? err.message : "Error" };
   }
 }
@@ -72,6 +73,6 @@ export async function markAsRead(phone: string): Promise<void> {
       .eq("direction", "inbound")
       .is("admin_read_at", null);
   } catch (err) {
-    console.error("[Inbox] Failed to mark as read:", err);
+    logger.error("[Inbox] Failed to mark as read", { phone, error: err instanceof Error ? err.message : String(err) });
   }
 }

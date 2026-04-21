@@ -145,6 +145,12 @@ export async function handlePaymentNotification(paymentId: string, _payload?: st
       scheduledAt: bookingData.scheduled_at,
       amount: Number(bookingData.services?.deposit_amount ?? 0),
       method: "mercadopago",
+    }).catch((err: unknown) => {
+      logger.error("MP webhook: notifyAdminPaymentConfirmed failed after retries", {
+        booking_id: bookingId,
+        payment_id: mpPaymentId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
   }
 }
@@ -178,9 +184,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ctx = (globalThis as any)[Symbol.for("next.request.context")];
   if (ctx?.waitUntil) {
-    ctx.waitUntil(handlePaymentNotification(dataId));
+    ctx.waitUntil(
+      handlePaymentNotification(dataId).catch((err: unknown) => {
+        logger.error("MP payment notification handler failed", {
+          data_id: dataId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      })
+    );
   } else {
-    void handlePaymentNotification(dataId);
+    void handlePaymentNotification(dataId).catch((err: unknown) => {
+      logger.error("MP payment notification handler failed", {
+        data_id: dataId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
   }
 
   return NextResponse.json({ status: "ok" }, { status: 200 });
