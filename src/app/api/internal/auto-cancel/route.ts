@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const authHeader = request.headers.get("authorization");
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     .lt("created_at", cutoff);
 
   if (fetchError) {
-    console.error("[Auto-cancel] Failed to fetch expired bookings:", fetchError);
+    logger.error("Auto-cancel failed to fetch expired bookings", { error: fetchError.message });
     return NextResponse.json({ error: fetchError.message }, { status: 500 });
   }
 
@@ -44,10 +45,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     .in("id", ids);
 
   if (updateError) {
-    console.error("[Auto-cancel] Failed to cancel bookings:", updateError);
+    logger.error("Auto-cancel failed to update bookings", { error: updateError.message });
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  console.log(`[Auto-cancel] Cancelled ${ids.length} expired booking(s)`);
+  logger.info("Auto-cancel completed", { cancelled: ids.length });
   return NextResponse.json({ cancelled: ids.length });
 }

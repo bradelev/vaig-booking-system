@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 import { syncSheetHistorico } from "@/lib/sheet-historico/import-engine";
 
 /**
@@ -26,7 +27,7 @@ export async function POST(): Promise<NextResponse> {
     return NextResponse.json(result);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[Sheet Sync] Error:", message);
+    logger.error("Sheet sync failed", { error: message });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 import { importKoobingAppointments } from "@/lib/koobing/import-engine";
 
 /**
@@ -52,7 +53,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(result);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[Koobing Import] Error:", message);
+    logger.error("Koobing import failed", { error: message });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -4,6 +4,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LOCAL_TIMEZONE } from "@/lib/timezone";
+import { logger } from "@/lib/logger";
 import { createCalendarEvent, deleteCalendarEvent } from "./index";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,7 +34,7 @@ export async function createBookingCalendarEvent(bookingId: string): Promise<voi
     .single();
 
   if (error || !booking) {
-    console.error(`[GCal] Failed to fetch booking ${bookingId}:`, error);
+    logger.error("Failed to fetch booking for GCal event creation", { booking_id: bookingId, error: error?.message ?? "not found" });
     return;
   }
 
@@ -65,9 +66,9 @@ export async function createBookingCalendarEvent(bookingId: string): Promise<voi
     });
 
     await client.from("bookings").update({ gcal_event_id: eventId }).eq("id", bookingId);
-    console.log(`[GCal] Event created for booking ${bookingId}: ${eventId}`);
+    logger.info("GCal event created for booking", { booking_id: bookingId, gcal_event_id: eventId });
   } catch (err) {
-    console.error(`[GCal] Failed to create event for booking ${bookingId}:`, err);
+    logger.error("Failed to create GCal event for booking", { booking_id: bookingId, error: err instanceof Error ? err.message : String(err) });
   }
 }
 
@@ -91,8 +92,8 @@ export async function deleteBookingCalendarEvent(bookingId: string): Promise<voi
   try {
     await deleteCalendarEvent(booking.gcal_event_id);
     await client.from("bookings").update({ gcal_event_id: null }).eq("id", bookingId);
-    console.log(`[GCal] Event deleted for booking ${bookingId}`);
+    logger.info("GCal event deleted for booking", { booking_id: bookingId });
   } catch (err) {
-    console.error(`[GCal] Failed to delete event for booking ${bookingId}:`, err);
+    logger.error("Failed to delete GCal event for booking", { booking_id: bookingId, error: err instanceof Error ? err.message : String(err) });
   }
 }

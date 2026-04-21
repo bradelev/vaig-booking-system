@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
+import { logger } from "@/lib/logger";
 import { sendTextMessage } from "@/lib/whatsapp/logged";
 import { upsertSession } from "@/lib/bot/session";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     .lte("scheduled_at", windowEnd);
 
   if (error) {
-    console.error("[Reminder] Failed to fetch bookings:", error);
+    logger.error("Reminder cron failed to fetch bookings", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -89,12 +90,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       await upsertSession(targetPhone, "awaiting_reminder_confirm", { pendingBookingId: booking.id });
       sent++;
     } catch (err) {
-      console.error(`[Reminder] Failed for booking ${booking.id}:`, err);
+      logger.error("Client reminder send failed", { booking_id: booking.id, error: err instanceof Error ? err.message : String(err) });
       failed++;
     }
   }
 
-  console.log(`[Reminder] Client reminders — Sent: ${sent}, Failed: ${failed}`);
+  logger.info("Client reminders sent", { sent, failed });
 
   // ── Professional reminders ──────────────────────────────────────────────────
   // Send each professional with a phone number a summary of their confirmed
@@ -152,11 +153,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       await sendTextMessage({ to: profTargetPhone, body: profMsg }, "cron_reminder");
       profSent++;
     } catch (err) {
-      console.error(`[Reminder] Professional ${prof.name} failed:`, err);
+      logger.error("Professional reminder send failed", { professional: prof.name, error: err instanceof Error ? err.message : String(err) });
       profFailed++;
     }
   }
 
-  console.log(`[Reminder] Professional reminders — Sent: ${profSent}, Failed: ${profFailed}`);
+  logger.info("Professional reminders sent", { sent: profSent, failed: profFailed });
   return NextResponse.json({ sent, failed, profSent, profFailed });
 }

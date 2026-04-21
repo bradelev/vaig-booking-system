@@ -9,6 +9,7 @@
  */
 
 import { artDateTime, getARTComponents, LOCAL_TIMEZONE } from "@/lib/timezone";
+import { logger } from "@/lib/logger";
 
 const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5-20251001";
@@ -227,7 +228,7 @@ Mensaje: "${text.replace(/"/g, "'")}"`;
     return artDateTime(candidate, parsed.hour, parsed.minute ?? 0);
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      console.error("[DateParser] LLM request timed out after 8s");
+      logger.error("Date parser LLM request timed out", { timeout_ms: 8000 });
     }
     return null;
   } finally {

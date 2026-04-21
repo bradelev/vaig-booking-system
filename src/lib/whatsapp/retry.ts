@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 interface RetryOptions {
   maxAttempts?: number;
   baseDelayMs?: number;
@@ -26,10 +28,10 @@ export async function withRetry<T>(
     }
   }
 
-  console.error(
-    `[Retry] Final failure after ${maxAttempts} attempts:`,
+  logger.error("Final failure after max retry attempts", {
     label,
-    lastError
-  );
+    max_attempts: maxAttempts,
+    error: lastError instanceof Error ? lastError.message : String(lastError),
+  });
   return undefined;
 }
