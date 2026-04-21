@@ -35,19 +35,19 @@ export function verifySignature(
 
 // payload parameter kept for future use (e.g. raw body logging)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function handlePaymentNotification(paymentId: string, _payload?: string): Promise<void> {
+export async function handlePaymentNotification(paymentId: string, _payload?: string): Promise<void> {
   const payment = await fetchMPPayment(paymentId);
   const externalRef = payment.external_reference;
 
   if (!externalRef) {
-    console.warn("[MP Webhook] Payment without external_reference:", paymentId);
+    logger.warn("MP webhook: payment without external_reference", { payment_id: paymentId });
     return;
   }
 
   // VBS-69: Pack purchase payments use "pack:{clientPackageId}" as external_reference
   if (externalRef.startsWith("pack:")) {
     if (payment.status !== "approved") {
-      console.log(`[MP Webhook] Pack payment ${paymentId} status: ${payment.status} (no action)`);
+      logger.info("MP webhook: pack payment not approved", { payment_id: paymentId, status: payment.status });
       return;
     }
 
@@ -66,7 +66,7 @@ async function handlePaymentNotification(paymentId: string, _payload?: string): 
       return;
     }
 
-    console.log(`[MP Webhook] Pack ${clientPackageId} activated`);
+    logger.info("MP webhook: pack activated", { client_package_id: clientPackageId });
 
     // Notify client
     const { data: cpData } = await db
@@ -87,46 +87,65 @@ async function handlePaymentNotification(paymentId: string, _payload?: string): 
     return;
   }
 
+  if (payment.status !== "approved") {
+    logger.info("MP webhook: payment not approved", { payment_id: paymentId, status: payment.status });
+    return;
+  }
+
   const bookingId = externalRef;
+  // MP payment id is a number; store as string for idempotency index
+  const mpPaymentId = String(payment.id);
 
-  if (payment.status === "approved") {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = createAdminClient() as any;
-    const { error } = await db
-      .from("bookings")
-      .update({
-        status: "deposit_paid",
-        deposit_paid_at: payment.date_approved ?? new Date().toISOString(),
-      })
-      .eq("id", bookingId)
-      .eq("status", "pending"); // Only update if still pending
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = createAdminClient() as any;
 
-    if (error) {
-      logger.error("MP webhook: failed to update booking", { booking_id: bookingId, payment_id: paymentId, error: error.message });
-    } else {
-      console.log(`[MP Webhook] Booking ${bookingId} marked as deposit_paid`);
+  // Idempotency guard: if this payment_id is already recorded on any booking, it was already processed
+  const { data: existing } = await db
+    .from("bookings")
+    .select("id")
+    .eq("mp_payment_id", mpPaymentId)
+    .maybeSingle();
 
-      // VBS-50: Notify admin of confirmed payment
-      const { data: bookingData } = await db
-        .from("bookings")
-        .select("scheduled_at, clients(first_name, last_name, phone), services(name, deposit_amount)")
-        .eq("id", bookingId)
-        .single();
+  if (existing) {
+    logger.info("MP webhook: payment already processed (idempotent)", { payment_id: mpPaymentId, booking_id: existing.id });
+    return;
+  }
 
-      if (bookingData) {
-        void notifyAdminPaymentConfirmed({
-          bookingId,
-          clientName: `${bookingData.clients?.first_name ?? ""} ${bookingData.clients?.last_name ?? ""}`.trim(),
-          clientPhone: bookingData.clients?.phone ?? "",
-          serviceName: bookingData.services?.name ?? "",
-          scheduledAt: bookingData.scheduled_at,
-          amount: Number(bookingData.services?.deposit_amount ?? 0),
-          method: "mercadopago",
-        });
-      }
+  // Atomic update: only transitions pending → deposit_paid; no rows matched = race condition or already updated
+  const { data: bookingData, error } = await db
+    .from("bookings")
+    .update({
+      status: "deposit_paid",
+      mp_payment_id: mpPaymentId,
+      deposit_paid_at: payment.date_approved ?? new Date().toISOString(),
+    })
+    .eq("id", bookingId)
+    .eq("status", "pending")
+    .select("scheduled_at, clients(first_name, last_name, phone), services(name, deposit_amount)")
+    .single();
+
+  if (error) {
+    // PGRST116 = no rows matched: booking was already transitioned by a concurrent webhook delivery
+    if ((error as { code?: string }).code === "PGRST116") {
+      logger.info("MP webhook: booking already transitioned (race condition handled)", { booking_id: bookingId, payment_id: mpPaymentId });
+      return;
     }
-  } else {
-    console.log(`[MP Webhook] Payment ${paymentId} status: ${payment.status} (no action)`);
+    logger.error("MP webhook: failed to update booking", { booking_id: bookingId, payment_id: mpPaymentId, error: error.message });
+    return;
+  }
+
+  logger.info("MP webhook: booking marked as deposit_paid", { booking_id: bookingId, payment_id: mpPaymentId });
+
+  if (bookingData) {
+    void notifyAdminPaymentConfirmed({
+      bookingId,
+      clientName: `${bookingData.clients?.first_name ?? ""} ${bookingData.clients?.last_name ?? ""}`.trim(),
+      clientPhone: bookingData.clients?.phone ?? "",
+      serviceName: bookingData.services?.name ?? "",
+      scheduledAt: bookingData.scheduled_at,
+      amount: Number(bookingData.services?.deposit_amount ?? 0),
+      method: "mercadopago",
+    });
   }
 }
 
