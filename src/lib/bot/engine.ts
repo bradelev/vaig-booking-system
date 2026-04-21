@@ -490,6 +490,10 @@ async function handleInfoFlow(phone: string, text: string): Promise<void> {
       await reply(phone, answer + "\n\n_Escribí *agendar* para reservar un turno o *hola* para el menú._");
       return;
     } catch (err) {
+      if (err instanceof Error && err.message === "LLM_TIMEOUT") {
+        await reply(phone, "Estoy teniendo dificultades técnicas en este momento. Escribí *agendar* para reservar o *mis turnos* para ver tus citas.");
+        return;
+      }
       console.error("[Bot] LLM error:", err);
       // Fall through to menu
     }

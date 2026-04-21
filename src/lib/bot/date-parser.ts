@@ -165,6 +165,8 @@ function looksTemporalButRegexFailed(text: string): boolean {
   return TEMPORAL_HINTS.some((hint) => t.includes(hint)) || /\d/.test(t);
 }
 
+const LLM_TIMEOUT_MS = 8000;
+
 /**
  * Tier 2: LLM-based date parser for complex/ambiguous natural language.
  * Only called when Tier 1 returns null and the text looks temporal.
@@ -187,6 +189,9 @@ Formato: { "date": "YYYY-MM-DD", "hour": HH, "minute": MM }
 
 Mensaje: "${text.replace(/"/g, "'")}"`;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
+
   try {
     const response = await fetch(CLAUDE_API_URL, {
       method: "POST",
@@ -200,6 +205,7 @@ Mensaje: "${text.replace(/"/g, "'")}"`;
         max_tokens: 80,
         messages: [{ role: "user", content: prompt }],
       }),
+      signal: controller.signal,
     });
 
     if (!response.ok) return null;
@@ -219,8 +225,13 @@ Mensaje: "${text.replace(/"/g, "'")}"`;
     const [year, month, day] = parsed.date.split("-").map(Number);
     const candidate = new Date(year, month - 1, day);
     return artDateTime(candidate, parsed.hour, parsed.minute ?? 0);
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      console.error("[DateParser] LLM request timed out after 8s");
+    }
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

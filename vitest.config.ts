@@ -28,6 +28,8 @@ export default defineConfig({
         "src/lib/utils.ts",
         "src/lib/templates.ts",
         "src/lib/whatsapp/sanitize.ts",
+        "src/lib/bot/llm.ts",
+        "src/lib/bot/intent.ts",
       ],
       exclude: [
         "src/**/*.d.ts",
