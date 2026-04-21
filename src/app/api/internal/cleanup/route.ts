@@ -16,8 +16,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const sessionDays = parseInt(sessionDaysStr, 10);
   const messageDays = parseInt(messageDaysStr, 10);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = createAdminClient() as any;
+  const client = createAdminClient();
 
   const sessionCutoff = new Date(Date.now() - sessionDays * 86_400_000).toISOString();
   const { data: deletedSessions, error: sessionError } = await client

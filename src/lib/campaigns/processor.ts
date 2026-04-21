@@ -10,9 +10,7 @@ function sleep(ms: number) {
 }
 
 export async function processDueCampaigns(): Promise<{ processed: number; errors: string[] }> {
-  const supabase = createAdminClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
+  const db = createAdminClient();
 
   const errors: string[] = [];
   let processed = 0;
@@ -36,7 +34,16 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
     return { processed: 0, errors: [`Failed to fetch campaigns: ${fetchError.message}`] };
   }
 
-  for (const campaign of campaigns ?? []) {
+  type CampaignRow = {
+    id: string;
+    name: string;
+    body: string;
+    image_url: string | null;
+    target_all: boolean;
+    total_recipients: number | null;
+  };
+
+  for (const campaign of (campaigns ?? []) as unknown as CampaignRow[]) {
     // Mark as sending
     await db.from("campaigns").update({ status: "sending" }).eq("id", campaign.id);
 
@@ -49,7 +56,7 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
           .from("clients")
           .select("id, phone, first_name")
           .eq("is_blocked", false);
-        recipients = data ?? [];
+        recipients = (data ?? []) as unknown as Array<{ id: string; phone: string; first_name: string }>;
       } else {
         // Join through campaign_recipients to filter to manually selected clients
         const { data } = await db
@@ -57,8 +64,9 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
           .select("clients!inner(id, phone, first_name, is_blocked)")
           .eq("campaign_id", campaign.id)
           .eq("clients.is_blocked", false);
-        recipients = (data ?? [])
-          .map((r: { clients: { id: string; phone: string; first_name: string } | null }) => r.clients)
+        type RecipientRow = { clients: { id: string; phone: string; first_name: string } | null };
+        recipients = ((data ?? []) as unknown as RecipientRow[])
+          .map((r) => r.clients)
           .filter(Boolean) as Array<{ id: string; phone: string; first_name: string }>;
       }
 

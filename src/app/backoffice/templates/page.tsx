@@ -6,8 +6,7 @@ export const metadata: Metadata = { title: "Templates" };
 import { TEMPLATE_KEYS, TEMPLATE_LABELS, TEMPLATE_PLACEHOLDERS } from "@/lib/templates";
 
 export default async function TemplatesPage() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = createAdminClient() as any;
+  const client = createAdminClient();
 
   const { data } = await client.from("system_config").select("key, value");
   const cfg: Record<string, string> = {};

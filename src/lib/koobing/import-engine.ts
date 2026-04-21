@@ -106,9 +106,7 @@ export async function importKoobingAppointments({
   to: string;   // YYYY-MM-DD
   dryRun?: boolean;
 }): Promise<ImportResult> {
-  // Cast to any: koobing_appointment_id not yet in generated DB types (regenerate after migration)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = createAdminClient() as any;
+  const db = createAdminClient();
 
   const result: ImportResult = { imported: 0, skipped: 0, unmatched_service: 0, errors: [], created: [] };
 
@@ -124,7 +122,7 @@ export async function importKoobingAppointments({
     .select("koobing_appointment_id")
     .not("koobing_appointment_id", "is", null);
   const existingIds = new Set<number>(
-    (existing ?? []).map((r: { koobing_appointment_id: number }) => r.koobing_appointment_id)
+    (existing ?? []).map((r) => (r as { koobing_appointment_id: number }).koobing_appointment_id)
   );
 
   // Load VAIG professionals
@@ -133,13 +131,13 @@ export async function importKoobingAppointments({
     .select("id, name")
     .eq("is_active", true);
   const profByName: Record<string, string> = {};
-  for (const p of professionals ?? []) {
+  for (const p of (professionals ?? []) as { id: string; name: string }[]) {
     profByName[p.name.toLowerCase().trim()] = p.id;
   }
 
   // Load VAIG services
   const { data: vaigServicesRaw } = await db.from("services").select("id, name").eq("is_active", true);
-  const vaigServices: Array<{ id: string; name: string }> = vaigServicesRaw ?? [];
+  const vaigServices: Array<{ id: string; name: string }> = (vaigServicesRaw ?? []) as unknown as Array<{ id: string; name: string }>;
 
   // Build Koobing service_id → VAIG service_id cache
   const koobSvcToVaig = new Map<number, string | null>();
@@ -178,7 +176,7 @@ export async function importKoobingAppointments({
           .ilike("phone", `%${normalizedPhone}`)
           .limit(1)
           .maybeSingle();
-        if (byPhone) clientId = byPhone.id;
+        if (byPhone) clientId = (byPhone as { id: string }).id;
       }
 
       // 2. Fallback: by name (only when last name is known to avoid false positives)
@@ -194,7 +192,7 @@ export async function importKoobingAppointments({
             .ilike("last_name", lastName)
             .limit(1)
             .maybeSingle();
-          if (byName) clientId = byName.id;
+          if (byName) clientId = (byName as { id: string }).id;
         }
       }
 
@@ -214,7 +212,7 @@ export async function importKoobingAppointments({
             })
             .select("id")
             .single();
-          clientId = newClient?.id;
+          clientId = (newClient as { id: string } | null)?.id;
         }
       }
 

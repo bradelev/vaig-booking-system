@@ -25,8 +25,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = createAdminClient() as any;
+  const client = createAdminClient();
 
   const autoHours = parseInt(await getConfigValue("auto_cancel_hours", "24"));
   const reminderAfterHours = parseInt(
@@ -37,7 +36,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const cancelCutoff = new Date(now - autoHours * 3600_000).toISOString();
   const reminderCutoff = new Date(now - reminderAfterHours * 3600_000).toISOString();
 
-  const { data: bookings, error } = await client
+  type PaymentReminderRow = {
+    id: string;
+    created_at: string;
+    clients: { phone: string; first_name: string | null; email: string | null } | null;
+    services: { name: string; deposit_amount: number } | null;
+  };
+
+  const { data: rawPRBookings, error } = await client
     .from("bookings")
     .select(
       `id, created_at,
@@ -53,6 +59,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     logger.error("Payment reminder cron failed to fetch bookings", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  const bookings = (rawPRBookings ?? []) as unknown as PaymentReminderRow[];
 
   const businessName = await getConfigValue("business_name", "VAIG");
   const mpEnabled =

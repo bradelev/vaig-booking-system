@@ -11,8 +11,7 @@ function adminKey(userId: string): string {
 export async function checkAdminRateLimit(
   userId: string
 ): Promise<{ allowed: boolean; retryAfterSeconds?: number }> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = createAdminClient() as any;
+  const client = createAdminClient();
   const key = adminKey(userId);
   const windowStart = new Date(Date.now() - WINDOW_SECONDS * 1_000).toISOString();
 
@@ -24,8 +23,10 @@ export async function checkAdminRateLimit(
     .order("window_start", { ascending: false })
     .limit(1);
 
-  const currentCount: number = rows?.[0]?.message_count ?? 0;
-  const rowId: string | null = rows?.[0]?.id ?? null;
+  type RateLimitRow = { id: string; message_count: number; window_start: string };
+  const firstRow = (rows?.[0] as unknown as RateLimitRow | undefined) ?? null;
+  const currentCount: number = firstRow?.message_count ?? 0;
+  const rowId: string | null = firstRow?.id ?? null;
 
   if (currentCount >= MAX_REQUESTS) {
     return { allowed: false, retryAfterSeconds: WINDOW_SECONDS };

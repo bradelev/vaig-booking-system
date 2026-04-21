@@ -17,9 +17,7 @@ cloudinary.config({
 });
 
 async function getDb() {
-  const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return supabase as any;
+  return createClient();
 }
 
 function parseFilterCriteria(formData: FormData): CampaignFilterCriteria | null {
@@ -32,14 +30,12 @@ function parseFilterCriteria(formData: FormData): CampaignFilterCriteria | null 
   }
 }
 
-async function insertRecipients(db: unknown, campaignId: string, clientIds: string[]) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = db as any;
+async function insertRecipients(db: Awaited<ReturnType<typeof createClient>>, campaignId: string, clientIds: string[]) {
   if (clientIds.length > 0) {
-    await client.from("campaign_recipients").insert(
+    await db.from("campaign_recipients").insert(
       clientIds.map((clientId) => ({ campaign_id: campaignId, client_id: clientId }))
     );
-    await client.from("campaigns").update({ total_recipients: clientIds.length }).eq("id", campaignId);
+    await db.from("campaigns").update({ total_recipients: clientIds.length }).eq("id", campaignId);
   }
 }
 
@@ -57,13 +53,14 @@ export async function createCampaign(formData: FormData) {
 
   const filterCriteria = parseFilterCriteria(formData);
 
-  const { data: campaign, error } = await db
+  const { data: rawCampaign, error } = await db
     .from("campaigns")
     .insert({ name, body, image_url: imageUrl, status: "draft", scheduled_at: scheduledAt, target_all: targetAll, filter_criteria: filterCriteria })
     .select("id")
     .single();
 
   if (error) throw new Error(error.message);
+  const campaign = rawCampaign as { id: string };
 
   if (!targetAll) {
     const selectedIds = formData.getAll("client_ids") as string[];
@@ -92,13 +89,14 @@ export async function createAndScheduleCampaign(formData: FormData) {
   const filterCriteria = parseFilterCriteria(formData);
 
   // Insert as draft first so we have an ID
-  const { data: campaign, error } = await db
+  const { data: rawCampaign2, error } = await db
     .from("campaigns")
     .insert({ name, body, image_url: imageUrl, status: "draft", scheduled_at: scheduledAt, target_all: targetAll, filter_criteria: filterCriteria })
     .select("id")
     .single();
 
   if (error) throw new Error(error.message);
+  const campaign = rawCampaign2 as { id: string };
 
   if (!targetAll) {
     const selectedIds = formData.getAll("client_ids") as string[];
@@ -121,13 +119,14 @@ export async function createAndScheduleCampaign(formData: FormData) {
 export async function updateCampaign(id: string, formData: FormData) {
   const db = await getDb();
 
-  const { data: existing, error: fetchErr } = await db
+  const { data: rawExisting, error: fetchErr } = await db
     .from("campaigns")
     .select("status")
     .eq("id", id)
     .single();
 
   if (fetchErr) throw new Error(fetchErr.message);
+  const existing = rawExisting as { status: string };
   if (existing.status !== "draft") throw new Error("Solo se pueden editar campañas en estado borrador");
 
   const targetAll = formData.get("target_all") === "true";
@@ -174,17 +173,18 @@ export async function updateCampaign(id: string, formData: FormData) {
 export async function scheduleCampaign(id: string) {
   const db = await getDb();
 
-  const { data: campaign, error: fetchErr } = await db
+  const { data: rawCampaignSched, error: fetchErr } = await db
     .from("campaigns")
     .select("status, scheduled_at")
     .eq("id", id)
     .single();
 
   if (fetchErr) throw new Error(fetchErr.message);
+  const campaign = rawCampaignSched as { status: string; scheduled_at: string | null };
   if (campaign.status !== "draft") throw new Error("Solo se pueden programar campañas en estado borrador");
   if (!campaign.scheduled_at) throw new Error("Configurá una fecha/hora de envío antes de programar");
 
-  const scheduledDate = new Date(campaign.scheduled_at as string);
+  const scheduledDate = new Date(campaign.scheduled_at);
   if (scheduledDate.getTime() < Date.now() - 60_000) {
     throw new Error("La fecha de envío ya pasó. Editá la campaña y configurá una nueva fecha.");
   }
@@ -231,15 +231,17 @@ export async function deleteCampaign(id: string) {
 export async function cloneCampaign(id: string) {
   const db = await getDb();
 
-  const { data: original, error: fetchErr } = await db
+  const { data: rawOriginal, error: fetchErr } = await db
     .from("campaigns")
     .select("name, body, image_url, target_all, filter_criteria")
     .eq("id", id)
     .single();
 
   if (fetchErr) throw new Error(fetchErr.message);
+  type CampaignCloneRow = { name: string; body: string; image_url: string | null; target_all: boolean; filter_criteria: unknown };
+  const original = rawOriginal as CampaignCloneRow;
 
-  const { data: clone, error: insertErr } = await db
+  const { data: rawClone, error: insertErr } = await db
     .from("campaigns")
     .insert({
       name: `${original.name} (copia)`,
@@ -253,17 +255,19 @@ export async function cloneCampaign(id: string) {
     .single();
 
   if (insertErr) throw new Error(insertErr.message);
+  const clone = rawClone as { id: string };
 
   // Clone recipients if manual selection
   if (!original.target_all) {
-    const { data: recipients } = await db
+    const { data: rawRecipients } = await db
       .from("campaign_recipients")
       .select("client_id")
       .eq("campaign_id", id);
+    const recipients = (rawRecipients ?? []) as { client_id: string }[];
 
-    if (recipients && recipients.length > 0) {
+    if (recipients.length > 0) {
       await db.from("campaign_recipients").insert(
-        recipients.map((r: { client_id: string }) => ({ campaign_id: clone.id, client_id: r.client_id }))
+        recipients.map((r) => ({ campaign_id: clone.id, client_id: r.client_id }))
       );
       await db.from("campaigns").update({ total_recipients: recipients.length }).eq("id", clone.id);
     }
@@ -324,11 +328,11 @@ export async function filterCampaignClients(
   }
 
   if (criteria.serviceCategories?.length) {
-    const { data: services } = await db
+    const { data: rawSvcs } = await db
       .from("services")
       .select("name")
       .in("category", criteria.serviceCategories);
-    const names = (services ?? []).map((s: { name: string }) => s.name);
+    const names = (rawSvcs ?? []).map((s) => (s as { name: string }).name);
     if (names.length > 0) {
       query = query.overlaps("servicios_usados", names);
     }

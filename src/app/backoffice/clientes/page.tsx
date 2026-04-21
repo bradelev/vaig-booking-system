@@ -83,8 +83,6 @@ export default async function ClientesPage({
   const pagina = Math.max(1, parseInt(params.pagina ?? "1", 10));
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const from = (pagina - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -94,13 +92,13 @@ export default async function ClientesPage({
   // Total absoluto (sin filtros) — solo necesario cuando hay filtros activos
   let totalAbsoluto = 0;
   if (hayFiltros) {
-    const { count: countAll } = await client
+    const { count: countAll } = await supabase
       .from("clientes_metricas")
       .select("id", { count: "exact", head: true });
     totalAbsoluto = countAll ?? 0;
   }
 
-  let query = client
+  let query = supabase
     .from("clientes_metricas")
     .select("id, first_name, last_name, phone, total_sesiones, dias_inactivo, segmento, servicios_usados", { count: "exact" });
 

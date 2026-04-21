@@ -90,7 +90,7 @@ export async function buildKnowledgeBase(): Promise<KnowledgeBase> {
   }));
 
   const packages: PackageInfo[] = (
-    (packagesResult.data ?? []) as PackageRow[]
+    (packagesResult.data ?? []) as unknown as PackageRow[]
   )
     .filter((pkg) => pkg.services !== null)
     .map((pkg) => ({

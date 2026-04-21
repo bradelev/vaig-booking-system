@@ -55,11 +55,9 @@ export default async function CitasPage({ searchParams }: PageProps) {
   const weekEnd = addDays(weekMonday, 7);
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const [bookingsResult, clientsResult, servicesResult, professionalsResult] = await Promise.all([
-    client
+    supabase
       .from("bookings")
       .select(
         `id, scheduled_at, status, notes, gcal_event_id,
@@ -70,9 +68,9 @@ export default async function CitasPage({ searchParams }: PageProps) {
       .gte("scheduled_at", `${weekMonday}T00:00:00`)
       .lt("scheduled_at", `${weekEnd}T00:00:00`)
       .order("scheduled_at"),
-    client.from("clients").select("id, first_name, last_name").order("last_name"),
-    client.from("services").select("id, name").eq("is_active", true).order("name"),
-    client.from("professionals").select("id, name").eq("is_active", true).order("name"),
+    supabase.from("clients").select("id, first_name, last_name").order("last_name"),
+    supabase.from("services").select("id, name").eq("is_active", true).order("name"),
+    supabase.from("professionals").select("id, name").eq("is_active", true).order("name"),
   ]);
 
   type RawBooking = {
@@ -86,7 +84,7 @@ export default async function CitasPage({ searchParams }: PageProps) {
     professionals: { id: string; name: string } | null;
   };
 
-  const allBookings = (bookingsResult.data ?? []) as RawBooking[];
+  const allBookings = (bookingsResult.data ?? []) as unknown as RawBooking[];
 
   const bookingsByDate: Record<string, BookingItem[]> = {};
   for (const b of allBookings) {
@@ -117,16 +115,16 @@ export default async function CitasPage({ searchParams }: PageProps) {
       weekDates={weekDates}
       bookingsByDate={bookingsByDate}
       allClients={(clientsResult.data ?? []).map(
-        (c: { id: string; first_name: string; last_name: string }) => ({
-          id: c.id,
-          label: `${c.first_name} ${c.last_name}`.trim(),
-        })
+        (c) => {
+          const cl = c as { id: string; first_name: string; last_name: string };
+          return { id: cl.id, label: `${cl.first_name} ${cl.last_name}`.trim() };
+        }
       )}
       allServices={(servicesResult.data ?? []).map(
-        (s: { id: string; name: string }) => ({ id: s.id, label: s.name })
+        (s) => { const sv = s as { id: string; name: string }; return { id: sv.id, label: sv.name }; }
       )}
       allProfessionals={(professionalsResult.data ?? []).map(
-        (p: { id: string; name: string }) => ({ id: p.id, label: p.name })
+        (p) => { const pr = p as { id: string; name: string }; return { id: pr.id, label: pr.name }; }
       )}
     />
   );

@@ -24,10 +24,8 @@ export default async function EditarClientePage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: raw } = await client
+  const { data: raw } = await supabase
     .from("clients")
     .select("id, first_name, last_name, phone, email, notes, source, is_blocked")
     .eq("id", id)

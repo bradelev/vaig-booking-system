@@ -24,10 +24,8 @@ interface PendingBooking {
 
 export default async function PagosPage() {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: raw } = await client
+  const { data: raw } = await supabase
     .from("bookings")
     .select(
       `id, scheduled_at, status, notes,
@@ -38,7 +36,7 @@ export default async function PagosPage() {
     .eq("status", "pending")
     .order("scheduled_at");
 
-  const bookings = (raw ?? []) as PendingBooking[];
+  const bookings = (raw ?? []) as unknown as PendingBooking[];
 
   const columns: TableColumn<PendingBooking>[] = [
     {

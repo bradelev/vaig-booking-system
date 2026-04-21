@@ -144,8 +144,7 @@ function nextHistPhone(existingCount: number): string {
 }
 
 export async function syncSheetHistorico(): Promise<SheetSyncResult> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = createAdminClient() as any;
+  const db = createAdminClient();
 
   const result: SheetSyncResult = {
     imported: 0,
@@ -165,9 +164,8 @@ export async function syncSheetHistorico(): Promise<SheetSyncResult> {
 
   // 2. Parse with ExcelJS
   const workbook = new ExcelJS.Workbook();
-  // ExcelJS .load() accepts ArrayBuffer at runtime; cast needed for Node 22 Buffer types
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await workbook.xlsx.load(arrayBuffer as any);
+  // ExcelJS declares Buffer as extending ArrayBuffer; pass the ArrayBuffer directly
+  await workbook.xlsx.load(arrayBuffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
   const worksheet = workbook.getWorksheet("Ingresos pacientes");
   if (!worksheet) {
     throw new Error(
@@ -197,20 +195,18 @@ export async function syncSheetHistorico(): Promise<SheetSyncResult> {
   const { data: clientsRaw } = await db
     .from("clients")
     .select("id, first_name, last_name, nombre_normalizado");
-  const clients: ClientRecord[] = (clientsRaw ?? []).map(
-    (c: {
-      id: string;
-      first_name: string;
-      last_name: string;
-      nombre_normalizado: string | null;
-    }) => ({
-      id: c.id,
-      normalized:
-        c.nombre_normalizado ?? normalize(`${c.first_name} ${c.last_name}`),
-      firstName: c.first_name,
-      lastName: c.last_name,
-    })
-  );
+  const clients: ClientRecord[] = ((clientsRaw ?? []) as unknown as Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    nombre_normalizado: string | null;
+  }>).map((c) => ({
+    id: c.id,
+    normalized:
+      c.nombre_normalizado ?? normalize(`${c.first_name} ${c.last_name}`),
+    firstName: c.first_name,
+    lastName: c.last_name,
+  }));
 
   // Count existing HIST- phones to generate unique placeholders
   const { count: histCount } = await db
@@ -225,22 +221,13 @@ export async function syncSheetHistorico(): Promise<SheetSyncResult> {
     .select("client_id, fecha, tipo_servicio, descripcion")
     .eq("fuente", "sheet_historico");
   const existingSet = new Set<string>(
-    (
-      existingRows ??
-      ([] as Array<{
-        client_id: string;
-        fecha: string;
-        tipo_servicio: string;
-        descripcion: string | null;
-      }>)
-    ).map(
-      (r: {
-        client_id: string;
-        fecha: string;
-        tipo_servicio: string;
-        descripcion: string | null;
-      }) =>
-        `${r.client_id}|${r.fecha}|${r.tipo_servicio}|${r.descripcion ?? ""}`
+    ((existingRows ?? []) as unknown as Array<{
+      client_id: string;
+      fecha: string;
+      tipo_servicio: string;
+      descripcion: string | null;
+    }>).map(
+      (r) => `${r.client_id}|${r.fecha}|${r.tipo_servicio}|${r.descripcion ?? ""}`
     )
   );
 
@@ -314,7 +301,7 @@ export async function syncSheetHistorico(): Promise<SheetSyncResult> {
           continue;
         }
 
-        clientId = newClient.id;
+        clientId = (newClient as { id: string }).id;
         result.clientsCreated.push(titleCase(paciente));
 
         // Add to in-memory client list for subsequent rows

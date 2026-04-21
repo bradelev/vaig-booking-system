@@ -49,10 +49,8 @@ export default async function RecordatoriosPage() {
   })();
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: rawBookings, error } = await client
+  const { data: rawBookings, error } = await supabase
     .from("bookings")
     .select(
       `id, scheduled_at, confirmation_sent_at, client_confirmed_at,
@@ -79,7 +77,7 @@ export default async function RecordatoriosPage() {
     professionals: { name: string } | null;
   };
 
-  const bookings: ReminderBooking[] = ((rawBookings ?? []) as RawBooking[]).map((b) => ({
+  const bookings: ReminderBooking[] = ((rawBookings ?? []) as unknown as RawBooking[]).map((b) => ({
     id: b.id,
     scheduledAt: b.scheduled_at,
     clientId: b.clients?.id ?? "",

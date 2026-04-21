@@ -15,8 +15,7 @@ const TIMEZONE_OPTIONS = [
 export const metadata: Metadata = { title: "Configuración" };
 
 export default async function ConfiguracionPage() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = createAdminClient() as any;
+  const client = createAdminClient();
 
   const { data } = await client.from("system_config").select("key, value");
   const cfg: Record<string, string> = {};

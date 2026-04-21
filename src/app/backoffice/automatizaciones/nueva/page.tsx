@@ -14,10 +14,8 @@ interface Client {
 
 export default async function NuevaCampanaPage() {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
 
-  const { data } = await db
+  const { data } = await supabase
     .from("clients")
     .select("id, first_name, last_name, phone")
     .eq("is_blocked", false)

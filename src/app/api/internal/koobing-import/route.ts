@@ -14,8 +14,7 @@ import { importKoobingAppointments } from "@/lib/koobing/import-engine";
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: { user } } = await (supabase as any).auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

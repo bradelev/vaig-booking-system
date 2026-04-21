@@ -6,8 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function createProfessional(formData: FormData) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const specialtiesRaw = (formData.get("specialties") as string) || "";
   const specialties = specialtiesRaw
@@ -17,7 +15,7 @@ export async function createProfessional(formData: FormData) {
 
   const phone = (formData.get("phone") as string) || null;
 
-  const { error } = await client.from("professionals").insert({
+  const { error } = await supabase.from("professionals").insert({
     name: formData.get("name") as string,
     specialties,
     phone,
@@ -32,8 +30,6 @@ export async function createProfessional(formData: FormData) {
 
 export async function updateProfessional(id: string, formData: FormData) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const specialtiesRaw = (formData.get("specialties") as string) || "";
   const specialties = specialtiesRaw
@@ -43,7 +39,7 @@ export async function updateProfessional(id: string, formData: FormData) {
 
   const phone = (formData.get("phone") as string) || null;
 
-  const { error } = await client
+  const { error } = await supabase
     .from("professionals")
     .update({
       name: formData.get("name") as string,
@@ -60,10 +56,8 @@ export async function updateProfessional(id: string, formData: FormData) {
 
 export async function toggleProfessionalActive(id: string, isActive: boolean) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { error } = await client
+  const { error } = await supabase
     .from("professionals")
     .update({ is_active: !isActive })
     .eq("id", id);

@@ -43,10 +43,8 @@ export default async function MetricasPage({
   const periodStart = getPeriodStart(days);
 
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: sessions } = await client
+  const { data: sessions } = await supabase
     .from("conversation_sessions")
     .select("funnel_stage, last_message_at")
     .gte("last_message_at", periodStart);

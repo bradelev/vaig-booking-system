@@ -25,8 +25,6 @@ export async function cancelBooking(
   cancelledBy: "admin" | "client"
 ) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
@@ -34,7 +32,15 @@ export async function cancelBooking(
     if (!rl.allowed) throw new Error("Demasiadas solicitudes. Esperá un momento antes de continuar.");
   }
 
-  const { data: booking, error: fetchError } = await client
+  type CancelBookingRow = {
+    id: string;
+    scheduled_at: string;
+    service_id: string;
+    professional_id: string | null;
+    clients: { phone: string; first_name: string | null; last_name: string | null } | null;
+    services: { name: string } | null;
+  };
+  const { data: rawBooking, error: fetchError } = await supabase
     .from("bookings")
     .select(
       `id, scheduled_at, service_id, professional_id,
@@ -45,8 +51,9 @@ export async function cancelBooking(
     .single();
 
   if (fetchError) throw new Error(fetchError.message);
+  const booking = rawBooking as unknown as CancelBookingRow | null;
 
-  const { error } = await client
+  const { error } = await supabase
     .from("bookings")
     .update({
       status: "cancelled",
@@ -62,8 +69,8 @@ export async function cancelBooking(
     withRetry(
       () =>
         notifyClientCancellation({
-          clientPhone: booking.clients.phone,
-          clientName: `${booking.clients.first_name ?? ""} ${booking.clients.last_name ?? ""}`.trim(),
+          clientPhone: booking.clients!.phone,
+          clientName: `${booking.clients!.first_name ?? ""} ${booking.clients!.last_name ?? ""}`.trim(),
           serviceName: booking.services?.name ?? "el servicio",
           scheduledAt: booking.scheduled_at,
           reason,
@@ -99,10 +106,8 @@ export async function cancelBooking(
 
 export async function updateBookingStatus(id: string, status: string) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { error } = await client
+  const { error } = await supabase
     .from("bookings")
     .update({ status })
     .eq("id", id);
@@ -111,18 +116,20 @@ export async function updateBookingStatus(id: string, status: string) {
 
   // VBS-68: If marking as realized, increment sessions_used on associated pack
   if (status === "realized") {
-    const { data: booking } = await client
+    const { data: rawBooking } = await supabase
       .from("bookings")
       .select("client_package_id")
       .eq("id", id)
       .single();
+    const booking = rawBooking as { client_package_id: string | null } | null;
 
     if (booking?.client_package_id) {
-      const { data: cp } = await client
+      const { data: rawCp } = await supabase
         .from("client_packages")
         .select("sessions_used, sessions_total")
         .eq("id", booking.client_package_id)
         .single();
+      const cp = rawCp as { sessions_used: number; sessions_total: number } | null;
 
       if (cp) {
         if (cp.sessions_used >= cp.sessions_total) {
@@ -132,7 +139,7 @@ export async function updateBookingStatus(id: string, status: string) {
             sessions_total: cp.sessions_total,
           });
         } else {
-          await client
+          await supabase
             .from("client_packages")
             .update({ sessions_used: cp.sessions_used + 1 })
             .eq("id", booking.client_package_id);
@@ -168,8 +175,6 @@ export async function updateBookingStatus(id: string, status: string) {
 
 export async function createBooking(formData: FormData) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
@@ -177,7 +182,7 @@ export async function createBooking(formData: FormData) {
     if (!rl.allowed) throw new Error("Demasiadas solicitudes. Esperá un momento antes de continuar.");
   }
 
-  const { data: inserted, error } = await client
+  const { data: rawInserted, error } = await supabase
     .from("bookings")
     .insert({
       client_id: formData.get("client_id") as string,
@@ -191,6 +196,7 @@ export async function createBooking(formData: FormData) {
     .single();
 
   if (error) throw new Error(error.message);
+  const inserted = rawInserted as { id: string } | null;
 
   // VBS-42/185: Await GCal creation before redirect to avoid serverless cutting the detached promise
   if (inserted?.id) {
@@ -210,10 +216,8 @@ export async function createBookingFromAgenda(data: {
   notes: string | null;
 }): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: inserted, error } = await client
+  const { data: rawInserted2, error } = await supabase
     .from("bookings")
     .insert({
       client_id: data.client_id,
@@ -227,6 +231,7 @@ export async function createBookingFromAgenda(data: {
     .single();
 
   if (error) return { success: false, error: error.message };
+  const inserted = rawInserted2 as { id: string } | null;
 
   if (inserted?.id) {
     createBookingCalendarEvent(inserted.id).catch((err: unknown) => {
@@ -251,19 +256,20 @@ export async function quickCreateClient(data: {
   | { error: string }
 > {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const normalized = normalizePhone(data.phone);
   if (normalized.length < 6) return { error: "Teléfono inválido." };
 
+  type ClientRow = { id: string; first_name: string; last_name: string; phone: string };
+
   // Look up by phone first — tolerant of stored variants (with/without 598 prefix)
-  const { data: existing } = await client
+  const { data: rawExisting } = await supabase
     .from("clients")
     .select("id, first_name, last_name, phone")
     .or(`phone.eq.${normalized},phone.ilike.%${normalized}`)
     .limit(1)
     .maybeSingle();
+  const existing = rawExisting as ClientRow | null;
 
   if (existing) {
     return {
@@ -275,7 +281,7 @@ export async function quickCreateClient(data: {
     };
   }
 
-  const { data: row, error } = await client
+  const { data: rawRow, error } = await supabase
     .from("clients")
     .insert({
       first_name: data.first_name.trim(),
@@ -284,22 +290,24 @@ export async function quickCreateClient(data: {
     })
     .select("id, first_name, last_name, phone")
     .single();
+  const row = rawRow as ClientRow | null;
 
   // Race condition / undetected variant → re-lookup
   if (error) {
     if ((error as { code?: string }).code === "23505") {
-      const { data: fallback } = await client
+      const { data: rawFallback } = await supabase
         .from("clients")
         .select("id, first_name, last_name, phone")
         .or(`phone.eq.${normalized},phone.ilike.%${normalized}`)
         .limit(1)
         .maybeSingle();
+      const fallback = rawFallback as ClientRow | null;
       if (fallback) return { ...fallback, reused: true };
     }
     return { error: error.message };
   }
 
-  return { id: row.id, first_name: row.first_name, last_name: row.last_name, phone: row.phone, reused: false };
+  return { id: row!.id, first_name: row!.first_name, last_name: row!.last_name, phone: row!.phone, reused: false };
 }
 
 export async function quickCreateService(data: {
@@ -309,10 +317,8 @@ export async function quickCreateService(data: {
   deposit_amount: number;
 }): Promise<{ id: string; name: string; duration_minutes: number } | { error: string }> {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: row, error } = await client
+  const { data: rawSvc, error } = await supabase
     .from("services")
     .insert({
       name: data.name.trim(),
@@ -324,6 +330,7 @@ export async function quickCreateService(data: {
     .single();
 
   if (error) return { error: error.message };
+  const row = rawSvc as { id: string; name: string; duration_minutes: number };
   return { id: row.id, name: row.name, duration_minutes: row.duration_minutes };
 }
 
@@ -332,23 +339,23 @@ export async function moveBooking(
   newScheduledAt: string
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   // Fetch booking + service duration
-  const { data: booking, error: fetchError } = await client
+  const { data: rawMoveBk, error: fetchError } = await supabase
     .from("bookings")
     .select("id, gcal_event_id, services(duration_minutes)")
     .eq("id", id)
     .single();
 
-  if (fetchError || !booking) return { success: false, error: fetchError?.message ?? "Not found" };
+  if (fetchError || !rawMoveBk) return { success: false, error: fetchError?.message ?? "Not found" };
+  type MoveBkRow = { id: string; gcal_event_id: string | null; services: { duration_minutes: number } | null };
+  const booking = rawMoveBk as unknown as MoveBkRow;
 
   const durationMinutes: number = booking.services?.duration_minutes ?? 60;
   const newStart = new Date(newScheduledAt);
   const newEnd = new Date(newStart.getTime() + durationMinutes * 60_000);
 
-  const { error } = await client
+  const { error } = await supabase
     .from("bookings")
     .update({
       scheduled_at: newStart.toISOString(),
@@ -376,8 +383,6 @@ export async function moveBooking(
 
 export async function updateBooking(id: string, formData: FormData) {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
@@ -385,7 +390,7 @@ export async function updateBooking(id: string, formData: FormData) {
     if (!rl.allowed) throw new Error("Demasiadas solicitudes. Esperá un momento antes de continuar.");
   }
 
-  const { error } = await client
+  const { error } = await supabase
     .from("bookings")
     .update({
       client_id: formData.get("client_id") as string,
@@ -415,16 +420,16 @@ export async function updateBookingInline(
   }
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: current, error: fetchError } = await client
+  type InlineCurrentRow = { status: string; gcal_event_id: string | null; scheduled_at: string; client_package_id: string | null };
+  const { data: rawCurrent, error: fetchError } = await supabase
     .from("bookings")
     .select("status, gcal_event_id, scheduled_at, client_package_id")
     .eq("id", id)
     .single();
 
-  if (fetchError || !current) return { success: false, error: fetchError?.message ?? "Not found" };
+  if (fetchError || !rawCurrent) return { success: false, error: fetchError?.message ?? "Not found" };
+  const current = rawCurrent as InlineCurrentRow;
 
   const updatePayload: Record<string, unknown> = {};
   if (data.client_id) updatePayload.client_id = data.client_id;
@@ -434,7 +439,7 @@ export async function updateBookingInline(
   if (data.status) updatePayload.status = data.status;
   if ("notes" in data) updatePayload.notes = data.notes;
 
-  const { error } = await client.from("bookings").update(updatePayload).eq("id", id);
+  const { error } = await supabase.from("bookings").update(updatePayload).eq("id", id);
   if (error) return { success: false, error: error.message };
 
   const newStatus = data.status;
@@ -471,11 +476,12 @@ export async function updateBookingInline(
   }
 
   if (newStatus === "realized" && oldStatus !== "realized" && current.client_package_id) {
-    const { data: cp } = await client
+    const { data: rawInlineCp } = await supabase
       .from("client_packages")
       .select("sessions_used, sessions_total")
       .eq("id", current.client_package_id)
       .single();
+    const cp = rawInlineCp as { sessions_used: number; sessions_total: number } | null;
     if (cp) {
       if (cp.sessions_used >= cp.sessions_total) {
         logger.warn("sessions_used at cap, skipping increment", {
@@ -484,7 +490,7 @@ export async function updateBookingInline(
           sessions_total: cp.sessions_total,
         });
       } else {
-        await client
+        await supabase
           .from("client_packages")
           .update({ sessions_used: cp.sessions_used + 1 })
           .eq("id", current.client_package_id);

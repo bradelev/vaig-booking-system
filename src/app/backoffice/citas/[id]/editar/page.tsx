@@ -37,19 +37,17 @@ export default async function EditarCitaPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const [{ data: bookingRaw }, { data: clientesRaw }, { data: serviciosRaw }, { data: profsRaw }] =
     await Promise.all([
-      client
+      supabase
         .from("bookings")
         .select("id, client_id, service_id, professional_id, scheduled_at, notes")
         .eq("id", id)
         .single(),
-      client.from("clients").select("id, first_name, last_name").order("last_name"),
-      client.from("services").select("id, name").eq("is_active", true).order("name"),
-      client.from("professionals").select("id, name").eq("is_active", true).order("name"),
+      supabase.from("clients").select("id, first_name, last_name").order("last_name"),
+      supabase.from("services").select("id, name").eq("is_active", true).order("name"),
+      supabase.from("professionals").select("id, name").eq("is_active", true).order("name"),
     ]);
 
   const booking = bookingRaw as Booking | null;

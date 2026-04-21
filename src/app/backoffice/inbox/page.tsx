@@ -9,8 +9,7 @@ export const metadata: Metadata = { title: "Inbox" };
 export default async function InboxPage() {
   const supabase = await createClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: conversations } = await (supabase as any)
+  const { data: conversations } = await supabase
     .from("inbox_conversations")
     .select("*");
 
@@ -21,7 +20,7 @@ export default async function InboxPage() {
         subtitle="Conversaciones de WhatsApp"
       />
       <ConversationList
-        initialConversations={(conversations ?? []) as InboxConversation[]}
+        initialConversations={(conversations ?? []) as unknown as InboxConversation[]}
       />
     </div>
   );

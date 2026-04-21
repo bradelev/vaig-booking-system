@@ -3,9 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 
 async function getDb() {
-  const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return supabase as any;
+  return createClient();
 }
 
 export interface SegmentationFilterCriteria {
@@ -84,11 +82,11 @@ export async function filterSegmentationClients(
   }
 
   if (criteria.serviceCategories?.length) {
-    const { data: services } = await db
+    const { data: rawSvcs } = await db
       .from("services")
       .select("name")
       .in("category", criteria.serviceCategories);
-    const names = (services ?? []).map((s: { name: string }) => s.name);
+    const names = (rawSvcs ?? []).map((s) => (s as { name: string }).name);
     if (names.length > 0) {
       query = query.overlaps("servicios_usados", names);
     }

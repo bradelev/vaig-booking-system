@@ -18,10 +18,8 @@ interface Servicio {
 
 export default async function ServiciosPage() {
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
-  const { data: raw } = await client
+  const { data: raw } = await supabase
     .from("services")
     .select(
       `id, name, description, duration_minutes, price, deposit_amount, is_active,
@@ -29,7 +27,7 @@ export default async function ServiciosPage() {
     )
     .order("name");
 
-  const servicios = (raw ?? []) as Servicio[];
+  const servicios = (raw ?? []) as unknown as Servicio[];
 
   return (
     <div className="space-y-6">

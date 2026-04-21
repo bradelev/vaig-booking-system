@@ -25,12 +25,10 @@ export default async function EditarPaquetePage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   const [{ data: raw }, { data: serviciosRaw }] = await Promise.all([
-    client.from("service_packages").select("*").eq("id", id).single(),
-    client.from("services").select("id, name").eq("is_active", true).order("name"),
+    supabase.from("service_packages").select("*").eq("id", id).single(),
+    supabase.from("services").select("id, name").eq("is_active", true).order("name"),
   ]);
 
   const paquete = raw as Paquete | null;

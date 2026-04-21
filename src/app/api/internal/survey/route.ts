@@ -23,12 +23,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = createAdminClient() as any;
+  const client = createAdminClient();
 
   const now = new Date().toISOString();
 
-  const { data: bookings, error } = await client
+  type SurveyBookingRow = {
+    id: string;
+    scheduled_at: string;
+    clients: { phone: string; first_name: string | null } | null;
+    services: { name: string } | null;
+  };
+
+  const { data: rawSurveyBookings, error } = await client
     .from("bookings")
     .select(
       `id, scheduled_at,
@@ -43,6 +49,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     logger.error("Survey cron failed to fetch bookings", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  const bookings = (rawSurveyBookings ?? []) as unknown as SurveyBookingRow[];
 
   const businessName = await getConfigValue("business_name", "VAIG");
   const surveyUrl = await getConfigValue("survey_url", "");
@@ -54,7 +61,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   let sent = 0;
   let failed = 0;
 
-  for (const booking of bookings ?? []) {
+  for (const booking of bookings) {
     const phone = booking.clients?.phone;
     if (!phone) continue;
 

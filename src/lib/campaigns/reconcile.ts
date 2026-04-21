@@ -20,8 +20,7 @@ export async function reconcileCampaignRecipientFromMessage(
 ): Promise<void> {
   if (messageRow.source !== "campaign" || !messageRow.wa_message_id) return;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = createAdminClient() as any;
+  const db = createAdminClient();
 
   // Lookup recipient by wa_message_id
   const { data: recipient } = await db
@@ -65,10 +64,10 @@ export async function reconcileCampaignRecipientFromMessage(
     .eq("client_id", recipient.client_id);
 
   // Recompute campaign counts from truth
-  const { data: counts } = await db
+  const { data: counts } = (await db
     .from("campaign_recipients")
     .select("status")
-    .eq("campaign_id", recipient.campaign_id) as { data: Array<{ status: string }> | null };
+    .eq("campaign_id", recipient.campaign_id)) as { data: Array<{ status: string }> | null };
 
   if (!counts) return;
 

@@ -21,14 +21,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = createAdminClient() as any;
+  const client = createAdminClient();
 
   const now = new Date();
   const windowStart = now.toISOString();
   const windowEnd = new Date(now.getTime() + 36 * 3_600_000).toISOString();
 
-  const { data: bookings, error } = await client
+  type ReminderBookingRow = {
+    id: string;
+    scheduled_at: string;
+    clients: { phone: string; first_name: string | null } | null;
+    services: { name: string } | null;
+  };
+
+  const { data: rawRemBookings, error } = await client
     .from("bookings")
     .select(
       `id, scheduled_at,
@@ -44,6 +50,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     logger.error("Reminder cron failed to fetch bookings", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  const bookings = (rawRemBookings ?? []) as unknown as ReminderBookingRow[];
 
   const businessName = await getConfigValue("business_name", "VAIG");
   const templateRaw = await getConfigValue(
@@ -53,7 +60,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   let sent = 0;
   let failed = 0;
 
-  for (const booking of bookings ?? []) {
+  for (const booking of bookings) {
     const phone = booking.clients?.phone;
     if (!phone) continue;
 
@@ -103,19 +110,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   let profSent = 0;
   let profFailed = 0;
 
-  const { data: professionals } = await client
+  type ProfRow = { id: string; name: string; phone: string | null };
+  type ProfBookingRow = { scheduled_at: string; clients: { first_name: string } | null; services: { name: string } | null };
+
+  const { data: rawProfessionals } = await client
     .from("professionals")
     .select("id, name, phone")
     .eq("is_active", true)
     .not("phone", "is", null);
+  const professionals = (rawProfessionals ?? []) as ProfRow[];
 
-  for (const prof of professionals ?? []) {
+  for (const prof of professionals) {
     if (!prof.phone) continue;
 
     const { send: sendProf, phone: profTargetPhone } = await shouldSendMessage("messaging_reminder", prof.phone);
     if (!sendProf) continue;
 
-    const { data: profBookings } = await client
+    const { data: rawProfBookings } = await client
       .from("bookings")
       .select(
         `scheduled_at,
@@ -127,11 +138,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .gte("scheduled_at", windowStart)
       .lte("scheduled_at", windowEnd)
       .order("scheduled_at", { ascending: true });
+    const profBookings = (rawProfBookings ?? []) as unknown as ProfBookingRow[];
 
-    if (!profBookings || profBookings.length === 0) continue;
+    if (profBookings.length === 0) continue;
 
     const lines = profBookings.map(
-      (b: { scheduled_at: string; clients: { first_name: string } | null; services: { name: string } | null }) => {
+      (b) => {
         const time = new Date(b.scheduled_at).toLocaleTimeString("es-AR", {
           timeZone: LOCAL_TIMEZONE,
           hour: "2-digit",
