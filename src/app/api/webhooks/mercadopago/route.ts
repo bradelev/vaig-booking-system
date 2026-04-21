@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { fetchMPPayment } from "@/lib/payments";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyAdminPaymentConfirmed, notifyClientPackPurchased } from "@/lib/bot/notifications";
+import { logger } from "@/lib/logger";
 
 export function verifySignature(
   payload: string,
@@ -61,7 +62,7 @@ async function handlePaymentNotification(paymentId: string, _payload?: string): 
       .is("paid_at", null);
 
     if (error) {
-      console.error("[MP Webhook] Failed to activate client_package:", error);
+      logger.error("MP webhook: failed to activate client_package", { client_package_id: clientPackageId, error: error.message });
       return;
     }
 
@@ -101,7 +102,7 @@ async function handlePaymentNotification(paymentId: string, _payload?: string): 
       .eq("status", "pending"); // Only update if still pending
 
     if (error) {
-      console.error("[MP Webhook] Failed to update booking:", error);
+      logger.error("MP webhook: failed to update booking", { booking_id: bookingId, payment_id: paymentId, error: error.message });
     } else {
       console.log(`[MP Webhook] Booking ${bookingId} marked as deposit_paid`);
 

@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { logInboundMessage, updateMessageStatus } from "@/lib/whatsapp/log";
 import { formatWebhookError } from "@/lib/whatsapp/meta-errors";
 import { reconcileCampaignRecipientFromMessage } from "@/lib/campaigns/reconcile";
+import { logger } from "@/lib/logger";
 
 // GET — webhook verification (Meta challenge)
 export function GET(request: NextRequest) {
@@ -130,13 +131,13 @@ async function processMessages(messages: WhatsAppMessage[]): Promise<void> {
         body: text,
       });
     } catch (err) {
-      console.error(`[WA Webhook] Failed to log inbound message:`, err);
+      logger.error("WA webhook: failed to log inbound message", { phone: msg.from, wa_message_id: msg.id, error: err instanceof Error ? err.message : String(err) });
     }
 
     try {
       await handleIncomingMessage(msg.from, text, msg.id);
     } catch (err) {
-      console.error(`[WA Webhook] Error processing message from ${msg.from}:`, err);
+      logger.error("WA webhook: error processing message", { phone: msg.from, error: err instanceof Error ? err.message : String(err) });
     }
   }
 }
@@ -154,7 +155,7 @@ async function processStatuses(statuses: WhatsAppStatusUpdate[]): Promise<void> 
         await reconcileCampaignRecipientFromMessage(row, s.status, errorCode, errorMessage);
       }
     } catch (err) {
-      console.error(`[WA Webhook] Failed to update status for ${s.id}:`, err);
+      logger.error("WA webhook: failed to update message status", { wa_message_id: s.id, error: err instanceof Error ? err.message : String(err) });
     }
   }
 }
