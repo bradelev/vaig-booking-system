@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplateMessage } from "@/lib/whatsapp/logged";
+import { sanitizeTemplateParam } from "@/lib/whatsapp/sanitize";
 
 const DELAY_MS = 100;
 const STUCK_SENDING_MINUTES = 30;
@@ -97,8 +98,8 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
           components.push({
             type: "body",
             parameters: [
-              { type: "text", text: recipient.first_name || "cliente" },
-              { type: "text", text: campaign.body },
+              { type: "text", text: sanitizeTemplateParam(recipient.first_name || "cliente") },
+              { type: "text", text: sanitizeTemplateParam(campaign.body) },
             ],
           });
 
