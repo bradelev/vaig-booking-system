@@ -12,6 +12,7 @@ import { sanitizeTemplateParam } from "@/lib/whatsapp/sanitize";
 import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { getConfigValue } from "@/lib/config";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
+import { logger } from "@/lib/logger";
 
 function applyTemplate(template: string, vars: Record<string, string>): string {
   return Object.entries(vars).reduce(
@@ -72,7 +73,7 @@ export async function notifyAdminNewBooking(params: NewBookingNotificationParams
       components: [{ type: "body", parameters: [{ type: "text", text: "Admin" }, { type: "text", text: sanitizeTemplateParam(msg) }] }],
     }, "admin_notification");
   } catch (err) {
-    console.error("[Notifications] Failed to send new booking notification to admin:", err);
+    logger.error("notification: failed to send new booking to admin", { booking_id: params.bookingId, admin_phone: adminPhone, error: err instanceof Error ? err.message : String(err) });
   }
 }
 
@@ -104,7 +105,7 @@ export async function notifyClientPackPurchased(
   try {
     await sendTextMessage({ to: targetPhone, body: msg }, "admin_notification");
   } catch (err) {
-    console.error("[Notifications] Failed to send pack purchased notification:", err);
+    logger.error("notification: failed to send pack purchased", { client_phone: params.clientPhone, error: err instanceof Error ? err.message : String(err) });
   }
 }
 
@@ -156,7 +157,7 @@ export async function notifyClientCancellation(
   try {
     await sendTextMessage({ to: targetPhone, body: msg }, "admin_notification");
   } catch (err) {
-    console.error("[Notifications] Failed to send cancellation notification to client:", err);
+    logger.error("notification: failed to send cancellation", { client_phone: params.clientPhone, error: err instanceof Error ? err.message : String(err) });
   }
 }
 
@@ -196,7 +197,7 @@ export async function notifyBusinessNewBooking(
       components: [{ type: "body", parameters: [{ type: "text", text: "VAIG" }, { type: "text", text: sanitizeTemplateParam(msg) }] }],
     }, "admin_notification");
   } catch (err) {
-    console.error("[Notifications] Failed to send booking notification to business phone:", err);
+    logger.error("notification: failed to send booking to business phone", { booking_id: params.bookingId, error: err instanceof Error ? err.message : String(err) });
   }
 }
 
@@ -251,6 +252,6 @@ export async function notifyAdminPaymentConfirmed(
       components: [{ type: "body", parameters: [{ type: "text", text: "Admin" }, { type: "text", text: sanitizeTemplateParam(msg) }] }],
     }, "admin_notification");
   } catch (err) {
-    console.error("[Notifications] Failed to send payment confirmation to admin:", err);
+    logger.error("notification: failed to send payment confirmation to admin", { booking_id: params.bookingId, error: err instanceof Error ? err.message : String(err) });
   }
 }
