@@ -113,10 +113,10 @@ describe("upsertSession", () => {
   it("calls upsert with correct payload", async () => {
     const { chain } = makeSupabaseMock();
 
-    await upsertSession("598099999999", "booking_service", { serviceId: "s1" });
+    await upsertSession("598099999999", "booking_service", { selectedServiceId: "s1" });
 
     expect(chain.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ phone: "598099999999", state: "booking_service", context_json: { serviceId: "s1" } }),
+      expect.objectContaining({ phone: "598099999999", state: "booking_service", context_json: { selectedServiceId: "s1" } }),
       { onConflict: "phone" }
     );
   });
@@ -130,6 +130,63 @@ describe("upsertSession", () => {
       expect.objectContaining({ phone: "598011111111", state: "idle" }),
       { onConflict: "phone" }
     );
+  });
+
+  it("strips underscore-prefixed ephemeral keys before upsert", async () => {
+    const { chain } = makeSupabaseMock();
+
+    await upsertSession("598099999999", "booking_window", {
+      selectedServiceId: "svc-1",
+      _slots: [{ start: "2026-04-21T10:00:00Z", end: "2026-04-21T11:00:00Z", label: "Lunes" }],
+      _slotsByDay: { "2026-04-21": [] },
+      _windows: ["mañana"],
+    });
+
+    const upsertArg = chain.upsert.mock.calls[0][0] as { context_json: Record<string, unknown> };
+    expect(upsertArg.context_json).toEqual({ selectedServiceId: "svc-1" });
+    expect(upsertArg.context_json).not.toHaveProperty("_slots");
+    expect(upsertArg.context_json).not.toHaveProperty("_slotsByDay");
+    expect(upsertArg.context_json).not.toHaveProperty("_windows");
+  });
+
+  it("persists non-ephemeral keys unchanged when context is under 32KB", async () => {
+    const { chain } = makeSupabaseMock();
+
+    const context = {
+      selectedServiceId: "svc-2",
+      selectedProfessionalId: "prof-1",
+      clientFirstName: "Ana",
+      _slots: [1, 2, 3],
+    };
+
+    await upsertSession("598099999999", "booking_confirm", context);
+
+    const upsertArg = chain.upsert.mock.calls[0][0] as { context_json: Record<string, unknown> };
+    expect(upsertArg.context_json).toEqual({
+      selectedServiceId: "svc-2",
+      selectedProfessionalId: "prof-1",
+      clientFirstName: "Ana",
+    });
+  });
+
+  it("truncates to essential keys when stripped context exceeds 32KB", async () => {
+    const { chain } = makeSupabaseMock();
+
+    const largeValue = "x".repeat(33 * 1024);
+    const context = {
+      selectedServiceId: "svc-3",
+      selectedProfessionalId: "prof-2",
+      clientFirstName: largeValue,
+    };
+
+    await upsertSession("598099999999", "booking_confirm", context);
+
+    const upsertArg = chain.upsert.mock.calls[0][0] as { context_json: Record<string, unknown> };
+    expect(upsertArg.context_json).toEqual({
+      selectedServiceId: "svc-3",
+      selectedProfessionalId: "prof-2",
+    });
+    expect(upsertArg.context_json).not.toHaveProperty("clientFirstName");
   });
 });
 
