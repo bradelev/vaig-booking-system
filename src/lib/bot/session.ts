@@ -2,6 +2,7 @@
  * Conversation session management — reads/writes to conversation_sessions table.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logger } from "@/lib/logger";
 import type { BotConversationState, BookingFlowContext } from "./types";
 
 export interface ConversationSession {
@@ -18,6 +19,33 @@ export interface ConversationSession {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
+
+const EPHEMERAL_KEY_PREFIX = "_";
+const MAX_CONTEXT_BYTES = 32 * 1024; // 32KB
+
+function sanitizeContext(context: BookingFlowContext): BookingFlowContext {
+  const stripped = Object.fromEntries(
+    Object.entries(context).filter(([k]) => !k.startsWith(EPHEMERAL_KEY_PREFIX))
+  ) as BookingFlowContext;
+
+  const serialized = JSON.stringify(stripped);
+  if (serialized.length > MAX_CONTEXT_BYTES) {
+    logger.warn("session context_json exceeds 32KB after stripping ephemeral keys — truncating to essential fields", {
+      sizeBytes: serialized.length,
+    });
+    const essential: (keyof BookingFlowContext)[] = [
+      "selectedServiceId", "selectedProfessionalId", "selectedSlot",
+      "selectedCategory", "bookingId", "lastMessageId",
+    ];
+    return Object.fromEntries(
+      essential
+        .filter((k) => k in stripped)
+        .map((k) => [k, stripped[k]])
+    ) as BookingFlowContext;
+  }
+
+  return stripped;
+}
 
 export async function getSession(phone: string): Promise<ConversationSession | null> {
   const client = createAdminClient() as AnyClient;
@@ -56,7 +84,7 @@ export async function upsertSession(
   await client
     .from("conversation_sessions")
     .upsert(
-      { phone, state, context_json: context, last_message_at: now },
+      { phone, state, context_json: sanitizeContext(context), last_message_at: now },
       { onConflict: "phone" }
     );
 }
