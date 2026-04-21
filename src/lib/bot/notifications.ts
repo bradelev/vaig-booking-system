@@ -8,6 +8,7 @@
  * If not set, notifications are silently skipped.
  */
 import { sendTextMessage, sendTemplateMessage } from "@/lib/whatsapp/logged";
+import { sanitizeTemplateParam } from "@/lib/whatsapp/sanitize";
 import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { getConfigValue } from "@/lib/config";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
@@ -68,7 +69,7 @@ export async function notifyAdminNewBooking(params: NewBookingNotificationParams
       to: adminPhone,
       templateName: "campana_general",
       languageCode: "es_UY",
-      components: [{ type: "body", parameters: [{ type: "text", text: "Admin" }, { type: "text", text: msg }] }],
+      components: [{ type: "body", parameters: [{ type: "text", text: "Admin" }, { type: "text", text: sanitizeTemplateParam(msg) }] }],
     }, "admin_notification");
   } catch (err) {
     console.error("[Notifications] Failed to send new booking notification to admin:", err);
@@ -192,7 +193,7 @@ export async function notifyBusinessNewBooking(
       to: businessPhone,
       templateName: "campana_general",
       languageCode: "es_UY",
-      components: [{ type: "body", parameters: [{ type: "text", text: "VAIG" }, { type: "text", text: msg }] }],
+      components: [{ type: "body", parameters: [{ type: "text", text: "VAIG" }, { type: "text", text: sanitizeTemplateParam(msg) }] }],
     }, "admin_notification");
   } catch (err) {
     console.error("[Notifications] Failed to send booking notification to business phone:", err);
@@ -247,7 +248,7 @@ export async function notifyAdminPaymentConfirmed(
       to: adminPhone,
       templateName: "campana_general",
       languageCode: "es_UY",
-      components: [{ type: "body", parameters: [{ type: "text", text: "Admin" }, { type: "text", text: msg }] }],
+      components: [{ type: "body", parameters: [{ type: "text", text: "Admin" }, { type: "text", text: sanitizeTemplateParam(msg) }] }],
     }, "admin_notification");
   } catch (err) {
     console.error("[Notifications] Failed to send payment confirmation to admin:", err);
