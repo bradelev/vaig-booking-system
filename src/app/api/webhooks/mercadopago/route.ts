@@ -12,7 +12,7 @@ export function verifySignature(
   dataId: string | null
 ): boolean {
   const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
-  if (!secret) return true; // Skip verification if secret not configured (dev mode)
+  if (!secret) return false;
   if (!xSignature) return false;
 
   // MP signature format: ts=<timestamp>,v1=<hash>

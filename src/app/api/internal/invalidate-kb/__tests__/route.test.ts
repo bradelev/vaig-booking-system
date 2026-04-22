@@ -85,16 +85,14 @@ describe("POST /api/internal/invalidate-kb", () => {
     expect(mockInvalidateKnowledgeCache).not.toHaveBeenCalled();
   });
 
-  it("allows request and invalidates when CRON_SECRET is not set", async () => {
+  it("returns 500 when CRON_SECRET is not set (fail-closed)", async () => {
     delete process.env.CRON_SECRET;
 
     const { POST } = await import("../route");
     const req = makeRequest();
     const res = await POST(req);
 
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.invalidated).toBe(true);
-    expect(mockInvalidateKnowledgeCache).toHaveBeenCalledOnce();
+    expect(res.status).toBe(500);
+    expect(mockInvalidateKnowledgeCache).not.toHaveBeenCalled();
   });
 });

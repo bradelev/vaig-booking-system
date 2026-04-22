@@ -77,10 +77,10 @@ describe("verifySignature (MP webhook)", () => {
     expect(result).toBe(false);
   });
 
-  it("returns true when secret is not set (dev mode bypass)", () => {
+  it("returns false when secret is not set (fail-closed)", () => {
     delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
     const result = verifySignature("", "ts=1,v1=abc", "req-1", "pay-1");
-    expect(result).toBe(true);
+    expect(result).toBe(false);
     // Restore
     process.env.MERCADOPAGO_WEBHOOK_SECRET = SECRET;
   });
@@ -90,6 +90,7 @@ describe("verifySignature (MP webhook)", () => {
     const manifest = `id:;request-id:;ts:${ts};`;
     const v1 = createHmac("sha256", SECRET).update(manifest).digest("hex");
     const sig = `ts=${ts},v1=${v1}`;
+    // Null dataId/requestId are treated as empty strings
     const result = verifySignature("", sig, null, null);
     expect(result).toBe(true);
   });

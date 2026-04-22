@@ -16,14 +16,11 @@ import { logger } from "@/lib/logger";
 import { sendTextMessage } from "@/lib/whatsapp/logged";
 import { createMPPreference } from "@/lib/payments/mp";
 import { shouldSendMessage } from "@/lib/messaging-toggle";
+import { requireCronAuth } from "@/lib/auth/require-cron-auth";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = requireCronAuth(request);
+  if (authError) return authError as NextResponse;
 
   const client = createAdminClient();
 
