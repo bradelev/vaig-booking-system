@@ -1,42 +1,11 @@
 /**
- * Tests for the sessions_used guard logic (VBS-216).
+ * Tests for the sessions_used guard logic (VBS-216, VBS-225).
  *
- * The guard prevents incrementing sessions_used past sessions_total,
- * enforcing the same constraint as the DB CHECK constraint
- * sessions_used_valid at the application level.
+ * Imports the real exported functions from src/lib/sessions-guard.ts.
+ * Renaming a production function causes a compile error here — no mirror tests.
  */
 import { describe, it, expect } from "vitest";
-
-// --- Pure helper mirroring the guard logic in citas.ts and sesiones.ts ---
-
-/**
- * Returns true if the sessions_used counter should be incremented,
- * false if it is already at or beyond the cap.
- * Mirrors the guard added in updateBookingStatus, updateBookingInline,
- * and confirmBookingAsSession.
- */
-function shouldIncrementSessionsUsed(
-  sessionsUsed: number,
-  sessionsTotal: number
-): boolean {
-  return sessionsUsed < sessionsTotal;
-}
-
-/**
- * Simulates the full guard + increment logic.
- * Returns the resulting sessions_used value (unchanged if at cap).
- */
-function applySessionsUsedGuard(
-  sessionsUsed: number,
-  sessionsTotal: number
-): { incremented: boolean; newSessionsUsed: number } {
-  if (sessionsUsed >= sessionsTotal) {
-    return { incremented: false, newSessionsUsed: sessionsUsed };
-  }
-  return { incremented: true, newSessionsUsed: sessionsUsed + 1 };
-}
-
-// --- Tests ---
+import { shouldIncrementSessionsUsed, applySessionsUsedGuard } from "@/lib/sessions-guard";
 
 describe("shouldIncrementSessionsUsed", () => {
   it("returns true when sessions_used is below sessions_total", () => {

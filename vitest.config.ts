@@ -32,6 +32,8 @@ export default defineConfig({
         "src/lib/logger.ts",
         "src/lib/whatsapp/retry.ts",
         "src/lib/admin-rate-limit.ts",
+        "src/lib/sessions-guard.ts",
+        "src/lib/auth/require-cron-auth.ts",
       ],
       exclude: [
         "src/**/*.d.ts",

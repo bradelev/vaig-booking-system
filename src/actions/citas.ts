@@ -11,6 +11,7 @@ import { normalizePhone } from "@/lib/phone";
 import { checkAdminRateLimit } from "@/lib/admin-rate-limit";
 import { logger } from "@/lib/logger";
 import { withRetry } from "@/lib/whatsapp/retry";
+import { shouldIncrementSessionsUsed } from "@/lib/sessions-guard";
 
 export type CancellationReason =
   | "client_request"
@@ -132,7 +133,7 @@ export async function updateBookingStatus(id: string, status: string) {
       const cp = rawCp as { sessions_used: number; sessions_total: number } | null;
 
       if (cp) {
-        if (cp.sessions_used >= cp.sessions_total) {
+        if (!shouldIncrementSessionsUsed(cp.sessions_used, cp.sessions_total)) {
           logger.warn("sessions_used at cap, skipping increment", {
             client_package_id: booking.client_package_id,
             sessions_used: cp.sessions_used,
@@ -483,7 +484,7 @@ export async function updateBookingInline(
       .single();
     const cp = rawInlineCp as { sessions_used: number; sessions_total: number } | null;
     if (cp) {
-      if (cp.sessions_used >= cp.sessions_total) {
+      if (!shouldIncrementSessionsUsed(cp.sessions_used, cp.sessions_total)) {
         logger.warn("sessions_used at cap, skipping increment", {
           client_package_id: current.client_package_id,
           sessions_used: cp.sessions_used,

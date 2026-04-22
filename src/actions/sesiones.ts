@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { LOCAL_TIMEZONE, localInputToISO } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import { shouldIncrementSessionsUsed } from "@/lib/sessions-guard";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseClient = any;
@@ -188,7 +189,7 @@ export async function confirmBookingAsSession(
       .single();
 
     if (cp) {
-      if (cp.sessions_used >= cp.sessions_total) {
+      if (!shouldIncrementSessionsUsed(cp.sessions_used, cp.sessions_total)) {
         logger.warn("sessions_used at cap, skipping increment", {
           client_package_id: booking.client_package_id,
           sessions_used: cp.sessions_used,
