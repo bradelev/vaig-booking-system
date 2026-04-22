@@ -173,9 +173,16 @@ async function processStatuses(statuses: WhatsAppStatusUpdate[]): Promise<void> 
   }
 }
 
+async function processWebhookPayloadAsync(payload: WhatsAppWebhookPayload): Promise<void> {
+  const { messages, statuses } = parseWebhookPayload(payload);
+  await Promise.all([
+    processMessages(messages),
+    processStatuses(statuses),
+  ]);
+}
+
 // POST — incoming messages
 export async function POST(request: NextRequest) {
-  // Respond 200 immediately (Meta requires < 5s response)
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
 
@@ -200,12 +207,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "ok" }, { status: 200 });
   }
 
-  const { messages, statuses } = parseWebhookPayload(payload);
+  // Return 200 immediately — Meta requires <5s. Process async per CLAUDE.md rule #1.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ctx = (globalThis as any)[Symbol.for("next.request.context")];
+  const processing = processWebhookPayloadAsync(payload).catch((err: unknown) => {
+    logger.error("WA webhook: async processing failed", { error: err instanceof Error ? err.message : String(err) });
+  });
 
-  await Promise.all([
-    processMessages(messages),
-    processStatuses(statuses),
-  ]);
+  if (ctx?.waitUntil) {
+    ctx.waitUntil(processing);
+  }
 
   return NextResponse.json({ status: "ok" }, { status: 200 });
 }
