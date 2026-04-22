@@ -9,7 +9,7 @@ interface RetryOptions {
 export async function withRetry<T>(
   fn: () => Promise<T>,
   options?: RetryOptions
-): Promise<T | undefined> {
+): Promise<T> {
   const maxAttempts = options?.maxAttempts ?? 3;
   const baseDelayMs = options?.baseDelayMs ?? 1000;
   const label = options?.label ?? "unknown";
@@ -33,5 +33,5 @@ export async function withRetry<T>(
     max_attempts: maxAttempts,
     error: lastError instanceof Error ? lastError.message : String(lastError),
   });
-  return undefined;
+  throw lastError;
 }
