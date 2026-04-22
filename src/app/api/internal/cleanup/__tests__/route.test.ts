@@ -120,22 +120,13 @@ describe("GET /api/internal/cleanup", () => {
     expect(body.error).toBe("msg error");
   });
 
-  it("allows request when CRON_SECRET is not set", async () => {
+  it("returns 500 when CRON_SECRET is not set (fail-closed)", async () => {
     delete process.env.CRON_SECRET;
-
-    const sessionChain = buildChain({ data: [], error: null });
-    const messageChain = buildChain({ data: [], error: null });
-    mockFrom
-      .mockReturnValueOnce(sessionChain)
-      .mockReturnValueOnce(messageChain);
 
     const { GET } = await import("../route");
     const req = makeRequest();
     const res = await GET(req);
 
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.deleted.sessions).toBe(0);
-    expect(body.deleted.messages).toBe(0);
+    expect(res.status).toBe(500);
   });
 });

@@ -145,66 +145,13 @@ export async function mergeClients(keepId: string, deleteId: string): Promise<vo
 
   const supabase = await createClient();
 
-  type SesionRow = { id: string; fecha: string; tipo_servicio: string; descripcion: string | null };
+  // Single atomic transaction via Postgres RPC — avoids partial-failure inconsistency
+  const { error } = await supabase.rpc("merge_clients", {
+    primary_id: keepId,
+    secondary_id: deleteId,
+  });
 
-  // 1. Reasignar sesiones_historicas — ignorar conflictos de unicidad (ON CONFLICT DO NOTHING via upsert skip)
-  const { data: rawSesiones } = await supabase
-    .from("sesiones_historicas")
-    .select("id, fecha, tipo_servicio, descripcion")
-    .eq("client_id", deleteId);
-  const sesiones = (rawSesiones ?? []) as SesionRow[];
-
-  if (sesiones.length > 0) {
-    // Get existing sessions for keepId to avoid duplicates
-    const { data: rawExistentes } = await supabase
-      .from("sesiones_historicas")
-      .select("fecha, tipo_servicio, descripcion")
-      .eq("client_id", keepId);
-    const existentes = (rawExistentes ?? []) as Pick<SesionRow, "fecha" | "tipo_servicio" | "descripcion">[];
-
-    const existenteSet = new Set(
-      existentes.map(
-        (s) => `${s.fecha}|${s.tipo_servicio}|${s.descripcion ?? ""}`
-      )
-    );
-
-    const idsAMover = sesiones
-      .filter((s) => !existenteSet.has(`${s.fecha}|${s.tipo_servicio}|${s.descripcion ?? ""}`))
-      .map((s) => s.id);
-
-    if (idsAMover.length > 0) {
-      const { error: errSes } = await supabase
-        .from("sesiones_historicas")
-        .update({ client_id: keepId })
-        .in("id", idsAMover);
-      if (errSes) throw new Error(`Error reasignando sesiones: ${errSes.message}`);
-    }
-  }
-
-  // 2. Reasignar client_packages (ON DELETE RESTRICT — debe moverse antes de borrar)
-  const { error: errPkg } = await supabase
-    .from("client_packages")
-    .update({ client_id: keepId })
-    .eq("client_id", deleteId);
-  if (errPkg) throw new Error(`Error reasignando paquetes: ${errPkg.message}`);
-
-  // 3. Reasignar bookings
-  const { error: errBook } = await supabase
-    .from("bookings")
-    .update({ client_id: keepId })
-    .eq("client_id", deleteId);
-  if (errBook) throw new Error(`Error reasignando bookings: ${errBook.message}`);
-
-  // 4. Reasignar conversation_sessions del bot
-  const { error: errSess } = await supabase
-    .from("conversation_sessions")
-    .update({ client_id: keepId })
-    .eq("client_id", deleteId);
-  if (errSess) throw new Error(`Error reasignando sesiones bot: ${errSess.message}`);
-
-  // 5. Eliminar el cliente duplicado
-  const { error: errDel } = await supabase.from("clients").delete().eq("id", deleteId);
-  if (errDel) throw new Error(`Error eliminando cliente: ${errDel.message}`);
+  if (error) throw new Error(`Error fusionando clientes: ${error.message}`);
 
   revalidatePath("/backoffice/clientes");
   revalidatePath("/backoffice/clientes/duplicados");

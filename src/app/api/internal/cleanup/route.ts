@@ -2,14 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getConfigValue } from "@/lib/config";
 import { logger } from "@/lib/logger";
+import { requireCronAuth } from "@/lib/auth/require-cron-auth";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = requireCronAuth(request);
+  if (authError) return authError as NextResponse;
 
   const sessionDaysStr = await getConfigValue("session_retention_days", "30");
   const messageDaysStr = await getConfigValue("message_retention_days", "90");

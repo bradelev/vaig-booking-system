@@ -31,29 +31,27 @@ describe("withRetry", () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
-  it("retries up to maxAttempts and returns undefined after all failures", async () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  it("retries up to maxAttempts and throws after all failures", async () => {
     const fn = vi.fn().mockRejectedValue(new Error("always fails"));
+    let caughtError: Error | undefined;
 
-    const promise = withRetry(fn, { maxAttempts: 3, baseDelayMs: 100, label: "notifyAdmin" });
+    const resultPromise = withRetry(fn, { maxAttempts: 3, baseDelayMs: 100, label: "notifyAdmin" })
+      .catch((e: Error) => { caughtError = e; });
     await vi.runAllTimersAsync();
-    const result = await promise;
+    await resultPromise;
 
-    expect(result).toBeUndefined();
+    expect(caughtError?.message).toBe("always fails");
     expect(fn).toHaveBeenCalledTimes(3);
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Final failure after max retry attempts")
-    );
-    consoleSpy.mockRestore();
   });
 
   it("uses exponential backoff delays", async () => {
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
     const fn = vi.fn().mockRejectedValue(new Error("fail"));
 
-    const promise = withRetry(fn, { maxAttempts: 3, baseDelayMs: 1000, label: "test" });
+    const resultPromise = withRetry(fn, { maxAttempts: 3, baseDelayMs: 1000, label: "test" })
+      .catch(() => "caught");
     await vi.runAllTimersAsync();
-    await promise;
+    await resultPromise;
 
     const delays = setTimeoutSpy.mock.calls.map((args) => args[1]);
     expect(delays).toContain(1000); // attempt 1 → delay 1000ms
@@ -62,27 +60,23 @@ describe("withRetry", () => {
   });
 
   it("uses defaults when no options provided", async () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const fn = vi.fn().mockRejectedValue(new Error("fail"));
 
-    const promise = withRetry(fn);
+    const resultPromise = withRetry(fn).catch(() => "caught");
     await vi.runAllTimersAsync();
-    await promise;
+    await resultPromise;
 
     expect(fn).toHaveBeenCalledTimes(3);
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Final failure after max retry attempts")
-    );
-    consoleSpy.mockRestore();
   });
 
   it("does not delay after the final failed attempt", async () => {
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
     const fn = vi.fn().mockRejectedValue(new Error("fail"));
 
-    const promise = withRetry(fn, { maxAttempts: 2, baseDelayMs: 500, label: "test" });
+    const resultPromise = withRetry(fn, { maxAttempts: 2, baseDelayMs: 500, label: "test" })
+      .catch(() => "caught");
     await vi.runAllTimersAsync();
-    await promise;
+    await resultPromise;
 
     const delays = setTimeoutSpy.mock.calls.map((args) => args[1]);
     // maxAttempts=2: delay after attempt 1 only (500ms), no delay after attempt 2
