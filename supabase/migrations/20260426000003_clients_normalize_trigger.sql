@@ -11,7 +11,7 @@ IMMUTABLE
 AS $$
   SELECT trim(
     lower(
-      unaccent(
+      extensions.unaccent(
         coalesce(first_name, '') || ' ' || coalesce(last_name, '')
       )
     )
