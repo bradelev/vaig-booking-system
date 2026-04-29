@@ -13,6 +13,7 @@ export type MessageSource =
   | "admin_manual"
   | "admin_notification"
   | "admin_reminder"
+  | "playbook"
   | "client";
 export type MessageStatus = "pending" | "sent" | "delivered" | "read" | "failed";
 
