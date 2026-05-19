@@ -1,28 +1,10 @@
 import type { Metadata } from "next";
 import { LOCAL_TIMEZONE } from "@/lib/timezone";
 import { createClient } from "@/lib/supabase/server";
+import { relativeDayLabel } from "@/lib/reminders/relative-label";
 import RecordatoriosPageClient from "./recordatorios-page-client";
 
 export const metadata: Metadata = { title: "Recordatorios" };
-
-function tomorrowAR(): { dateStr: string; label: string } {
-  const now = new Date();
-  const todayStr = now.toLocaleDateString("sv-SE", {
-    timeZone: LOCAL_TIMEZONE,
-  });
-  const tomorrow = new Date(todayStr + "T12:00:00");
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const dateStr = tomorrow.toLocaleDateString("sv-SE", {
-    timeZone: LOCAL_TIMEZONE,
-  });
-  const label = tomorrow.toLocaleDateString("es-AR", {
-    timeZone: LOCAL_TIMEZONE,
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-  return { dateStr, label };
-}
 
 export type ReminderBooking = {
   id: string;
@@ -38,15 +20,20 @@ export type ReminderBooking = {
   clientConfirmedAt: string | null;
 };
 
+export type DayGroup = {
+  dateStr: string;
+  /** "Hoy", "Mañana", "Sábado 24/05" */
+  label: string;
+  bookings: ReminderBooking[];
+};
+
 export default async function RecordatoriosPage() {
-  const { dateStr, label } = tomorrowAR();
-  const nextDateStr = (() => {
-    const d = new Date(dateStr + "T12:00:00");
-    d.setDate(d.getDate() + 1);
-    return d.toLocaleDateString("sv-SE", {
-      timeZone: LOCAL_TIMEZONE,
-    });
-  })();
+  const now = new Date();
+
+  // Rolling 7-day window in local timezone
+  const todayStr = now.toLocaleDateString("sv-SE", { timeZone: LOCAL_TIMEZONE });
+  const sevenDaysLater = new Date(now.getTime() + 7 * 86_400_000);
+  const endStr = sevenDaysLater.toLocaleDateString("sv-SE", { timeZone: LOCAL_TIMEZONE });
 
   const supabase = await createClient();
 
@@ -59,8 +46,8 @@ export default async function RecordatoriosPage() {
        professionals(name)`
     )
     .in("status", ["confirmed", "deposit_paid", "pending"])
-    .gte("scheduled_at", `${dateStr}T00:00:00`)
-    .lt("scheduled_at", `${nextDateStr}T00:00:00`)
+    .gte("scheduled_at", `${todayStr}T00:00:00`)
+    .lt("scheduled_at", `${endStr}T00:00:00`)
     .order("scheduled_at");
 
   if (error) {
@@ -93,14 +80,36 @@ export default async function RecordatoriosPage() {
     clientConfirmedAt: b.client_confirmed_at,
   }));
 
+  // Group bookings by local calendar day
+  const dayMap = new Map<string, ReminderBooking[]>();
+  for (const booking of bookings) {
+    const dayStr = new Date(booking.scheduledAt).toLocaleDateString("sv-SE", {
+      timeZone: LOCAL_TIMEZONE,
+    });
+    if (!dayMap.has(dayStr)) dayMap.set(dayStr, []);
+    dayMap.get(dayStr)!.push(booking);
+  }
+
+  // Build ordered DayGroup array (only days that have bookings)
+  const dayGroups: DayGroup[] = [];
+  const sortedDays = Array.from(dayMap.keys()).sort();
+  for (const dateStr of sortedDays) {
+    const representativeBooking = dayMap.get(dateStr)![0];
+    const { label } = relativeDayLabel(representativeBooking.scheduledAt, LOCAL_TIMEZONE, now);
+    dayGroups.push({
+      dateStr,
+      label,
+      bookings: dayMap.get(dateStr)!,
+    });
+  }
+
   const contactPhone = process.env.VAIG_CONTACT_PHONE ?? "";
   const address = process.env.VAIG_ADDRESS ?? "";
   const accessInstructions = process.env.VAIG_ACCESS_INSTRUCTIONS ?? "";
 
   return (
     <RecordatoriosPageClient
-      bookings={bookings}
-      tomorrowLabel={label}
+      dayGroups={dayGroups}
       contactPhone={contactPhone}
       address={address}
       accessInstructions={accessInstructions}

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { LOCAL_TIMEZONE } from "@/lib/timezone";
+import { relativeDayLabel } from "@/lib/reminders/relative-label";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplateMessage } from "@/lib/whatsapp/logged";
@@ -88,10 +89,12 @@ export async function sendReminders(
       minute: "2-digit",
       hour12: false,
     });
+    const { clauseEs } = relativeDayLabel(booking.scheduled_at, LOCAL_TIMEZONE);
     const instrucciones = getPreCitaInstructions(booking.services?.category ?? null);
 
     const personalizedMessage = sanitizeTemplateParam(
       message
+        .replace(/\{dia_hora\}/g, clauseEs)
         .replace(/\{hora\}/g, hora)
         .replace(/\{servicio\}/g, serviceName)
         .replace(/\{direccion\}/g, address)
