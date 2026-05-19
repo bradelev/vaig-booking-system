@@ -91,11 +91,14 @@ function AddRowCombobox({
   async function selectOption(opt: ComboboxOption) {
     if (opt.id === "__create__") {
       const query = inputText.trim();
+      // Determine if input is phone-like (digits, spaces, +, dashes) or a name
+      const isPhoneLike = /^[\d\s+\-()]+$/.test(query);
       const parts = query.split(/\s+/);
-      const first_name = parts[0] ?? query;
-      const last_name = parts.slice(1).join(" ") || undefined;
+      const first_name = isPhoneLike ? "Nuevo" : (parts[0] ?? query);
+      const last_name = isPhoneLike ? undefined : (parts.slice(1).join(" ") || undefined);
+      const phone = isPhoneLike ? query : "";
       try {
-        const created = await quickCreateClientForCampaign({ first_name, last_name, phone: query });
+        const created = await quickCreateClientForCampaign({ first_name, last_name, phone });
         onAdd(created);
         setInputText("");
         setOpen(false);

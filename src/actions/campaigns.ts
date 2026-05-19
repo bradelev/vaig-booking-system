@@ -245,13 +245,13 @@ export async function cloneCampaign(id: string) {
     .single();
 
   if (fetchErr) throw new Error(fetchErr.message);
-  type CampaignCloneRow = { name: string; body: string; image_url: string | null; target_all: boolean; filter_criteria: unknown };
+  type CampaignCloneRow = { name: string | null; body: string; image_url: string | null; target_all: boolean; filter_criteria: unknown };
   const original = rawOriginal as CampaignCloneRow;
 
   const { data: rawClone, error: insertErr } = await db
     .from("campaigns")
     .insert({
-      name: `${original.name} (copia)`,
+      name: `${original.name ?? defaultCampaignName()} (copia)`,
       body: original.body,
       image_url: original.image_url,
       target_all: original.target_all,
