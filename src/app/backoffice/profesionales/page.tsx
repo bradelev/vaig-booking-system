@@ -11,6 +11,7 @@ interface Professional {
   name: string;
   specialties: string[] | null;
   is_active: boolean;
+  phone: string | null;
 }
 
 export default async function ProfesionalesPage() {
@@ -18,7 +19,7 @@ export default async function ProfesionalesPage() {
 
   const { data: raw } = await supabase
     .from("professionals")
-    .select("id, name, specialties, is_active")
+    .select("id, name, specialties, is_active, phone")
     .order("name");
 
   const profesionales = (raw ?? []) as Professional[];
@@ -29,6 +30,12 @@ export default async function ProfesionalesPage() {
       primaryOnMobile: true,
       accessor: (p) => (
         <span className="text-sm font-medium text-foreground">{p.name}</span>
+      ),
+    },
+    {
+      header: "Teléfono",
+      accessor: (p) => (
+        <span className="whitespace-nowrap">{p.phone ?? "—"}</span>
       ),
     },
     {
