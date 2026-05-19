@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useRealtimeMessages } from "@/app/backoffice/inbox/use-realtime-messages";
-import Link from "next/link";
-import { Menu, PanelLeftClose, PanelLeft, Plus, LogOut, ChevronRight } from "lucide-react";
+import { Menu, PanelLeftClose, PanelLeft, LogOut, ChevronRight } from "lucide-react";
 import Sidebar from "./sidebar";
 import {
   DropdownMenu,
@@ -149,15 +148,6 @@ export default function MobileLayout({ email, logoutAction, children, inboxUnrea
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Quick action */}
-            <Link
-              href="/backoffice/citas/nueva"
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Nueva cita</span>
-            </Link>
-
             {/* User dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary hover:bg-primary/20 transition-colors">

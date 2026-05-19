@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   CalendarDays,
   ClipboardList,
   MessageSquare,
@@ -11,11 +10,7 @@ import {
   Package,
   Users,
   UserCircle,
-  FileSpreadsheet,
-  BarChart3,
-  Zap,
   Megaphone,
-  Target,
   Settings,
   X,
 } from "lucide-react";
@@ -26,7 +21,6 @@ const navSections = [
   {
     label: "Operaciones",
     items: [
-      { href: "/backoffice", label: "Dashboard", icon: LayoutDashboard },
       { href: "/backoffice/agenda", label: "Agenda", icon: CalendarDays },
       { href: "/backoffice/citas", label: "Citas", icon: ClipboardList },
       { href: "/backoffice/inbox", label: "Inbox", icon: MessageSquare },
@@ -44,10 +38,6 @@ const navSections = [
   {
     label: "Negocio",
     items: [
-      { href: "/backoffice/sesiones", label: "Sesiones", icon: FileSpreadsheet },
-      { href: "/backoffice/metricas/depilacion", label: "Depilación", icon: Zap },
-      { href: "/backoffice/metricas", label: "Métricas", icon: BarChart3 },
-      { href: "/backoffice/segmentacion", label: "Segmentación", icon: Target },
       { href: "/backoffice/automatizaciones", label: "Campañas", icon: Megaphone },
     ],
   },
@@ -109,10 +99,7 @@ export default function Sidebar({ collapsed = false, onClose, email, inboxUnread
             )}
             <div className={cn("space-y-0.5", collapsed ? "px-1.5" : "px-2")}>
               {section.items.map((item) => {
-                const isActive =
-                  item.href === "/backoffice" || item.href === "/backoffice/metricas"
-                    ? pathname === item.href
-                    : pathname.startsWith(item.href);
+                const isActive = pathname.startsWith(item.href);
 
                 const Icon = item.icon;
 
