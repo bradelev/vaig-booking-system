@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { sendTextMessage } from "@/lib/whatsapp/logged";
 import { activateHandoff, releaseHandoff } from "@/lib/bot/handoff";
@@ -72,6 +73,8 @@ export async function markAsRead(phone: string): Promise<void> {
       .eq("phone", phone)
       .eq("direction", "inbound")
       .is("admin_read_at", null);
+
+    revalidatePath("/backoffice", "layout");
   } catch (err) {
     logger.error("[Inbox] Failed to mark as read", { phone, error: err instanceof Error ? err.message : String(err) });
   }
