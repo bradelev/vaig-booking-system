@@ -15,15 +15,16 @@ export default async function BackofficeLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch inbox unread count for sidebar badge
-  const { count } = await (supabase as AnyClient)
-    .from("messages")
-    .select("id", { count: "exact", head: true })
-    .eq("direction", "inbound")
-    .is("admin_read_at", null);
+  // Count conversations (not messages) with unread messages to match the inbox "Sin leer (N)" filter.
+  const { data: convs } = await (supabase as AnyClient)
+    .from("inbox_conversations")
+    .select("phone, unread_count");
+  const count = (convs ?? []).filter(
+    (c: { unread_count: number }) => c.unread_count > 0
+  ).length;
 
   return (
-    <MobileLayout email={user?.email ?? ""} logoutAction={logout} inboxUnreadCount={count ?? 0}>
+    <MobileLayout email={user?.email ?? ""} logoutAction={logout} inboxUnreadCount={count}>
       {children}
     </MobileLayout>
   );

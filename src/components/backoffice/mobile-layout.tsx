@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useRealtimeMessages } from "@/app/backoffice/inbox/use-realtime-messages";
 import { Menu, PanelLeftClose, PanelLeft, LogOut, ChevronRight } from "lucide-react";
 import Sidebar from "./sidebar";
@@ -45,13 +45,13 @@ const BREADCRUMB_MAP: Record<string, string> = {
 
 export default function MobileLayout({ email, logoutAction, children, inboxUnreadCount = 0 }: MobileLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(inboxUnreadCount);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(COLLAPSED_KEY) === "1";
   });
   const pathname = usePathname();
   const prevPathname = useRef(pathname);
+  const router = useRouter();
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -61,15 +61,10 @@ export default function MobileLayout({ email, logoutAction, children, inboxUnrea
     });
   }
 
-  // Sync initial count from server when layout re-renders (e.g. navigation)
-  useEffect(() => {
-    setUnreadCount(inboxUnreadCount);
-  }, [inboxUnreadCount]);
-
-  // Increment badge in real-time when new inbound messages arrive
+  // Refresh server layout on new inbound messages so badge re-fetches from inbox_conversations view.
   useRealtimeMessages((newMsg) => {
     if (newMsg.direction === "inbound") {
-      setUnreadCount((prev) => prev + 1);
+      router.refresh();
     }
   });
 
@@ -105,7 +100,7 @@ export default function MobileLayout({ email, logoutAction, children, inboxUnrea
           collapsed={collapsed}
           onClose={() => setMobileOpen(false)}
           email={email}
-          inboxUnreadCount={unreadCount}
+          inboxUnreadCount={inboxUnreadCount}
         />
       </div>
 
