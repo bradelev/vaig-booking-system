@@ -1,0 +1,1 @@
+ALTER TABLE campaigns ALTER COLUMN name DROP NOT NULL;

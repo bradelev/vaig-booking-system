@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition, useId, useCallback, useEffect } from "react";
+import { useState, useRef, useTransition } from "react";
+import { toast } from "sonner";
 import { LOCAL_TIMEZONE, localInputToISO } from "@/lib/timezone";
 import {
   createCampaign,
@@ -8,24 +9,11 @@ import {
   updateCampaign,
   uploadCampaignImage,
   scheduleCampaign,
-  filterCampaignClients,
-  type CampaignFilterCriteria,
-  type FilteredClient,
+  updateClientInline,
 } from "@/actions/campaigns";
-import CampaignFilterPanel, { hasAnyCriteria } from "@/components/backoffice/campaign-filter-panel";
-import CampaignFilterPreview from "@/components/backoffice/campaign-filter-preview";
-
-interface Client {
-  id: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
-}
-
-type RecipientMode = "all" | "filter" | "manual";
+import CampaignRecipientsTable, { type RecipientClient } from "@/components/backoffice/campaign-recipients-table";
 
 interface CampaignFormProps {
-  clients: Client[];
   campaign?: {
     id: string;
     name: string;
@@ -35,7 +23,7 @@ interface CampaignFormProps {
     target_all: boolean;
     status: string;
     recipient_ids: string[];
-    filter_criteria?: CampaignFilterCriteria | null;
+    initialRecipients?: RecipientClient[];
   };
 }
 
@@ -64,14 +52,7 @@ function formatTimeART(isoString: string | null): string {
   });
 }
 
-function deriveInitialMode(campaign?: CampaignFormProps["campaign"]): RecipientMode {
-  if (!campaign) return "all";
-  if (campaign.target_all) return "all";
-  if (campaign.filter_criteria && hasAnyCriteria(campaign.filter_criteria)) return "filter";
-  return "manual";
-}
-
-export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
+export default function CampaignForm({ campaign }: CampaignFormProps) {
   const isEdit = !!campaign;
   const isDraft = !campaign || campaign.status === "draft";
 
@@ -79,142 +60,70 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
   const [body, setBody] = useState(campaign?.body ?? "");
   const [imageUrl, setImageUrl] = useState(campaign?.image_url ?? "");
   const [imagePreview, setImagePreview] = useState(campaign?.image_url ?? "");
-  const [recipientMode, setRecipientMode] = useState<RecipientMode>(deriveInitialMode(campaign));
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    new Set(campaign?.recipient_ids ?? [])
-  );
-  const [comboboxQuery, setComboboxQuery] = useState("");
-  const [comboboxOpen, setComboboxOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const [scheduledAt, setScheduledAt] = useState(
-    toLocalDatetimeValue(campaign?.scheduled_at ?? null)
+  const [scheduledAt, setScheduledAt] = useState(toLocalDatetimeValue(campaign?.scheduled_at ?? null));
+  const [selectedClients, setSelectedClients] = useState<RecipientClient[]>(
+    campaign?.initialRecipients ?? []
   );
   const [uploading, setUploading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  // Filter mode state
-  const [filterCriteria, setFilterCriteria] = useState<CampaignFilterCriteria>(
-    campaign?.filter_criteria ?? {}
-  );
-  const [filteredClients, setFilteredClients] = useState<FilteredClient[]>([]);
-  const [filteredCount, setFilteredCount] = useState(0);
-  const [filterApplied, setFilterApplied] = useState(false);
-  const [isFiltering, startFilterTransition] = useTransition();
-  const [filterSelectedIds, setFilterSelectedIds] = useState<Set<string>>(new Set());
-
   const fileRef = useRef<HTMLInputElement>(null);
-  const comboboxId = useId();
-  const listboxId = `${comboboxId}-listbox`;
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-apply filters on mount if editing a filter-based campaign
-  useEffect(() => {
-    if (
-      recipientMode === "filter" &&
-      hasAnyCriteria(filterCriteria) &&
-      !filterApplied
-    ) {
-      startFilterTransition(async () => {
-        const result = await filterCampaignClients(filterCriteria);
-        setFilteredClients(result.clients);
-        setFilteredCount(result.count);
-        setFilterApplied(true);
-        setFilterSelectedIds(new Set(result.clients.map((c) => c.id)));
-      });
+  const minDatetime = toLocalDatetimeValue(new Date().toISOString());
+
+  function buildFormData(): FormData {
+    const fd = new FormData();
+    fd.append("name", name);
+    fd.append("body", body);
+    fd.append("image_url", imageUrl);
+    fd.append("target_all", "false");
+    fd.append("scheduled_at", scheduledAt);
+    for (const c of selectedClients) {
+      fd.append("client_ids", c.id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Read segmentation handoff from sessionStorage (one-shot, from /segmentacion page)
-  useEffect(() => {
-    if (typeof window === "undefined" || isEdit) return;
-    const raw = sessionStorage.getItem("segmentacion_handoff");
-    if (!raw) return;
-    sessionStorage.removeItem("segmentacion_handoff");
-    try {
-      const { criteria, selectedIds: ids } = JSON.parse(raw) as {
-        criteria: CampaignFilterCriteria;
-        selectedIds: string[];
-      };
-      setRecipientMode("filter");
-      setFilterCriteria(criteria);
-      startFilterTransition(async () => {
-        const result = await filterCampaignClients(criteria);
-        setFilteredClients(result.clients);
-        setFilteredCount(result.count);
-        setFilterApplied(true);
-        setFilterSelectedIds(new Set(ids));
-      });
-    } catch {
-      // Malformed handoff — ignore silently
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const dropdownClients = clients.filter((c) => {
-    if (selectedIds.has(c.id)) return false;
-    const q = comboboxQuery.toLowerCase();
-    return (
-      c.first_name.toLowerCase().includes(q) ||
-      c.last_name.toLowerCase().includes(q) ||
-      c.phone.includes(q)
-    );
-  }).slice(0, 8);
-
-  const selectedClients = clients.filter((c) => selectedIds.has(c.id));
-
-  const selectClient = useCallback((id: string) => {
-    setSelectedIds((prev) => new Set([...prev, id]));
-    setComboboxQuery("");
-    setComboboxOpen(false);
-    setActiveIndex(-1);
-    inputRef.current?.focus();
-  }, []);
-
-  const removeClient = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  }, []);
-
-  function handleComboboxKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!comboboxOpen) {
-      if (e.key === "ArrowDown") {
-        setComboboxOpen(true);
-        setActiveIndex(0);
-        e.preventDefault();
-      }
-      return;
-    }
-    if (e.key === "ArrowDown") {
-      setActiveIndex((i) => Math.min(i + 1, dropdownClients.length - 1));
-      e.preventDefault();
-    } else if (e.key === "ArrowUp") {
-      setActiveIndex((i) => Math.max(i - 1, -1));
-      e.preventDefault();
-    } else if (e.key === "Enter" && activeIndex >= 0 && dropdownClients[activeIndex]) {
-      selectClient(dropdownClients[activeIndex].id);
-      e.preventDefault();
-    } else if (e.key === "Escape") {
-      setComboboxOpen(false);
-      setActiveIndex(-1);
-    }
+    return fd;
   }
 
-  useEffect(() => {
-    if (!comboboxOpen) return;
-    function handleClick(e: MouseEvent) {
-      const container = document.getElementById(comboboxId);
-      if (container && !container.contains(e.target as Node)) {
-        setComboboxOpen(false);
-        setActiveIndex(-1);
+  function handleSaveDraft() {
+    startTransition(async () => {
+      try {
+        const fd = buildFormData();
+        if (isEdit && campaign) {
+          await updateCampaign(campaign.id, fd);
+        } else {
+          await createCampaign(fd);
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Error al guardar");
       }
+    });
+  }
+
+  function handleScheduleNew() {
+    if (!scheduledAt) {
+      toast.error("Configurá una fecha y hora de envío antes de programar");
+      return;
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [comboboxOpen, comboboxId]);
+    startTransition(async () => {
+      try {
+        const fd = buildFormData();
+        await createAndScheduleCampaign(fd);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Error al programar");
+      }
+    });
+  }
+
+  async function handleScheduleExisting() {
+    if (!campaign) return;
+    startTransition(async () => {
+      try {
+        await scheduleCampaign(campaign.id);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Error al programar");
+      }
+    });
+  }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -231,7 +140,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
       const result = await uploadCampaignImage(fd);
       setImageUrl(result.url);
     } catch (err) {
-      alert(`Error al subir imagen: ${err instanceof Error ? err.message : "Error desconocido"}`);
+      toast.error(`Error al subir imagen: ${err instanceof Error ? err.message : "Error desconocido"}`);
       setImagePreview(imageUrl);
     } finally {
       setUploading(false);
@@ -244,88 +153,26 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  function handleApplyFilters() {
-    startFilterTransition(async () => {
-      const result = await filterCampaignClients(filterCriteria);
-      setFilteredClients(result.clients);
-      setFilteredCount(result.count);
-      setFilterApplied(true);
-      setFilterSelectedIds(new Set(result.clients.map((c) => c.id)));
+  function handleAddClient(client: RecipientClient) {
+    setSelectedClients((prev) => {
+      if (prev.some((c) => c.id === client.id)) return prev;
+      return [...prev, client];
     });
   }
 
-  function buildFormData(): FormData {
-    const fd = new FormData();
-    fd.append("name", name);
-    fd.append("body", body);
-    fd.append("image_url", imageUrl);
-    fd.append("target_all", String(recipientMode === "all"));
-    fd.append("scheduled_at", scheduledAt);
-
-    if (recipientMode === "filter") {
-      fd.append("filter_criteria", JSON.stringify(filterCriteria));
-      for (const id of filterSelectedIds) {
-        fd.append("client_ids", id);
-      }
-    } else if (recipientMode === "manual") {
-      for (const id of selectedIds) {
-        fd.append("client_ids", id);
-      }
-    }
-
-    return fd;
+  function handleRemoveClient(clientId: string) {
+    setSelectedClients((prev) => prev.filter((c) => c.id !== clientId));
   }
 
-  const filterNotReady = recipientMode === "filter" && !filterApplied;
-
-  function handleSaveDraft() {
-    if (filterNotReady) {
-      alert("Aplicá los filtros antes de guardar");
-      return;
-    }
-    startTransition(async () => {
-      const fd = buildFormData();
-      if (isEdit && campaign) {
-        await updateCampaign(campaign.id, fd);
-      } else {
-        await createCampaign(fd);
-      }
-    });
+  async function handleUpdateClient(
+    clientId: string,
+    patch: { first_name?: string; last_name?: string; phone?: string }
+  ) {
+    await updateClientInline(clientId, patch);
+    setSelectedClients((prev) =>
+      prev.map((c) => (c.id === clientId ? { ...c, ...patch } : c))
+    );
   }
-
-  function handleScheduleNew() {
-    if (filterNotReady) {
-      alert("Aplicá los filtros antes de programar");
-      return;
-    }
-    if (!scheduledAt) {
-      alert("Configurá una fecha y hora de envío antes de programar");
-      return;
-    }
-    startTransition(async () => {
-      const fd = buildFormData();
-      await createAndScheduleCampaign(fd);
-    });
-  }
-
-  async function handleScheduleExisting() {
-    if (!campaign) return;
-    startTransition(async () => {
-      await scheduleCampaign(campaign.id);
-    });
-  }
-
-  const minDatetime = toLocalDatetimeValue(new Date().toISOString());
-
-  // Recipient count for meta info
-  const recipientLabel =
-    recipientMode === "all"
-      ? "Todos los activos"
-      : recipientMode === "filter"
-        ? filterApplied
-          ? `${filterSelectedIds.size} de ${filteredCount} por filtro`
-          : "Filtros sin aplicar"
-        : `${selectedIds.size} seleccionados`;
 
   return (
     <div className="space-y-6">
@@ -335,17 +182,19 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nombre de la campaña <span className="text-red-500">*</span>
+              Nombre de la campaña
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ej: Promo Marzo 2026"
+              placeholder="Opcional — si lo dejás vacío usamos la fecha"
               disabled={!isDraft}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 disabled:bg-gray-50 disabled:text-gray-500"
             />
-            <p className="mt-1 text-xs text-gray-400">Referencia interna, no se envía al cliente.</p>
+            <p className="mt-1 text-xs text-gray-400">
+              Si lo dejás vacío se autocompleta con la fecha y hora de creación.
+            </p>
           </div>
 
           {/* Image */}
@@ -406,156 +255,10 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
             />
           </div>
 
-          {/* Recipients — three modes */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Destinatarios</label>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="recipient_mode"
-                  checked={recipientMode === "all"}
-                  onChange={() => setRecipientMode("all")}
-                  disabled={!isDraft}
-                  className="h-4 w-4 text-gray-900"
-                />
-                <span className="text-sm text-gray-700">Todos los clientes activos</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="recipient_mode"
-                  checked={recipientMode === "filter"}
-                  onChange={() => setRecipientMode("filter")}
-                  disabled={!isDraft}
-                  className="h-4 w-4 text-gray-900"
-                />
-                <span className="text-sm text-gray-700">Filtrar por criterios</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="recipient_mode"
-                  checked={recipientMode === "manual"}
-                  onChange={() => setRecipientMode("manual")}
-                  disabled={!isDraft}
-                  className="h-4 w-4 text-gray-900"
-                />
-                <span className="text-sm text-gray-700">Seleccionar manualmente</span>
-              </label>
-            </div>
-
-            {/* Filter mode */}
-            {recipientMode === "filter" && (
-              <div className="mt-3 space-y-3">
-                <CampaignFilterPanel
-                  criteria={filterCriteria}
-                  onChange={(c) => {
-                    setFilterCriteria(c);
-                    setFilterApplied(false);
-                  }}
-                  onApply={handleApplyFilters}
-                  isPending={isFiltering}
-                  disabled={!isDraft}
-                />
-              </div>
-            )}
-
-            {/* Manual mode */}
-            {recipientMode === "manual" && (
-              <div className="mt-3 space-y-2">
-                <div id={comboboxId} className="relative">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    role="combobox"
-                    aria-expanded={comboboxOpen}
-                    aria-controls={listboxId}
-                    aria-activedescendant={
-                      activeIndex >= 0 && dropdownClients[activeIndex]
-                        ? `${comboboxId}-option-${dropdownClients[activeIndex].id}`
-                        : undefined
-                    }
-                    value={comboboxQuery}
-                    onChange={(e) => {
-                      setComboboxQuery(e.target.value);
-                      setComboboxOpen(true);
-                      setActiveIndex(-1);
-                    }}
-                    onFocus={() => setComboboxOpen(true)}
-                    onKeyDown={handleComboboxKeyDown}
-                    placeholder="Buscar cliente..."
-                    disabled={!isDraft}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 disabled:bg-gray-50 disabled:text-gray-500"
-                    autoComplete="off"
-                  />
-                  {comboboxOpen && (
-                    <ul
-                      id={listboxId}
-                      role="listbox"
-                      className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-56 overflow-y-auto divide-y divide-gray-100"
-                    >
-                      {dropdownClients.length === 0 ? (
-                        <li className="px-3 py-3 text-sm text-gray-400 text-center">Sin resultados</li>
-                      ) : (
-                        dropdownClients.map((c, idx) => (
-                          <li
-                            key={c.id}
-                            id={`${comboboxId}-option-${c.id}`}
-                            role="option"
-                            aria-selected={idx === activeIndex}
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              selectClient(c.id);
-                            }}
-                            onMouseEnter={() => setActiveIndex(idx)}
-                            className={`flex items-center justify-between px-3 py-2 cursor-pointer text-sm ${
-                              idx === activeIndex ? "bg-gray-100" : "hover:bg-gray-50"
-                            }`}
-                          >
-                            <span className="text-gray-800">
-                              {c.first_name} {c.last_name}
-                              <span className="ml-2 text-gray-400 text-xs">{c.phone}</span>
-                            </span>
-                          </li>
-                        ))
-                      )}
-                    </ul>
-                  )}
-                </div>
-
-                {selectedClients.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedClients.map((c) => (
-                      <span
-                        key={c.id}
-                        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border border-gray-200 bg-gray-100 text-gray-700"
-                      >
-                        {c.first_name} {c.last_name}
-                        {isDraft && (
-                          <button
-                            type="button"
-                            onClick={() => removeClient(c.id)}
-                            className="ml-0.5 rounded-full hover:bg-gray-300 hover:text-gray-900 leading-none"
-                            aria-label={`Quitar ${c.first_name} ${c.last_name}`}
-                          >
-                            ×
-                          </button>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <p className="text-xs text-gray-500">{selectedIds.size} seleccionado{selectedIds.size !== 1 ? "s" : ""}</p>
-              </div>
-            )}
-          </div>
-
           {/* Scheduled at */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Fecha y hora de envío (hora Argentina)
+              Fecha y hora de envío
             </label>
             <input
               type="datetime-local"
@@ -565,9 +268,19 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
               disabled={!isDraft}
               className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 disabled:bg-gray-50 disabled:text-gray-500"
             />
-            <p className="mt-1 text-xs text-gray-400">
-              Timezone: {LOCAL_TIMEZONE} (UTC-3). Si elegís una hora pasada, el envío será inmediato.
-            </p>
+            <p className="mt-1 text-xs text-gray-400">Timezone: {LOCAL_TIMEZONE}.</p>
+          </div>
+
+          {/* Recipients — Excel table */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Destinatarios</label>
+            <CampaignRecipientsTable
+              clients={selectedClients}
+              disabled={!isDraft}
+              onAdd={handleAddClient}
+              onRemove={handleRemoveClient}
+              onUpdate={handleUpdateClient}
+            />
           </div>
 
           {/* Action buttons */}
@@ -576,7 +289,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
               <button
                 type="button"
                 onClick={handleSaveDraft}
-                disabled={isPending || !name.trim()}
+                disabled={isPending}
                 className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 {isPending ? "Guardando..." : "Guardar borrador"}
@@ -594,7 +307,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
                 <button
                   type="button"
                   onClick={handleScheduleNew}
-                  disabled={isPending || !name.trim() || !scheduledAt}
+                  disabled={isPending || !scheduledAt}
                   className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors disabled:opacity-50"
                 >
                   {isPending ? "Procesando..." : "Programar envío"}
@@ -609,7 +322,7 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
           <p className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-3">Vista previa</p>
           <div
             className="rounded-2xl p-4 max-w-xs mx-auto shadow-sm"
-            style={{ backgroundColor: "#E5DDD5", backgroundImage: "none" }}
+            style={{ backgroundColor: "#E5DDD5" }}
           >
             <div
               className="rounded-2xl rounded-tl-none overflow-hidden max-w-[280px] ml-auto shadow"
@@ -626,7 +339,9 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
               <div className="px-3 py-2">
                 {body ? (
                   <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-snug">
-                    {"Hola {nombre}, te escribimos desde VAIG Depilación Láser.\n\n"}{body}{"\n\nCualquier consulta estamos a tu disposición."}
+                    {"Hola {nombre}, te escribimos desde VAIG Depilación Láser.\n\n"}
+                    {body}
+                    {"\n\nCualquier consulta estamos a tu disposición."}
                   </p>
                 ) : (
                   <p className="text-sm text-gray-400 italic">Tu mensaje aparecerá aquí...</p>
@@ -651,7 +366,9 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
           <div className="mt-4 rounded-md bg-gray-50 border border-gray-200 p-3 space-y-1 text-xs text-gray-500">
             <div className="flex justify-between">
               <span>Destinatarios</span>
-              <span className="font-medium text-gray-700">{recipientLabel}</span>
+              <span className="font-medium text-gray-700">
+                {selectedClients.length} seleccionado{selectedClients.length !== 1 ? "s" : ""}
+              </span>
             </div>
             {scheduledAt && (
               <div className="flex justify-between">
@@ -671,18 +388,6 @@ export default function CampaignForm({ clients, campaign }: CampaignFormProps) {
           </div>
         </div>
       </div>
-
-      {/* Filter preview — full width below the grid */}
-      {recipientMode === "filter" && filterApplied && (
-        <CampaignFilterPreview
-          clients={filteredClients}
-          totalCount={filteredCount}
-          loading={isFiltering}
-          selectedIds={filterSelectedIds}
-          onSelectionChange={setFilterSelectedIds}
-          disabled={!isDraft}
-        />
-      )}
     </div>
   );
 }

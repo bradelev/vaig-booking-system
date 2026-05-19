@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { v2 as cloudinary } from "cloudinary";
-import { localInputToISO } from "@/lib/timezone";
+import { localInputToISO, dateToLocalInput, LOCAL_TIMEZONE } from "@/lib/timezone";
+import { normalizePhone } from "@/lib/phone";
 
 if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
   throw new Error("Missing required Cloudinary environment variables");
@@ -18,6 +19,12 @@ cloudinary.config({
 
 async function getDb() {
   return createClient();
+}
+
+function defaultCampaignName(): string {
+  const local = dateToLocalInput(new Date(), LOCAL_TIMEZONE);
+  // local is "YYYY-MM-DDTHH:mm" → "Campaña YYYY-MM-DD HH:mm"
+  return `Campaña ${local.replace("T", " ")}`;
 }
 
 function parseFilterCriteria(formData: FormData): CampaignFilterCriteria | null {
@@ -43,8 +50,8 @@ export async function createCampaign(formData: FormData) {
   const db = await getDb();
 
   const targetAll = formData.get("target_all") === "true";
-  const name = (formData.get("name") as string)?.trim();
-  if (!name) throw new Error("El nombre de la campaña es requerido");
+  const rawName = (formData.get("name") as string)?.trim();
+  const name = rawName || defaultCampaignName();
 
   const body = (formData.get("body") as string) || "";
   const imageUrl = (formData.get("image_url") as string) || null;
@@ -76,8 +83,8 @@ export async function createAndScheduleCampaign(formData: FormData) {
   const db = await getDb();
 
   const targetAll = formData.get("target_all") === "true";
-  const name = (formData.get("name") as string)?.trim();
-  if (!name) throw new Error("El nombre de la campaña es requerido");
+  const rawName2 = (formData.get("name") as string)?.trim();
+  const name = rawName2 || defaultCampaignName();
 
   const body = (formData.get("body") as string) || "";
   const imageUrl = (formData.get("image_url") as string) || null;
@@ -130,8 +137,8 @@ export async function updateCampaign(id: string, formData: FormData) {
   if (existing.status !== "draft") throw new Error("Solo se pueden editar campañas en estado borrador");
 
   const targetAll = formData.get("target_all") === "true";
-  const name = (formData.get("name") as string)?.trim();
-  if (!name) throw new Error("El nombre de la campaña es requerido");
+  const rawName3 = (formData.get("name") as string)?.trim();
+  const name = rawName3 || defaultCampaignName();
 
   const body = (formData.get("body") as string) || "";
   const imageUrl = (formData.get("image_url") as string) || null;
@@ -361,6 +368,72 @@ export async function updateClientPhone(clientId: string, phone: string): Promis
   const db = await getDb();
   const { error } = await db.from("clients").update({ phone }).eq("id", clientId);
   if (error) throw new Error(error.message);
+}
+
+export async function updateClientInline(
+  clientId: string,
+  data: { first_name?: string; last_name?: string; phone?: string }
+): Promise<void> {
+  const db = await getDb();
+  const patch: Record<string, string> = {};
+  if (data.first_name !== undefined) patch.first_name = data.first_name.trim();
+  if (data.last_name !== undefined) patch.last_name = data.last_name.trim();
+  if (data.phone !== undefined) patch.phone = normalizePhone(data.phone);
+  if (Object.keys(patch).length === 0) return;
+  const { error } = await db.from("clients").update(patch).eq("id", clientId);
+  if (error) throw new Error(error.message);
+}
+
+export async function quickCreateClientForCampaign(data: {
+  first_name: string;
+  last_name?: string;
+  phone: string;
+}): Promise<{ id: string; first_name: string; last_name: string | null; phone: string }> {
+  const db = await getDb();
+  const phone = normalizePhone(data.phone);
+
+  const { data: existing } = await db
+    .from("clients")
+    .select("id, first_name, last_name, phone")
+    .eq("phone", phone)
+    .maybeSingle();
+
+  if (existing) return existing as { id: string; first_name: string; last_name: string | null; phone: string };
+
+  const { data: created, error } = await db
+    .from("clients")
+    .insert({ first_name: data.first_name.trim(), last_name: data.last_name?.trim() ?? null, phone, source: "manual" })
+    .select("id, first_name, last_name, phone")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      const { data: fallback } = await db
+        .from("clients")
+        .select("id, first_name, last_name, phone")
+        .eq("phone", phone)
+        .single();
+      return fallback as { id: string; first_name: string; last_name: string | null; phone: string };
+    }
+    throw new Error(error.message);
+  }
+
+  return created as { id: string; first_name: string; last_name: string | null; phone: string };
+}
+
+export async function searchClientsForCampaign(
+  query: string
+): Promise<{ id: string; first_name: string; last_name: string | null; phone: string }[]> {
+  if (query.trim().length < 2) return [];
+  const db = await getDb();
+  const { data, error } = await db
+    .from("clients")
+    .select("id, first_name, last_name, phone")
+    .ilike("nombre_normalizado", `%${query.toLowerCase()}%`)
+    .eq("is_blocked", false)
+    .limit(10);
+  if (error) return [];
+  return (data ?? []) as { id: string; first_name: string; last_name: string | null; phone: string }[];
 }
 
 export async function uploadCampaignImage(formData: FormData): Promise<{ url: string }> {
