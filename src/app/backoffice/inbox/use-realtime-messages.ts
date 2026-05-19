@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export interface RealtimeMessage {
@@ -21,17 +21,20 @@ export function useRealtimeMessages(
   onInsert: MessageHandler,
   filter?: { phone?: string }
 ) {
+  const instanceId = useId();
   const handlerRef = useRef<MessageHandler>(onInsert);
 
   useEffect(() => {
     handlerRef.current = onInsert;
-  });
+  }, [onInsert]);
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
+    // Each hook instance gets a unique channel name to avoid Supabase reusing
+    // a shared channel across concurrent consumers (e.g. MobileLayout + ConversationList).
     const channelName = filter?.phone
-      ? `messages:phone=${filter.phone}`
-      : "messages:all";
+      ? `messages:phone=${filter.phone}:${instanceId}`
+      : `messages:all:${instanceId}`;
 
     const channel = supabase
       .channel(channelName)
@@ -52,5 +55,5 @@ export function useRealtimeMessages(
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [filter?.phone]);
+  }, [filter?.phone, instanceId]);
 }
