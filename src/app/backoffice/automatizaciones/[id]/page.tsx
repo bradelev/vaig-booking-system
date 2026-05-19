@@ -4,7 +4,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ConfirmDeleteForm } from "@/components/backoffice/confirm-delete-form";
-import { scheduleCampaign, cancelSchedule, deleteCampaign, cloneCampaign } from "@/actions/campaigns";
+import { scheduleCampaign, cancelSchedule, deleteCampaign, cloneCampaign, retryFailedRecipients } from "@/actions/campaigns";
+import { Tooltip } from "@/components/ui/tooltip";
 
 export const metadata: Metadata = { title: "Campaña" };
 
@@ -128,6 +129,16 @@ export default async function CampanaDetallePage({
                 className="rounded-md border border-yellow-300 px-3 py-1.5 text-sm text-yellow-700 hover:bg-yellow-50 transition-colors"
               >
                 Cancelar programación
+              </button>
+            </form>
+          )}
+          {(campaign.failed_count ?? 0) > 0 && (campaign.status === "failed" || campaign.status === "completed") && (
+            <form action={retryFailedRecipients.bind(null, id)} className="inline">
+              <button
+                type="submit"
+                className="rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 transition-colors"
+              >
+                Reintentar fallidos ({campaign.failed_count})
               </button>
             </form>
           )}
@@ -262,9 +273,11 @@ export default async function CampanaDetallePage({
                           })}
                         </span>
                       ) : r.error ? (
-                        <span className="text-xs text-red-600" title={r.error}>
-                          ✗ Error
-                        </span>
+                        <Tooltip content={r.error} side="left" className="max-w-xs whitespace-normal text-left">
+                          <span className="text-xs text-red-600 cursor-help underline decoration-dotted">
+                            ✗ Error
+                          </span>
+                        </Tooltip>
                       ) : (
                         <span className="text-xs text-gray-400">Pendiente</span>
                       )}

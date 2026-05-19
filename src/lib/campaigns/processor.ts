@@ -77,8 +77,23 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
       // Update total count
       await db.from("campaigns").update({ total_recipients: totalRecipients }).eq("id", campaign.id);
 
+      // Load already-sent recipients to make processing idempotent (safe for retry)
+      const { data: sentRows } = await db
+        .from("campaign_recipients")
+        .select("client_id")
+        .eq("campaign_id", campaign.id)
+        .not("sent_at", "is", null);
+      const alreadySent = new Set(
+        ((sentRows ?? []) as { client_id: string }[]).map((r) => r.client_id)
+      );
+
       // Send messages
       for (const recipient of recipients) {
+        if (alreadySent.has(recipient.id)) {
+          sentCount++;
+          continue;
+        }
+
         // Skip placeholder phones (historical/migrated clients without real phone)
         if (
           recipient.phone.startsWith("historico_") ||
@@ -134,6 +149,7 @@ export async function processDueCampaigns(): Promise<{ processed: number; errors
           await db.from("campaign_recipients").upsert({
             campaign_id: campaign.id,
             client_id: recipient.id,
+            status: "failed",
             error: errMsg,
           });
         }

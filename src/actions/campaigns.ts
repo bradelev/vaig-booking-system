@@ -284,6 +284,52 @@ export async function cloneCampaign(id: string) {
   redirect(`/backoffice/automatizaciones/${clone.id}/editar`);
 }
 
+export async function retryFailedRecipients(id: string) {
+  const db = await getDb();
+
+  const { data: rawCampaign, error: fetchErr } = await db
+    .from("campaigns")
+    .select("status, failed_count")
+    .eq("id", id)
+    .single();
+
+  if (fetchErr) throw new Error(fetchErr.message);
+  const campaign = rawCampaign as { status: string; failed_count: number | null };
+
+  if (!["failed", "completed"].includes(campaign.status)) {
+    throw new Error("Solo se puede reintentar una campaña completada o fallida");
+  }
+  if (!campaign.failed_count || campaign.failed_count === 0) {
+    throw new Error("No hay destinatarios fallidos para reintentar");
+  }
+
+  // Reset only failed recipients (null sent_at + non-null error) so the processor re-sends them.
+  // Recipients with sent_at are preserved — the processor's alreadySent guard skips them.
+  const { error: resetErr } = await db
+    .from("campaign_recipients")
+    .update({ status: "pending", error: null, error_code: null })
+    .eq("campaign_id", id)
+    .is("sent_at", null)
+    .not("error", "is", null);
+
+  if (resetErr) throw new Error(resetErr.message);
+
+  const { error: updErr } = await db
+    .from("campaigns")
+    .update({
+      status: "scheduled",
+      scheduled_at: new Date().toISOString(),
+      completed_at: null,
+    })
+    .eq("id", id);
+
+  if (updErr) throw new Error(updErr.message);
+
+  revalidatePath("/backoffice/automatizaciones");
+  revalidatePath(`/backoffice/automatizaciones/${id}`);
+  redirect(`/backoffice/automatizaciones/${id}`);
+}
+
 export interface CampaignFilterCriteria {
   segmentos?: string[];
   categorias?: string[];
